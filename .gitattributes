@@ -1,0 +1,33 @@
+# Normalise line endings so .meta GUID files and release archives are identical on every machine.
+* text=auto eol=lf
+
+*.cs        text eol=lf
+*.shader    text eol=lf
+*.cginc     text eol=lf
+*.asmdef    text eol=lf
+*.meta      text eol=lf
+*.md        text eol=lf
+*.json      text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.mjs       text eol=lf
+*.html      text eol=lf
+*.css       text eol=lf
+*.js        text eol=lf
+*.svg       text eol=lf
+
+*.png          binary
+*.jpg          binary
+*.jpeg         binary
+*.gif          binary
+*.webp         binary
+*.ico          binary
+*.psd          binary
+*.mp4          binary
+*.webm         binary
+*.woff         binary
+*.woff2        binary
+*.ttf          binary
+*.otf          binary
+*.zip          binary
+*.unitypackage binary

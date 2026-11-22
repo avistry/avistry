@@ -1,0 +1,84 @@
+name: Changelog check
+
+# Every pull request that changes the tool (Editor/ or package.json) must add a line under
+# "## [Unreleased]" in CHANGELOG.md, so the release notes stay complete. Add the label "no-changelog" to skip.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check for a CHANGELOG line
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          case ",${LABELS}," in
+            *,no-changelog,*) echo "Label no-changelog is set: skipping."; exit 0 ;;
+          esac
+
+          CHANGED=$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}")
+          if ! echo "${CHANGED}" | grep -qE '^(Editor/|package\.json$)'; then
+            echo "No changes in Editor/ or package.json: nothing to add to the CHANGELOG."
+            exit 0
+          fi
+
+          # A release PR (changelog-release.mjs) moves [Unreleased] into a new "## [x.y.z]" section: that counts.
+          NEW_SECTION=$(git diff -U0 "${BASE_SHA}...${HEAD_SHA}" -- CHANGELOG.md | grep -cE '^\+## \[[0-9]+\.[0-9]+\.[0-9]+' || true)
+          if [ "${NEW_SECTION:-0}" -gt 0 ]; then
+            echo "CHANGELOG.md has a new release section: nothing more to add."
+            exit 0
+          fi
+
+          # Added lines inside the "## [Unreleased]" section only (stops at the next "## " heading).
+          ADDED=$(git diff -U0 "${BASE_SHA}...${HEAD_SHA}" -- CHANGELOG.md | node -e '
+            const lines = require("fs").readFileSync(0, "utf8").split(/\r?\n/);
+            const head = require("child_process").execSync(`git show ${process.env.HEAD_SHA}:CHANGELOG.md`, { encoding: "utf8", maxBuffer: 1 << 26 }).split(/\r?\n/);
+            const s = head.findIndex((l) => /^##\s+\[Unreleased\]/i.test(l));
+            let e = head.findIndex((l, i) => i > s && /^##\s/.test(l) && !/^###/.test(l));
+            if (s < 0) process.exit(0);
+            if (e < 0) e = head.length;
+            let n = 0, cur = 0;
+            for (const l of lines) {
+              const h = /^@@ -\d+(?:,\d+)? \+(\d+)/.exec(l);
+              if (h) { cur = +h[1]; continue; }
+              if (l.startsWith("+") && !l.startsWith("+++")) {
+                const idx = cur - 1;
+                if (idx > s && idx < e && l.slice(1).trim() && !/^\+###/.test(l)) n++;
+                cur++;
+              } else if (!l.startsWith("-") && !l.startsWith("\\")) cur++;
+            }
+            console.log(n);
+          ')
+
+          if [ "${ADDED:-0}" -gt 0 ]; then
+            echo "Found ${ADDED} new line(s) under [Unreleased]. Thank you!"
+            exit 0
+          fi
+
+          echo "::error file=CHANGELOG.md::This pull request changes the tool but adds nothing under \"## [Unreleased]\" in CHANGELOG.md."
+          {
+            echo "### Please add a line to CHANGELOG.md"
+            echo
+            echo "This pull request changes \`Editor/\` or \`package.json\`, but \`CHANGELOG.md\` has no new line under \`## [Unreleased]\`."
+            echo
+            echo "1. Open \`CHANGELOG.md\` and find \`## [Unreleased]\` near the top."
+            echo "2. Under \`### Added\`, \`### Changed\` or \`### Fixed\`, add one plain line that says what a user will notice, for example:"
+            echo "   \`- Brush size now shows in the Scene bar.\`"
+            echo "3. Commit and push. This check runs again by itself."
+            echo
+            echo "If users will not notice the change (a typo in a comment, a test), ask a maintainer to add the \`no-changelog\` label."
+          } >> "${GITHUB_STEP_SUMMARY}"
+          exit 1

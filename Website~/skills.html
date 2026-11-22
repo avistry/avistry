@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en" data-page="learn" data-title-key="sk.meta.title">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avistry skill tree: learn Unity as you go</title>
+<meta name="description" content="A free course inside Avistry: 40 short skills in 6 tiers, from finding the Hierarchy to baking maps. Nothing is locked." data-i18n-attr="content:sk.meta.description">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#141218">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Avistry skill tree: learn Unity as you go">
+<meta property="og:url" content="https://avistry.github.io/avistry/skills.html">
+<meta property="og:image" content="https://avistry.github.io/avistry/media/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://avistry.github.io/avistry/skills.html">
+<link rel="icon" type="image/svg+xml" href="media/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="media/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="media/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&amp;family=Figtree:wght@400;600&amp;display=swap">
+<script>
+(function () {
+  var root = document.documentElement;
+  root.classList.add('js');
+  try {
+    var theme = localStorage.getItem('ats-theme');
+    root.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+  } catch (e) {}
+})();
+</script>
+<style>html{background:#141218}html[data-theme="light"]{background:#F3F1F6}</style>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="v4 sub-page page-learn">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-check" viewBox="0 0 16 16"><path d="m3 8.5 3.2 3.3L13 4.5"/></symbol>
+    <symbol id="i-dot" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.5"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 20 20"><path d="M10 2.5 18 16.5H2z"/><path d="M10 8v4M10 14v.5"/></symbol>
+    <symbol id="i-fix" viewBox="0 0 16 16"><path d="M3 8a5 5 0 0 1 9-3M13 8a5 5 0 0 1-9 3"/><path d="M12 2v3h-3M4 14v-3h3"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.6"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.300 4.300l1.400 1.400M14.300 14.300l1.400 1.400M4.300 15.700l1.400-1.400M14.300 5.700l1.400-1.400"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 20 20"><path d="M16.500 11.800A6.800 6.800 0 0 1 8.200 3.500a6.800 6.800 0 1 0 8.300 8.300z"/></symbol>
+    <symbol id="i-gh" viewBox="0 0 20 20"><path d="M10 1.800a8.200 8.200 0 0 0-2.600 16c.4.100.6-.2.600-.4v-1.500c-2.300.5-2.800-1-2.800-1-.4-1-.9-1.200-.9-1.200-.8-.5.100-.5.100-.5.800.1 1.300.9 1.300.9.700 1.300 1.900.9 2.400.7.100-.5.300-.9.500-1.100-1.800-.2-3.700-.9-3.700-4 0-.9.300-1.600.8-2.100-.1-.2-.4-1 .1-2.100 0 0 .7-.2 2.200.8a7.700 7.700 0 0 1 4 0c1.500-1 2.200-.8 2.200-.8.400 1.100.2 1.900.1 2.100.5.600.8 1.300.8 2.100 0 3.100-1.900 3.800-3.700 4 .3.300.6.800.6 1.500v2.200c0 .2.200.5.600.4A8.200 8.200 0 0 0 10 1.800z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 20 20"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M13 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 20 20"><path d="M10 2.500 16 4.800V10c0 3.400-2.400 5.800-6 7.500C6.400 15.800 4 13.400 4 10V4.800z"/><path d="m7.200 10 2 2 3.600-4"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 20 20"><path d="M7.500 4.500 3.500 8.500l4 4"/><path d="M3.500 8.500H12a4.500 4.500 0 0 1 0 9H8"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 20 20"><path d="M4 10h12M11 5l5 5-5 5"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main" data-i18n="a11y.skip">Skip to content</a>
+
+<header class="hdr" id="hdr">
+  <div class="hdr-in">
+    <a class="brand" href="index.html" aria-label="Avistry">
+      <img class="lockup lockup-dark" src="media/lockup.svg" width="130" height="40" alt="" decoding="async">
+      <img class="lockup lockup-light" src="media/lockup-light.svg" width="130" height="40" alt="" decoding="async">
+    </a>
+    <nav class="nav" id="nav" aria-label="Main" data-i18n-attr="aria-label:a11y.nav">
+      <a href="features.html" data-i18n="nav.features">Features</a>
+      <a href="gallery.html" data-i18n="nav.gallery">Gallery</a>
+      <a href="learn.html" aria-current="true" data-i18n="nav.learn">Learn</a>
+      <a href="about.html" data-i18n="nav.about">About</a>
+    </nav>
+    <a class="btn btn-primary btn-sm hdr-get" href="index.html#install" data-i18n="nav.get">Get it</a>
+    <button type="button" class="menu-btn" id="menu-btn" aria-expanded="false" aria-controls="sheet"><span data-i18n="nav.menu">Menu</span></button>
+  </div>
+</header>
+
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Menu" data-i18n-attr="aria-label:nav.menu" hidden>
+  <div class="sheet-in">
+    <nav class="sheet-nav" aria-label="Main" data-i18n-attr="aria-label:a11y.nav">
+      <a href="index.html" data-i18n="nav.home">Home</a>
+      <a href="features.html" data-i18n="nav.features">Features</a>
+      <a href="gallery.html" data-i18n="nav.gallery">Gallery</a>
+      <a href="learn.html" aria-current="true" data-i18n="nav.learn">Learn</a>
+      <a href="about.html" data-i18n="nav.about">About</a>
+    </nav>
+    <div class="tools" data-where="sheet">
+      <div class="langs" role="group" aria-label="Language" data-i18n-attr="aria-label:a11y.lang">
+        <button type="button" data-lang="en" lang="en" aria-pressed="true">English</button>
+        <button type="button" data-lang="ja" lang="ja" aria-pressed="false">日本語</button>
+        <button type="button" data-lang="ko" lang="ko" aria-pressed="false">한국어</button>
+        <button type="button" data-lang="zh-CN" lang="zh-CN" aria-pressed="false">中文 (简体)</button>
+      </div>
+      <button type="button" class="theme-toggle" aria-label="Light mode"><svg class="ic ic-sun" aria-hidden="true" focusable="false"><use href="#i-sun"/></svg><svg class="ic ic-moon" aria-hidden="true" focusable="false"><use href="#i-moon"/></svg><span class="theme-text">Light mode</span></button>
+    </div>
+  </div>
+</div>
+
+
+<main id="main">
+  <section class="stage surface-dark pg-hero" id="top">
+    <div class="wrap pg-hero-in">
+      <h1 class="h-display" data-i18n="sk.title">Learn Unity as you go.</h1>
+      <p class="sub" data-i18n="sk.lead">Forty skills in six tiers, from finding the Hierarchy to baking maps. Each is marked done when you do it in the tool. Nothing is locked.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary btn-lg" href="#in-unity" data-i18n="sk.cta.how">How to start it in Unity</a>
+        <a class="btn btn-outline btn-lg" href="glossary.html" data-i18n="lb.glossary">Open the glossary</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="in-unity" aria-labelledby="in-unity-title">
+    <div class="wrap sk-how">
+      <h2 class="h-display" id="in-unity-title" data-i18n="sk.how.title">Start it in Unity.</h2>
+      <ol class="steps-list sk-steps">
+        <li data-i18n-html="sk.how.1">Open <span class="path">Tools &gt; Avistry &gt; Textures</span>.</li>
+        <li data-i18n-html="sk.how.2">Press <strong>Start the skill tree</strong> in the New to Unity? note at the top of the window. It opens the first thing to try.</li>
+        <li data-i18n-html="sk.how.3">Or open the <strong>?</strong> Help menu and choose <strong>Glossary and skill tree</strong>. Pick a skill, read the card and press <strong>Show me</strong> to try it.</li>
+      </ol>
+      <p class="small sk-fine" data-i18n="sk.how.note">Progress is kept on your computer only, with medals for each tier. Reset skill progress clears it.</p>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="wrap">
+      <p class="pg-note" id="gl-note" hidden data-i18n="gl.note.en">The glossary text is only written in English so far. The page around it is translated.</p>
+      <div class="sk-tiers" id="sk-root" aria-label="Skill tree" data-i18n-attr="aria-label:sk.list">
+        <noscript><p data-i18n="sk.nojs">This page needs JavaScript to show the skills. The same course is in the tool under Help.</p></noscript>
+      </div>
+      <div class="pg-cta">
+        <a class="btn btn-primary btn-lg" href="glossary.html" data-i18n="lb.glossary">Open the glossary</a>
+        <a class="btn btn-outline btn-lg" href="index.html" data-i18n="pg.home">Back to the front page</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <div class="foot-cols">
+      <nav class="foot-links" aria-label="Project" data-i18n-attr="aria-label:footer.project">
+        <a href="https://github.com/avistry/avistry" data-i18n="nav.github">GitHub</a>
+        <a href="https://github.com/avistry/avistry/releases" data-i18n="footer.releases">Releases</a>
+        <a href="https://discord.gg/PM8uC2UnT" data-i18n="footer.discord">Discord</a>
+        <a href="glossary.html" data-i18n="nav.glossary">Glossary</a>
+        <a href="skills.html" data-i18n="nav.skills">Skill tree</a>
+        <a href="learn.html" data-i18n="footer.learn">Learn</a>
+        <a href="https://github.com/avistry/avistry/issues" data-i18n="footer.issues">Report an issue</a>
+      </nav>
+      <nav class="foot-links" aria-label="Legal" data-i18n-attr="aria-label:footer.legal">
+        <a href="https://github.com/avistry/avistry/blob/main/LICENSE" data-i18n="footer.license">MIT licence</a>
+        <a href="https://github.com/avistry/avistry/blob/main/Third%20Party%20Notices.md" data-i18n="footer.notices">Third-party notices</a>
+        <a href="https://github.com/avistry/avistry/blob/main/CHANGELOG.md" data-i18n="footer.changelog">Changelog</a>
+      </nav>
+    </div>
+    <p class="foot-promise" data-i18n="footer.promise">No tracking. Update check is opt-in.</p>
+    <div class="tools" data-where="foot">
+      <div class="langs" role="group" aria-label="Language" data-i18n-attr="aria-label:a11y.lang">
+        <button type="button" data-lang="en" lang="en" aria-pressed="true">English</button>
+        <button type="button" data-lang="ja" lang="ja" aria-pressed="false">日本語</button>
+        <button type="button" data-lang="ko" lang="ko" aria-pressed="false">한국어</button>
+        <button type="button" data-lang="zh-CN" lang="zh-CN" aria-pressed="false">中文 (简体)</button>
+      </div>
+      <button type="button" class="theme-toggle" aria-label="Light mode"><svg class="ic ic-sun" aria-hidden="true" focusable="false"><use href="#i-sun"/></svg><svg class="ic ic-moon" aria-hidden="true" focusable="false"><use href="#i-moon"/></svg><span class="theme-text">Light mode</span></button>
+    </div>
+    <p class="foot-small" data-i18n-html="credit.html">Avatar shown: <a href="https://godfall.club/collections/avatars-assets/products/godmagician" rel="noopener">GodMagician by Godfall</a></p>
+    <p class="foot-small" data-i18n="footer.disclaimer">Not affiliated with VRChat Inc., Unity Technologies, Adobe, Poiyomi or lilToon.</p>
+  </div>
+</footer>
+
+<div class="cta-bar" id="cta-bar" aria-hidden="true">
+  <a class="btn btn-primary" href="vcc://vpm/addRepo?url=https://avistry.github.io/avistry/index.json" tabindex="-1" data-i18n="cta.vcc">Get it in VCC</a>
+  <a class="cta-alt js-download" href="https://github.com/avistry/avistry/releases/latest" tabindex="-1" data-i18n="cta.pkg">.unitypackage</a>
+</div>
+
+<p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
+
+<script src="app.js" defer></script>
+<script src="learn.js" defer></script>
+</body>
+</html>

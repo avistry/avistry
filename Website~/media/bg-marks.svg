@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="640" height="640" viewBox="0 0 640 640">
+  <defs>
+    <path id="m" fill="#43DCFF" fill-rule="evenodd" d="M52 330C50 240 66 140 92 40Q100 18 118 30L190 130Q206 152 256 152Q306 152 322 130L394 30Q412 18 420 40C446 140 462 240 460 330C462 410 370 456 256 456C142 456 50 410 52 330ZM216.9 179.1Q220 170 229.6 170L282.4 170Q292 170 295.1 179.1L378.2 424.6Q382 436 370 436L324 436Q312 436 308.2 424.6L300.6 402.3Q298.5 396 291.9 396L220.1 396Q213.5 396 211.4 402.3L203.8 424.6Q200 436 188 436L142 436Q130 436 133.8 424.6ZM253.9 276.7Q256 270.5 258.1 276.7L277.6 334.3Q279.5 340 273.5 340L238.5 340Q232.5 340 234.4 334.3Z"/>
+  </defs>
+  <use xlink:href="#m" href="#m" transform="translate(60 70) rotate(-12) scale(0.06)"/>
+  <use xlink:href="#m" href="#m" transform="translate(300 40) rotate(9) scale(0.035)"/>
+  <use xlink:href="#m" href="#m" transform="translate(500 150) rotate(-4) scale(0.05)"/>
+  <use xlink:href="#m" href="#m" transform="translate(180 250) rotate(16) scale(0.04)"/>
+  <use xlink:href="#m" href="#m" transform="translate(410 330) rotate(-18) scale(0.07)"/>
+  <use xlink:href="#m" href="#m" transform="translate(40 430) rotate(6) scale(0.045)"/>
+  <use xlink:href="#m" href="#m" transform="translate(250 500) rotate(-8) scale(0.03)"/>
+  <use xlink:href="#m" href="#m" transform="translate(560 520) rotate(14) scale(0.04)"/>
+</svg>

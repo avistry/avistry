@@ -1,0 +1,24 @@
+{
+  "name": "com.avistry.toolkit",
+  "displayName": "Avistry",
+  "version": "0.2.0",
+  "unity": "2022.3",
+  "description": "Avistry, an avatar toolkit for VRChat creators. Starts with textures: edit avatar textures and materials inside Unity, with recolour (Poiyomi / lilToon aware), select UV islands, paint, fill, gradients and layers, then save a new PNG. Editor only; nothing is added to your avatar.",
+  "author": {
+    "name": "Avistry contributors",
+    "url": "https://github.com/avistry"
+  },
+  "license": "MIT",
+  "url": "https://github.com/avistry/avistry",
+  "documentationUrl": "https://avistry.github.io/avistry/",
+  "changelogUrl": "https://github.com/avistry/avistry/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/avistry/avistry/blob/main/LICENSE",
+  "keywords": ["vrchat", "avatar", "texture", "paint", "recolour", "poiyomi", "liltoon"],
+  "vpmDependencies": {},
+  "legacyFolders": {
+    "Assets\\AvatarTextureStudio\\Editor": ""
+  },
+  "legacyFiles": {
+    "Assets\\AvatarTextureStudio\\README.md": ""
+  }
+}

@@ -1,0 +1,56 @@
+name: Idea (from Discord or anywhere)
+description: Share an idea for Avistry (formerly Avatar Texture Studio). A maintainer reads every one.
+title: "[Idea] "
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Describe the problem first; the solution can come later.
+        If the idea started in our Discord, paste the link to the thread so we can keep both in sync.
+        **Privacy:** do not paste file paths, your user name, or avatar files you may not share.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of Avistry is this about?
+      options:
+        - Textures
+        - Toggles
+        - Animations
+        - Performance
+        - AI agent control
+        - Docs
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does it solve?
+      description: Describe the task, not the solution. For example, "I make the same outfit toggle by hand for every avatar."
+    validations:
+      required: true
+
+  - type: textarea
+    id: who
+    attributes:
+      label: Who does it help?
+      description: For example beginners editing a bought outfit, creators who sell avatars, or people who use their own AI agent.
+    validations:
+      required: true
+
+  - type: textarea
+    id: how
+    attributes:
+      label: How should it work?
+      description: Optional. Steps, sketches, screenshots or examples from other tools help.
+
+  - type: input
+    id: discord
+    attributes:
+      label: Discord thread link
+      description: Optional. The link to the idea's post in the Avistry Discord.
+      placeholder: "https://discord.com/channels/..."

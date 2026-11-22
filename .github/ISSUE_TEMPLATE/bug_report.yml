@@ -1,0 +1,103 @@
+name: Bug report
+description: Something does not work as it should.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please check that you are on the [latest release](https://github.com/avistry/avistry/releases/latest) and search the open issues first.
+        **Privacy:** do not paste file paths, your user name, or avatar files you may not share.
+
+  - type: input
+    id: version
+    attributes:
+      label: Avistry version
+      description: Shown under the **?** button in the window.
+      placeholder: "0.2.0"
+    validations:
+      required: true
+
+  - type: input
+    id: unity
+    attributes:
+      label: Unity version
+      placeholder: "2022.3.22f1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - VRChat Creator Companion (VCC)
+        - ALCOM
+        - .unitypackage
+        - Git URL in Package Manager
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: shader
+    attributes:
+      label: Shader on the material
+      multiple: true
+      options:
+        - Poiyomi
+        - Poiyomi Pro
+        - lilToon
+        - Standard or another shader
+        - Not related to a material
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Tools > Avistry > Textures
+        2. Pick ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Copy diagnostics
+      description: |
+        In the window, open the **?** menu and choose **Copy diagnostics**, then paste the text here. It lists the tool and Unity versions, your graphics card and the target's shader and texture sizes. It contains no file paths or user names.
+        Older versions do not have this button yet. Then please write your operating system and graphics card instead.
+      render: text
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors
+      description: Copy any red error from Unity's Console, including the lines below it. Remove file paths if there are any.
+      render: text
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or video
+      description: Drag images or a short video here if they help.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I am on the latest release.
+          required: true
+        - label: I removed file paths and personal information from everything above.
+          required: true

@@ -1,0 +1,29 @@
+{
+    "name": "Avistry.Textures.McpBridge",
+    "rootNamespace": "Avistry.Textures.McpBridge",
+    "references": [
+        "Avistry.Textures.Editor",
+        "MCPForUnity.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Newtonsoft.Json.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "AVISTRY_MCP4U"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.coplaydev.unity-mcp",
+            "expression": "[10.0.0,11.0.0)",
+            "define": "AVISTRY_MCP4U"
+        }
+    ],
+    "noEngineReferences": false
+}

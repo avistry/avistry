@@ -1,0 +1,184 @@
+name: Release
+
+# Push a tag such as v0.2.0 (it must match package.json "version") to publish a release.
+# Manual run: dry_run=true only builds and checks; dry_run=false publishes v<package.json version>.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build and verify only, publish nothing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write # create the release and upload assets
+      actions: write  # start the Pages workflow afterwards
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VT_API_KEY: ${{ secrets.VT_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read version and check the tag
+        run: |
+          NAME=$(jq -r .name package.json)
+          VERSION=$(jq -r .version package.json)
+          TAG="v${VERSION}"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "${TAG}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version ${VERSION} (expected ${TAG})"
+            exit 1
+          fi
+          PUBLISH=true
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then PUBLISH=false; fi
+          PRERELEASE=false
+          case "${VERSION}" in *-*) PRERELEASE=true ;; esac
+          if grep -q 'OWNER' package.json; then
+            echo "::warning::package.json still contains OWNER/REPO placeholders. Replace them before the first public release."
+          fi
+          {
+            echo "NAME=${NAME}"
+            echo "VERSION=${VERSION}"
+            echo "TAG=${TAG}"
+            echo "PUBLISH=${PUBLISH}"
+            echo "PRERELEASE=${PRERELEASE}"
+            echo "ZIP=${NAME}-${VERSION}.zip"
+            echo "UNITYPACKAGE=Avistry-${VERSION}.unitypackage"
+          } >> "$GITHUB_ENV"
+
+      - name: Check the CHANGELOG has notes for this version
+        run: |
+          if node .github/scripts/changelog-section.mjs "${VERSION}" CHANGELOG.md > /dev/null 2> "${RUNNER_TEMP}/changelog-error.txt"; then
+            echo "CHANGELOG.md has release notes for ${VERSION}."
+          elif [ "${PUBLISH}" = "false" ] && node .github/scripts/changelog-section.mjs Unreleased CHANGELOG.md > /dev/null 2>&1; then
+            echo "::notice::Dry run: no [${VERSION}] section yet, so the notes preview uses [Unreleased]. Before the real release run: node .github/scripts/changelog-release.mjs ${VERSION}"
+            echo "NOTES_SECTION=Unreleased" >> "$GITHUB_ENV"
+          else
+            cat "${RUNNER_TEMP}/changelog-error.txt"
+            echo "::error file=CHANGELOG.md::No release notes for ${VERSION}. Run 'node .github/scripts/changelog-release.mjs ${VERSION}' (it turns [Unreleased] into [${VERSION}]), commit CHANGELOG.md and package.json, and push again. If this tag already exists on GitHub, do not move it: release the next patch version instead."
+            exit 1
+          fi
+
+      - name: Build zip and unitypackage
+        run: |
+          mkdir dist
+          node .github/scripts/build-zip.mjs . "dist/${ZIP}"
+          node .github/scripts/build-unitypackage.mjs . "dist/${UNITYPACKAGE}"
+
+      - name: Verify package contents
+        run: |
+          unzip -Z1 "dist/${ZIP}" | sort | tee zip-files.txt
+          grep -qx 'package.json' zip-files.txt || { echo "::error::package.json is not at the zip root"; exit 1; }
+          if grep -E '^(\.|Documentation~|Website~|\.github|dist|_site)' zip-files.txt; then
+            echo "::error::Non-package files in the zip"; exit 1
+          fi
+          tar -tzf "dist/${UNITYPACKAGE}" | grep -c '/pathname$'
+          tar -xzOf "dist/${UNITYPACKAGE}" --wildcards '*/pathname' | sort | sed -n '1,5p'
+
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum "${ZIP}" "${UNITYPACKAGE}" | tee SHA256SUMS.txt
+          echo "ZIP_SHA=$(sha256sum "${ZIP}" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          echo "UPK_SHA=$(sha256sum "${UNITYPACKAGE}" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+
+      - name: Write release notes from CHANGELOG
+        run: |
+          node .github/scripts/changelog-section.mjs "${NOTES_SECTION:-${VERSION}}" CHANGELOG.md > notes.md
+          VT=https://www.virustotal.com/gui/file
+          {
+            echo
+            echo '---'
+            echo
+            echo '### Downloads and verification'
+            echo
+            echo "| File | SHA-256 | VirusTotal |"
+            echo "| --- | --- | --- |"
+            echo "| \`${ZIP}\` (VCC / Package Manager) | \`${ZIP_SHA}\` | [report](${VT}/${ZIP_SHA}) |"
+            echo "| \`${UNITYPACKAGE}\` (drag into Unity) | \`${UPK_SHA}\` | [report](${VT}/${UPK_SHA}) |"
+          } >> notes.md
+          cat notes.md
+
+      - name: Create GitHub release
+        if: env.PUBLISH == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.TAG }}
+          name: Avistry ${{ env.VERSION }}
+          body_path: notes.md
+          prerelease: ${{ env.PRERELEASE }}
+          make_latest: ${{ env.PRERELEASE == 'false' }}
+          fail_on_unmatched_files: true
+          files: |
+            dist/${{ env.ZIP }}
+            dist/${{ env.UNITYPACKAGE }}
+            dist/SHA256SUMS.txt
+
+      - name: VirusTotal scan
+        id: vt
+        if: env.PUBLISH == 'true' && env.VT_API_KEY != ''
+        continue-on-error: true # the release already exists; a scan failure must not undo it
+        uses: crazy-max/ghaction-virustotal@v5
+        with:
+          vt_api_key: ${{ env.VT_API_KEY }}
+          update_release_body: true # only takes effect on release events; see the next step
+          request_rate: 4
+          files: |
+            dist/*.zip
+            dist/*.unitypackage
+
+      - name: VirusTotal skipped
+        if: env.PUBLISH == 'true' && env.VT_API_KEY == ''
+        run: echo "::notice::VT_API_KEY secret is not set, so the files were not uploaded to VirusTotal."
+
+      - name: Add VirusTotal analysis links to the release
+        if: steps.vt.outcome == 'success'
+        env:
+          ANALYSIS: ${{ steps.vt.outputs.analysis }}
+        run: |
+          BODY=$(gh release view "${TAG}" --json body --jq .body)
+          {
+            printf '%s\n\n' "${BODY}"
+            echo '**VirusTotal analysis**'
+            echo
+            echo "${ANALYSIS}" | tr ',' '\n' | while IFS= read -r pair; do
+              [ -n "${pair}" ] && echo "- [$(basename "${pair%%=*}")](${pair#*=})"
+            done
+          } > notes-final.md
+          gh release edit "${TAG}" --notes-file notes-final.md
+
+      - name: Write latest.json
+        if: env.PUBLISH == 'true'
+        run: |
+          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          VT=https://www.virustotal.com/gui/file
+          jq -n \
+            --arg version "${VERSION}" --arg tag "${TAG}" --arg date "$(date -u +%Y-%m-%d)" \
+            --arg release "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}" \
+            --arg zip "${BASE}/${ZIP}" --arg upk "${BASE}/${UNITYPACKAGE}" \
+            --arg zipSha "${ZIP_SHA}" --arg upkSha "${UPK_SHA}" \
+            --arg zipVt "${VT}/${ZIP_SHA}" --arg upkVt "${VT}/${UPK_SHA}" \
+            --argjson scanned "$([ "${{ steps.vt.outcome }}" = success ] && echo true || echo false)" \
+            --argjson prerelease "${PRERELEASE}" \
+            '{version: $version, tag: $tag, date: $date, prerelease: $prerelease, releaseUrl: $release,
+              zip: $zip, unitypackage: $upk,
+              sha256: {zip: $zipSha, unitypackage: $upkSha},
+              virustotal: {zip: $zipVt, unitypackage: $upkVt, scanned: $scanned}}' > dist/latest.json
+          cat dist/latest.json
+          gh release upload "${TAG}" dist/latest.json --clobber
+
+      - name: Rebuild the website and VPM listing
+        if: env.PUBLISH == 'true'
+        run: gh workflow run pages.yml --ref "${{ github.event.repository.default_branch }}"

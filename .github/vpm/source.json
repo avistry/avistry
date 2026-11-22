@@ -1,0 +1,15 @@
+{
+  "name": "Avistry",
+  "id": "com.avistry.toolkit.listing",
+  "url": "https://avistry.github.io/avistry/index.json",
+  "description": "VPM listing for Avistry",
+  "author": {
+    "name": "Avistry contributors",
+    "url": "https://github.com/avistry"
+  },
+  "infoLink": {
+    "text": "Homepage",
+    "url": "https://avistry.github.io/avistry/"
+  },
+  "githubRepos": ["avistry/avistry"]
+}

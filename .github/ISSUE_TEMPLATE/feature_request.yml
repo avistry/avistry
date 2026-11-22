@@ -1,0 +1,71 @@
+name: Feature request
+description: Ask for an idea, or vote for one that is already planned.
+title: "[Request] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        We build what people ask for. Every request is counted: when enough people want an idea, it moves into the next version.
+        **If an issue for your idea already exists, add a 👍 to it instead of opening a new one.** That counts the same.
+
+  - type: dropdown
+    id: idea
+    attributes:
+      label: Which idea?
+      description: These are the ideas waiting for demand. Pick "Something else" for a new one.
+      options:
+        - "I13: Glow, glitter, rim or hue shift on a selected part (Poiyomi)"
+        - "I08: Pen pressure curve and line smoothing"
+        - "I06: More patterns (plaid, camo, shapes, pattern brush)"
+        - "I07: Logo or sticker placed on the model (already planned)"
+        - "I03: Recolour the whole avatar but keep skin and eyes"
+        - "I02: Colour variants (_Red, _Black...) baked in one click"
+        - "I10: Name or text on clothing"
+        - "I17: Layered PSD export"
+        - "I19: Interface in Japanese, Korean or Chinese"
+        - "I11: Palette import (.gpl, hex) and colour harmonies"
+        - "I15: Texture memory check that fits a performance rank automatically"
+        - "I04: Masks from the mesh (edges, height, curvature)"
+        - "I14: Pack several masks into one texture"
+        - "I05: Magic wand, select by colour, marquee select"
+        - "I09: Seam-check overlay"
+        - "Hide unselected parts while painting"
+        - "Live preview of the edit as an NDMF component"
+        - "Opt-in update check"
+        - "Something else"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the task, not the solution. For example, "I sell an outfit in 6 colours and bake each one by hand."
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea-details
+    attributes:
+      label: How would you like it to work?
+      description: Optional. Screenshots or examples from other tools help.
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often would you use it?
+      options:
+        - Every time I edit an avatar
+        - Now and then
+        - Once or twice
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: You are mostly a...
+      options:
+        - Beginner editing an outfit I bought
+        - Regular creator editing my own avatars
+        - Creator who sells avatars or outfits (Booth)
+        - Other

@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "tag": "v0.2.0",
+  "date": "2026-11-20",
+  "prerelease": false,
+  "releaseUrl": "https://github.com/avistry/avistry/releases/tag/v0.2.0",
+  "zip": "https://github.com/avistry/avistry/releases/download/v0.2.0/com.avistry.toolkit-0.2.0.zip",
+  "unitypackage": "https://github.com/avistry/avistry/releases/download/v0.2.0/Avistry-0.2.0.unitypackage",
+  "sha256": {
+    "zip": "0000000000000000000000000000000000000000000000000000000000000000",
+    "unitypackage": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "virustotal": {
+    "zip": "https://www.virustotal.com/gui/file/0000000000000000000000000000000000000000000000000000000000000000",
+    "unitypackage": "https://www.virustotal.com/gui/file/0000000000000000000000000000000000000000000000000000000000000000",
+    "scanned": false
+  }
+}

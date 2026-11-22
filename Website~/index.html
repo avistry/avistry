@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en" data-page="home" data-title-key="meta.title">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avistry: make a bought avatar yours in minutes</title>
+<meta name="description" content="Free Unity tool for VRChat avatars. Pick a part, recolour it, paint on layers and save a new PNG. Your original files never change." data-i18n-attr="content:meta.description">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#F3F1F6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141218" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Avistry: make a bought avatar yours in minutes">
+<meta property="og:url" content="https://avistry.github.io/avistry/index.html">
+<meta property="og:description" content="Free Unity tool for VRChat avatars. Pick a part, recolour it, paint on layers and save a new PNG. Your original files never change.">
+<meta property="og:image" content="https://avistry.github.io/avistry/media/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://avistry.github.io/avistry/index.html">
+<link rel="icon" type="image/svg+xml" href="media/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="media/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="media/apple-touch-icon.png">
+<script>
+/* preload the hero of the look this browser will show (?look= wins, then the remembered look), not always crimson */
+(function () {
+  var look = "crimson", q = /[?&]look=(\w+)/.exec(location.search), l = q && q[1];
+  try { l = l || localStorage.getItem("ats-look"); } catch (e) {}
+  if (l === "frost" || l === "venom") look = l;
+  var t = ["<link rel=\"preload\" as=\"image\" type=\"image/webp\" media=\"(min-width: 1024px) and (min-aspect-ratio: 2/1)\" imagesrcset=\"media/v4/hero-%L%-orig-21x9-1920.webp 1920w\" imagesizes=\"100vw\" fetchpriority=\"high\">", "<link rel=\"preload\" as=\"image\" type=\"image/webp\" media=\"(min-width: 1024px) and (min-aspect-ratio: 2/1)\" imagesrcset=\"media/v4/hero-%L%-saved-21x9-1920.webp 1920w\" imagesizes=\"100vw\" fetchpriority=\"high\">", "<link rel=\"preload\" as=\"image\" type=\"image/webp\" media=\"(min-width: 640px) and (not ((min-width: 1024px) and (min-aspect-ratio: 2/1)))\" imagesrcset=\"media/v4/hero-%L%-orig-16x9-1280.webp 1280w, media/v4/hero-%L%-orig-16x9-1920.webp 1920w\" imagesizes=\"100vw\" fetchpriority=\"high\">", "<link rel=\"preload\" as=\"image\" type=\"image/webp\" media=\"(min-width: 640px) and (not ((min-width: 1024px) and (min-aspect-ratio: 2/1)))\" imagesrcset=\"media/v4/hero-%L%-saved-16x9-1280.webp 1280w, media/v4/hero-%L%-saved-16x9-1920.webp 1920w\" imagesizes=\"100vw\" fetchpriority=\"high\">", "<link rel=\"preload\" as=\"image\" type=\"image/webp\" media=\"(max-width: 639px)\" imagesrcset=\"media/v4/hero-%L%-orig-4x5-720.webp 720w, media/v4/hero-%L%-orig-4x5-1080.webp 1080w\" imagesizes=\"100vw\" fetchpriority=\"high\">", "<link rel=\"preload\" as=\"image\" type=\"image/webp\" media=\"(max-width: 639px)\" imagesrcset=\"media/v4/hero-%L%-saved-4x5-720.webp 720w, media/v4/hero-%L%-saved-4x5-1080.webp 1080w\" imagesizes=\"100vw\" fetchpriority=\"high\">"];
+  document.write(t.join("").replace(/%L%/g, look));
+})();
+</script>
+<noscript>
+<link rel="preload" as="image" type="image/webp" media="(min-width: 1024px) and (min-aspect-ratio: 2/1)" imagesrcset="media/v4/hero-crimson-orig-21x9-1920.webp 1920w" imagesizes="100vw" fetchpriority="high">
+<link rel="preload" as="image" type="image/webp" media="(min-width: 1024px) and (min-aspect-ratio: 2/1)" imagesrcset="media/v4/hero-crimson-saved-21x9-1920.webp 1920w" imagesizes="100vw" fetchpriority="high">
+<link rel="preload" as="image" type="image/webp" media="(min-width: 640px) and (not ((min-width: 1024px) and (min-aspect-ratio: 2/1)))" imagesrcset="media/v4/hero-crimson-orig-16x9-1280.webp 1280w, media/v4/hero-crimson-orig-16x9-1920.webp 1920w" imagesizes="100vw" fetchpriority="high">
+<link rel="preload" as="image" type="image/webp" media="(min-width: 640px) and (not ((min-width: 1024px) and (min-aspect-ratio: 2/1)))" imagesrcset="media/v4/hero-crimson-saved-16x9-1280.webp 1280w, media/v4/hero-crimson-saved-16x9-1920.webp 1920w" imagesizes="100vw" fetchpriority="high">
+<link rel="preload" as="image" type="image/webp" media="(max-width: 639px)" imagesrcset="media/v4/hero-crimson-orig-4x5-720.webp 720w, media/v4/hero-crimson-orig-4x5-1080.webp 1080w" imagesizes="100vw" fetchpriority="high">
+<link rel="preload" as="image" type="image/webp" media="(max-width: 639px)" imagesrcset="media/v4/hero-crimson-saved-4x5-720.webp 720w, media/v4/hero-crimson-saved-4x5-1080.webp 1080w" imagesizes="100vw" fetchpriority="high">
+</noscript>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&amp;family=Figtree:wght@400;600&amp;display=swap">
+<script>
+(function () {
+  var root = document.documentElement;
+  root.classList.add('js');
+  try {
+    var theme = localStorage.getItem('ats-theme');
+    root.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+  } catch (e) {}
+})();
+</script>
+<style>html{background:#141218}html[data-theme="light"]{background:#F3F1F6}</style>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="v4 home">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-check" viewBox="0 0 16 16"><path d="m3 8.5 3.2 3.3L13 4.5"/></symbol>
+    <symbol id="i-dot" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.5"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 20 20"><path d="M10 2.5 18 16.5H2z"/><path d="M10 8v4M10 14v.5"/></symbol>
+    <symbol id="i-fix" viewBox="0 0 16 16"><path d="M3 8a5 5 0 0 1 9-3M13 8a5 5 0 0 1-9 3"/><path d="M12 2v3h-3M4 14v-3h3"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.6"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.300 4.300l1.400 1.400M14.300 14.300l1.400 1.400M4.300 15.700l1.400-1.400M14.300 5.700l1.400-1.400"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 20 20"><path d="M16.500 11.800A6.800 6.800 0 0 1 8.200 3.500a6.800 6.800 0 1 0 8.300 8.300z"/></symbol>
+    <symbol id="i-gh" viewBox="0 0 20 20"><path d="M10 1.800a8.200 8.200 0 0 0-2.600 16c.4.100.6-.2.600-.4v-1.500c-2.300.5-2.800-1-2.800-1-.4-1-.9-1.200-.9-1.200-.8-.5.100-.5.100-.5.800.1 1.300.9 1.300.9.700 1.300 1.900.9 2.400.7.100-.5.300-.9.500-1.100-1.800-.2-3.700-.9-3.700-4 0-.9.300-1.600.8-2.100-.1-.2-.4-1 .1-2.100 0 0 .7-.2 2.200.8a7.700 7.700 0 0 1 4 0c1.500-1 2.200-.8 2.200-.8.400 1.100.2 1.900.1 2.100.5.600.8 1.300.8 2.100 0 3.100-1.900 3.800-3.700 4 .3.300.6.800.6 1.500v2.200c0 .2.200.5.600.4A8.200 8.200 0 0 0 10 1.800z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 20 20"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M13 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 20 20"><path d="M10 2.500 16 4.800V10c0 3.400-2.400 5.800-6 7.500C6.400 15.800 4 13.400 4 10V4.800z"/><path d="m7.200 10 2 2 3.600-4"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 20 20"><path d="M7.500 4.500 3.500 8.500l4 4"/><path d="M3.500 8.500H12a4.500 4.500 0 0 1 0 9H8"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 20 20"><path d="M4 10h12M11 5l5 5-5 5"/></symbol>
+  </defs>
+</svg>
+
+<a class="skip" href="#main" data-i18n="a11y.skip">Skip to content</a>
+<header class="hdr is-clear" id="hdr">
+  <div class="hdr-in">
+    <a class="brand" href="index.html" aria-label="Avistry">
+      <img class="lockup lockup-dark" src="media/lockup.svg" width="130" height="40" alt="" decoding="async">
+      <img class="lockup lockup-light" src="media/lockup-light.svg" width="130" height="40" alt="" decoding="async">
+    </a>
+    <nav class="nav" id="nav" aria-label="Main" data-i18n-attr="aria-label:a11y.nav">
+      <a href="features.html" data-i18n="nav.features">Features</a>
+      <a href="gallery.html" data-i18n="nav.gallery">Gallery</a>
+      <a href="learn.html" data-i18n="nav.learn">Learn</a>
+      <a href="about.html" data-i18n="nav.about">About</a>
+    </nav>
+    <a class="btn btn-primary btn-sm hdr-get" href="index.html#install" data-i18n="nav.get">Get it</a>
+    <button type="button" class="menu-btn" id="menu-btn" aria-expanded="false" aria-controls="sheet"><span data-i18n="nav.menu">Menu</span></button>
+  </div>
+</header>
+
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Menu" data-i18n-attr="aria-label:nav.menu" hidden>
+  <div class="sheet-in">
+    <nav class="sheet-nav" aria-label="Main" data-i18n-attr="aria-label:a11y.nav">
+      <a href="index.html" aria-current="page" data-i18n="nav.home">Home</a>
+      <a href="features.html" data-i18n="nav.features">Features</a>
+      <a href="gallery.html" data-i18n="nav.gallery">Gallery</a>
+      <a href="learn.html" data-i18n="nav.learn">Learn</a>
+      <a href="about.html" data-i18n="nav.about">About</a>
+    </nav>
+    <div class="tools" data-where="sheet">
+      <div class="langs" role="group" aria-label="Language" data-i18n-attr="aria-label:a11y.lang">
+        <button type="button" data-lang="en" lang="en" aria-pressed="true">English</button>
+        <button type="button" data-lang="ja" lang="ja" aria-pressed="false">日本語</button>
+        <button type="button" data-lang="ko" lang="ko" aria-pressed="false">한국어</button>
+        <button type="button" data-lang="zh-CN" lang="zh-CN" aria-pressed="false">中文 (简体)</button>
+      </div>
+      <button type="button" class="theme-toggle" aria-label="Light mode"><svg class="ic ic-sun" aria-hidden="true" focusable="false"><use href="#i-sun"/></svg><svg class="ic ic-moon" aria-hidden="true" focusable="false"><use href="#i-moon"/></svg><span class="theme-text">Light mode</span></button>
+    </div>
+  </div>
+</div>
+
+<main id="main">
+
+<!-- 1. HERO: the picture, the original/saved slider, the look chips -->
+<section class="hero surface-dark" id="top" data-hero aria-labelledby="hero-title">
+  <div class="hero-pic" id="hero-pic">
+    <div class="hero-bg" id="hero-bg">
+      <div class="hl-saved" id="hero-saved">
+        <picture class="art">
+          <source media="(min-width: 1024px) and (min-aspect-ratio: 2/1)" srcset="media/v4/hero-crimson-saved-21x9-1920.webp 1920w" sizes="100vw">
+          <source media="(min-width: 640px)" srcset="media/v4/hero-crimson-saved-16x9-1280.webp 1280w, media/v4/hero-crimson-saved-16x9-1920.webp 1920w" sizes="100vw">
+          <img src="media/v4/hero-crimson-saved-4x5-720.webp" srcset="media/v4/hero-crimson-saved-4x5-720.webp 720w, media/v4/hero-crimson-saved-4x5-1080.webp 1080w" sizes="100vw" width="1080" height="1350" fetchpriority="high" decoding="async" alt="The avatar in the crimson look on a club stage, one hand on the hip: red and orange hair, red eyes, gold horns with glitter, spread gold and red wings and a magenta and cyan chrome tattoo on the face and body, under light beams on a dark violet backdrop." data-i18n-attr="alt:look.crimson.alt">
+        </picture>
+      </div>
+      <div class="hl-orig" id="hero-orig">
+        <picture class="art">
+          <source media="(min-width: 1024px) and (min-aspect-ratio: 2/1)" srcset="media/v4/hero-crimson-orig-21x9-1920.webp 1920w" sizes="100vw">
+          <source media="(min-width: 640px)" srcset="media/v4/hero-crimson-orig-16x9-1280.webp 1280w, media/v4/hero-crimson-orig-16x9-1920.webp 1920w" sizes="100vw">
+          <img src="media/v4/hero-crimson-orig-4x5-720.webp" srcset="media/v4/hero-crimson-orig-4x5-720.webp 720w, media/v4/hero-crimson-orig-4x5-1080.webp 1080w" sizes="100vw" width="1080" height="1350" fetchpriority="high" decoding="async" alt="The same avatar before editing, without the tattoo: pink and black hair, pink eyes, purple crystal horns, black and pink wings, same pose and light." data-i18n-attr="alt:look.orig.alt">
+        </picture>
+      </div>
+    </div>
+    <div class="hero-pop" aria-hidden="true">
+      <div class="pop-saved" id="pop-saved">
+        <picture class="art">
+          <source media="(min-width: 1024px) and (min-aspect-ratio: 2/1)" srcset="media/v4/pop-crimson-21x9-1920.webp" sizes="100vw">
+          <source media="(min-width: 640px)" srcset="media/v4/pop-crimson-16x9-1280.webp 1280w, media/v4/pop-crimson-16x9-1920.webp 1920w" sizes="100vw">
+          <img src="media/v4/pop-crimson-4x5-1080.webp" srcset="media/v4/pop-crimson-4x5-720.webp 720w, media/v4/pop-crimson-4x5-1080.webp 1080w" sizes="100vw" width="1080" height="1350" fetchpriority="low" decoding="async" alt="">
+        </picture>
+      </div>
+    </div>
+    <script>
+    /* point the hero at the remembered look before the first paint, so a returning visitor never sees crimson flash first */
+    (function () {
+      var q = /[?&]look=(\w+)/.exec(location.search), l = q && q[1];
+      try { l = l || localStorage.getItem("ats-look"); } catch (e) {}
+      if (l !== "frost" && l !== "venom") return;
+      var bg = document.getElementById("hero-bg");
+      bg.setAttribute("data-look", l);
+      var n = document.querySelectorAll("#hero-saved source, #hero-saved img, #hero-orig source, #hero-orig img, #pop-saved source, #pop-saved img");
+      for (var i = 0; i < n.length; i++) {
+        if (n[i].srcset) n[i].srcset = n[i].srcset.replace(/-crimson-/g, "-" + l + "-");
+        if (n[i].tagName === "IMG") n[i].src = n[i].getAttribute("src").replace(/-crimson-/g, "-" + l + "-");
+      }
+    })();
+    </script>
+    <div class="hero-seam" aria-hidden="true">
+      <span class="seam-tag seam-tag-o"><span data-i18n="compare.original">Before</span></span>
+      <span class="seam-tag seam-tag-s"><span data-i18n="compare.saved">After</span></span>
+      <span class="seam-line"></span>
+      <span class="cmp-handle"></span>
+    </div>
+    <div class="hero-drag" id="hero-drag"></div>
+    <input class="cmp-range" id="hero-range" type="range" min="0" max="100" step="1" value="25" aria-label="Compare original and saved" data-i18n-attr="aria-label:compare.label">
+    <div class="looks" id="looks" role="radiogroup" aria-label="Saved look" data-i18n-attr="aria-label:look.label">
+      <button type="button" role="radio" aria-checked="false" tabindex="-1" data-look="original" style="--a:#E58AB8;--b:#2A3555"><i aria-hidden="true"></i><span data-i18n="look.original">Original</span></button>
+      <button type="button" role="radio" aria-checked="true" tabindex="0" data-look="crimson" style="--a:#CF0A11;--b:#93611A"><i aria-hidden="true"></i><span data-i18n="look.crimson">Crimson</span></button>
+      <button type="button" role="radio" aria-checked="false" tabindex="-1" data-look="frost" style="--a:#8FD3FF;--b:#C9D6E8"><i aria-hidden="true"></i><span data-i18n="look.frost">Frost</span></button>
+      <button type="button" role="radio" aria-checked="false" tabindex="-1" data-look="venom" style="--a:#3CDC78;--b:#2A2A30"><i aria-hidden="true"></i><span data-i18n="look.venom">Venom</span></button>
+    </div>
+    <p class="hero-credit credit" data-i18n-html="credit.html">Avatar shown: <a href="https://godfall.club/collections/avatars-assets/products/godmagician" rel="noopener">GodMagician by Godfall</a></p>
+  </div>
+  <div class="hero-copy">
+    <h1 class="hero-title h-display" id="hero-title" data-i18n="hero.title">Make a bought avatar yours in minutes.</h1>
+    <div class="btn-row">
+      <a class="btn btn-primary btn-lg" id="hero-vcc" href="vcc://vpm/addRepo?url=https://avistry.github.io/avistry/index.json" data-i18n="cta.vcc">Get it in VCC</a>
+      <a class="link-alt js-download" href="https://github.com/avistry/avistry/releases/latest" data-i18n="cta.pkg">.unitypackage</a>
+    </div>
+    <p class="hero-free" data-i18n="hero.free">Free and open source.</p>
+  </div>
+</section>
+
+<!-- 2. PROOF STRIP -->
+<section class="proof" aria-label="Why you can trust it" data-i18n-attr="aria-label:proof.label">
+  <div class="wrap">
+    <ul class="proof-list" role="list">
+      <li><a href="about.html#checks"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span data-i18n="proof.free">Free and open source</span></a></li>
+      <li><a href="about.html#q-originals"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span data-i18n="proof.originals">Your original files never change</span></a></li>
+      <li><a href="about.html#what"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span data-i18n="proof.upload">Nothing added to your upload</span></a></li>
+      <li><a href="about.html#no-network"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><span data-i18n="proof.tracking">No tracking</span></a></li>
+    </ul>
+  </div>
+</section>
+
+<!-- 2b. THE WHOLE TOOL IN ONE VIDEO -->
+<section class="sec tour" id="tour" aria-labelledby="tour-title">
+  <div class="wrap">
+    <h2 id="tour-title" data-i18n="tour.title">The whole tool in three minutes.</h2>
+    <figure class="plate plate--lg tour-plate">
+      <div class="plate-body">
+        <video controls playsinline preload="none" width="1280" height="720" poster="media/v4/tour-poster.webp" aria-label="A three minute tour of Avistry with voice-over: selecting pieces, recolouring, Colour Match, painting, layers and blend modes, the material, maps, safety and the looks." data-i18n-attr="aria-label:tour.alt"><source src="media/v4/tour.mp4" type="video/mp4"></video>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<!-- 3. FOUR STEPS, ONE WINDOW -->
+<section class="sec" id="how" aria-labelledby="how-title">
+  <div class="wrap">
+    <h2 id="how-title" data-i18n="how.title">Four steps, one window.</h2>
+    <div class="how-grid">
+      <ol class="how-steps" id="how-steps" role="list">
+        <li class="how-step is-on" data-step="1">
+          <button type="button" aria-pressed="true"><span class="num" aria-hidden="true">1</span><span class="st" data-i18n="how.1.title">Pick a part</span><span class="sb" data-i18n="how.1.body">Click it on the model or on the texture. The same pieces light up in both.</span></button>
+        </li>
+        <li class="how-step" data-step="2">
+          <button type="button" aria-pressed="false"><span class="num" aria-hidden="true">2</span><span class="st" data-i18n="how.2.title">Choose a colour</span><span class="sb" data-i18n="how.2.body">Shift the colour. Shading and patterns stay where they were.</span></button>
+        </li>
+        <li class="how-step" data-step="3">
+          <button type="button" aria-pressed="false"><span class="num" aria-hidden="true">3</span><span class="st" data-i18n="how.3.title">Paint a detail</span><span class="sb" data-i18n="how.3.body">Brushes and gradients, kept inside the pieces you picked.</span></button>
+        </li>
+        <li class="how-step" data-step="4">
+          <button type="button" aria-pressed="false"><span class="num" aria-hidden="true">4</span><span class="st" data-i18n="how.4.title">Save a new copy</span><span class="sb" data-i18n="how.4.body">A new PNG and material.</span></button>
+        </li>
+      </ol>
+      <figure class="plate plate--md how-plate">
+        <div class="plate-body vwrap">
+          <video id="how-video" muted playsinline preload="none" width="1280" height="720" poster="media/v4/how-1-poster.webp" aria-label="A click on the black forearm sleeve on the model, then a Shift+click on the second glove piece in the texture: both pieces light up orange on the model and in the texture, and the panel reads 2 pieces selected." data-i18n-attr="aria-label:how.1.alt"><source src="media/v4/how-1.webm" type="video/webm"><source src="media/v4/how-1.mp4" type="video/mp4"></video>
+          <button type="button" class="pp" aria-label="Pause video" data-i18n-attr="aria-label:ui.pause"></button>
+        </div>
+        <figcaption class="plate-cap"><span class="how-cap" id="how-cap" aria-live="off"></span></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- 4. WINGS (full-bleed, dark) -->
+<section class="sec stage-sec surface-dark wings" id="wings" aria-labelledby="wings-title">
+  <div class="wrap">
+    <h2 id="wings-title" data-i18n="wings.title">Wings, hair, horns, gold.</h2>
+  </div>
+  <figure class="plate plate--lg plate--bleed cmp-plate">
+    <div class="cmp" data-see="wings" data-cmp="50" data-ar="16 / 9" data-ar-m="4 / 5">
+      <div class="cmp-view">
+        <picture class="cmp-saved"><source media="(max-width: 639px)" srcset="media/v4/see-wings-crimson-m.webp"><img src="media/v4/see-wings-crimson.webp" width="1800" height="1200" loading="lazy" decoding="async" alt="The avatar's wings from behind at three-quarter, after saving" data-i18n-attr="alt:see.wings.alt.saved"></picture>
+        <picture class="cmp-orig"><source media="(max-width: 639px)" srcset="media/v4/see-wings-original-crimson-m.webp"><img src="media/v4/see-wings-original-crimson.webp" width="1800" height="1200" loading="lazy" decoding="async" alt="The avatar's wings from behind at three-quarter, as they came" data-i18n-attr="alt:see.wings.alt.orig"></picture>
+        <span class="cmp-label cmp-label-orig" aria-hidden="true"><span data-i18n="compare.original">Before</span></span>
+        <span class="cmp-label cmp-label-saved" aria-hidden="true"><span data-i18n="compare.saved">After</span></span>
+        <span class="cmp-seam" aria-hidden="true"><span class="cmp-handle"></span></span>
+        <input class="cmp-range" type="range" min="0" max="100" step="1" value="50" aria-label="Compare original and saved" data-i18n-attr="aria-label:compare.label">
+      </div>
+    </div>
+  </figure>
+  <div class="wrap wings-more">
+    <ul class="thumbs" role="list">
+      <li><a href="gallery.html#closeups" data-thumb="face"><img src="media/v4/thumb-face-crimson.webp" width="480" height="600" loading="lazy" decoding="async" alt=""><span data-i18n="see.tab.face">Face</span></a></li>
+      <li><a href="gallery.html#closeups" data-thumb="horns"><img src="media/v4/thumb-horns-crimson.webp" width="480" height="600" loading="lazy" decoding="async" alt=""><span data-i18n="see.tab.horns">Horns</span></a></li>
+      <li><a href="gallery.html#closeups" data-thumb="arm"><img src="media/v4/thumb-arm-crimson.webp" width="480" height="600" loading="lazy" decoding="async" alt=""><span data-i18n="cu.arm">Arm</span></a></li>
+    </ul>
+    <a class="link-arrow" href="gallery.html#closeups"><span data-i18n="wings.more">See every angle</span> <svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
+  </div>
+</section>
+
+<!-- 5. SAFE BY DESIGN -->
+<section class="sec" id="safe" aria-labelledby="safe-title">
+  <div class="wrap">
+    <h2 id="safe-title" data-i18n="safe.title">Safe by design.</h2>
+    <div class="safe-grid">
+      <ul class="facts" role="list">
+        <li><svg class="ic ic-lg" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg><p data-i18n="safe.1">Saves a new PNG and material. Originals never change.</p></li>
+        <li><svg class="ic ic-lg" aria-hidden="true" focusable="false"><use href="#i-shield"/></svg><p data-i18n="safe.2">Nothing added to your uploaded avatar.</p></li>
+        <li><svg class="ic ic-lg" aria-hidden="true" focusable="false"><use href="#i-undo"/></svg><p data-i18n="safe.3">Undo any step.</p></li>
+      </ul>
+      <figure class="plate plate--md safe-plate" id="files">
+        <div class="plate-body">
+          <div class="fwin">
+            <p class="fwin-title mono">Textures</p>
+            <ul class="fwin-list" role="list">
+              <li class="frow frow-old"><code class="mono">Hair_color.png</code><span class="fmark"><i aria-hidden="true"></i><span data-i18n="files.orig.label">stays as it was</span></span></li>
+            </ul>
+            <ul class="fwin-new" role="list" id="files-new">
+              <li><code class="mono">Hair_color_ats.png</code><span data-i18n="files.png">the new PNG</span></li>
+              <li><code class="mono">Hair_ats.mat</code><span data-i18n="files.mat">a copy of the material</span></li>
+              <li><code class="mono">Hair_color_ats_recipe.asset</code><span data-i18n="files.recipe">your layers, to keep editing later</span></li>
+            </ul>
+          </div>
+          <picture class="safe-shot" hidden><source media="(max-width: 639px)" data-v4="safe-files-m.webp"><img data-v4="safe-files.webp" width="1600" height="900" decoding="async" loading="lazy" alt="Unity Project window showing the original hair texture and material next to the new _ats copies" data-i18n-attr="alt:safe.alt"></picture>
+        </div>
+        <figcaption class="plate-cap"><span data-i18n="files.note">Example names. Saving again adds _ats_2.</span></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="sec install" id="install" aria-labelledby="install-title">
+  <div class="wrap">
+    <div class="inst-head">
+      <h2 class="h-display" id="install-title" data-i18n="final.title">Your avatar. Your colours.</h2>
+    </div>
+    <div class="inst-grid">
+      <article class="inst-card inst-card--main">
+        <h3 data-i18n="install.tab.vcc">VCC (recommended)</h3>
+        <a class="btn btn-primary btn-lg" id="btn-vcc" href="vcc://vpm/addRepo?url=https://avistry.github.io/avistry/index.json" data-i18n="cta.vcc">Get it in VCC</a>
+        <ol class="steps-list">
+          <li data-i18n-html="install.vcc.s1">Select <strong>Get it in VCC</strong>. If nothing happens, copy the listing URL below and add it in VCC under <span class="path">Settings &gt; Packages &gt; Add Repository</span>.</li>
+          <li data-i18n-html="install.vcc.s2">Open your avatar project in VCC, go to <strong>Manage Project</strong> and select <strong>+</strong> next to Avistry.</li>
+          <li data-i18n-html="install.open">In Unity, open <span class="path">Tools &gt; Avistry &gt; Textures</span>.</li>
+        </ol>
+        <p class="vcc-help" id="vcc-help" hidden data-i18n="install.vcchelp">VCC did not open? Copy the listing URL and add it under Settings &gt; Packages &gt; Add Repository.</p>
+        <label class="field-label" for="vcc-url" data-i18n="install.listing">Listing URL</label>
+        <div class="urlrow"><input class="field mono" id="vcc-url" type="text" readonly value="https://avistry.github.io/avistry/index.json" data-sub><button type="button" class="btn btn-sm btn-outline copy" data-copy-target="vcc-url" data-i18n="ui.copy">Copy</button></div>
+      </article>
+      <article class="inst-card">
+        <h3 data-i18n="install.tab.unity">.unitypackage</h3>
+        <div class="dl">
+          <a class="btn btn-outline btn-lg js-download" id="btn-download" href="https://github.com/avistry/avistry/releases/latest" data-i18n="release.download">Download .unitypackage</a>
+          <small class="tnum" id="btn-dl-version" hidden></small>
+        </div>
+        <details class="more-ways steps-fold" id="unity-steps" open>
+          <summary data-i18n="install.steps">Steps</summary>
+          <ol class="steps-list">
+            <li data-i18n-html="install.unity.s1">Download the <code>.unitypackage</code> from the button above or from GitHub Releases.</li>
+            <li data-i18n-html="install.unity.s2">With your project open, drag the file into the Project window, or choose <span class="path">Assets &gt; Import Package &gt; Custom Package</span>. Then select <strong>Import</strong>.</li>
+            <li data-i18n-html="install.open">In Unity, open <span class="path">Tools &gt; Avistry &gt; Textures</span>.</li>
+          </ol>
+        </details>
+        <details class="more-ways">
+          <summary data-i18n="install.tab.git">Git URL</summary>
+          <ol class="steps-list">
+            <li data-i18n-html="install.git.s1">In Unity, open <span class="path">Window &gt; Package Manager</span>.</li>
+            <li data-i18n-html="install.git.s2">Select <strong>+</strong>, choose <strong>Add package from git URL</strong> and paste the URL below.</li>
+          </ol>
+          <label class="field-label" for="git-url" data-i18n="install.gitLabel">Git URL</label>
+          <div class="urlrow"><input class="field mono" id="git-url" type="text" readonly value="https://github.com/avistry/avistry.git" data-sub><button type="button" class="btn btn-sm btn-outline copy" data-copy-target="git-url" data-i18n="ui.copy">Copy</button></div>
+        </details>
+      </article>
+    </div>
+    <p class="inst-meta"><span class="tnum" id="inst-version" hidden></span><a class="js-vt" href="https://github.com/avistry/avistry/releases/latest" rel="noopener" data-i18n="trust.r1">Scanned on VirusTotal</a> <span aria-hidden="true">&middot;</span> <span data-i18n="install.meta">Unity 2022.3 · VRChat avatars</span></p>
+    <div class="share-pc" id="share-pc-box" hidden>
+      <button type="button" class="btn btn-outline btn-lg" id="share-pc" data-share-url="https://avistry.github.io/avistry/" data-i18n="share.btn">Send this link to your PC</button>
+      <p class="small" id="share-pc-note" data-i18n="share.note">Avistry runs in Unity on a PC.</p>
+    </div>
+    <dl class="qa">
+      <div><dt data-i18n="qa.2.q">Does it work with Poiyomi and lilToon?</dt><dd data-i18n="qa.2.a">Yes. Selecting and painting work on any shader.</dd></div>
+      <div><dt data-i18n="qa.3.q">Is it free?</dt><dd data-i18n="qa.3.a">Yes. It is free and open source (MIT).</dd></div>
+    </dl>
+    <p class="more-link"><a href="about.html#faq"><span data-i18n="qa.more">More questions</span> <svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a></p>
+    <div class="more">
+      <h3 data-i18n="more.title">Want more?</h3>
+      <ul class="more-cards" role="list">
+        <li><a class="more-card" href="features.html"><span class="mc-t" data-i18n="nav.features">Features</span><span class="mc-b" data-i18n="more.features">Every tool in action</span></a></li>
+        <li><a class="more-card" href="gallery.html"><span class="mc-t" data-i18n="nav.gallery">Gallery</span><span class="mc-b" data-i18n="more.gallery">Every angle, every look</span></a></li>
+        <li><a class="more-card" href="about.html"><span class="mc-t" data-i18n="nav.about">About</span><span class="mc-b" data-i18n="more.about">Safety, FAQ, how to help</span></a></li>
+      </ul>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <div class="foot-cols">
+      <nav class="foot-links" aria-label="Project" data-i18n-attr="aria-label:footer.project">
+        <a href="https://github.com/avistry/avistry" data-i18n="nav.github">GitHub</a>
+        <a href="https://github.com/avistry/avistry/releases" data-i18n="footer.releases">Releases</a>
+        <a href="https://discord.gg/PM8uC2UnT" data-i18n="footer.discord">Discord</a>
+        <a href="glossary.html" data-i18n="nav.glossary">Glossary</a>
+        <a href="skills.html" data-i18n="nav.skills">Skill tree</a>
+        <a href="learn.html" data-i18n="footer.learn">Learn</a>
+        <a href="https://github.com/avistry/avistry/issues" data-i18n="footer.issues">Report an issue</a>
+      </nav>
+      <nav class="foot-links" aria-label="Legal" data-i18n-attr="aria-label:footer.legal">
+        <a href="https://github.com/avistry/avistry/blob/main/LICENSE" data-i18n="footer.license">MIT licence</a>
+        <a href="https://github.com/avistry/avistry/blob/main/Third%20Party%20Notices.md" data-i18n="footer.notices">Third-party notices</a>
+        <a href="https://github.com/avistry/avistry/blob/main/CHANGELOG.md" data-i18n="footer.changelog">Changelog</a>
+      </nav>
+    </div>
+    <p class="foot-promise" data-i18n="footer.promise">No tracking. Update check is opt-in.</p>
+    <div class="tools" data-where="foot">
+      <div class="langs" role="group" aria-label="Language" data-i18n-attr="aria-label:a11y.lang">
+        <button type="button" data-lang="en" lang="en" aria-pressed="true">English</button>
+        <button type="button" data-lang="ja" lang="ja" aria-pressed="false">日本語</button>
+        <button type="button" data-lang="ko" lang="ko" aria-pressed="false">한국어</button>
+        <button type="button" data-lang="zh-CN" lang="zh-CN" aria-pressed="false">中文 (简体)</button>
+      </div>
+      <button type="button" class="theme-toggle" aria-label="Light mode"><svg class="ic ic-sun" aria-hidden="true" focusable="false"><use href="#i-sun"/></svg><svg class="ic ic-moon" aria-hidden="true" focusable="false"><use href="#i-moon"/></svg><span class="theme-text">Light mode</span></button>
+    </div>
+    <p class="foot-small" data-i18n-html="credit.html">Avatar shown: <a href="https://godfall.club/collections/avatars-assets/products/godmagician" rel="noopener">GodMagician by Godfall</a></p>
+    <p class="foot-small" data-i18n="footer.disclaimer">Not affiliated with VRChat Inc., Unity Technologies, Adobe, Poiyomi or lilToon.</p>
+  </div>
+</footer>
+
+<div class="cta-bar" id="cta-bar" aria-hidden="true">
+  <a class="btn btn-primary" href="vcc://vpm/addRepo?url=https://avistry.github.io/avistry/index.json" tabindex="-1" data-i18n="cta.vcc">Get it in VCC</a>
+  <a class="cta-alt js-download" href="https://github.com/avistry/avistry/releases/latest" tabindex="-1" data-i18n="cta.pkg">.unitypackage</a>
+</div>
+
+<p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
+
+<script src="app.js" defer></script>
+<script src="ideas.js" defer></script>
+</body>
+</html>
