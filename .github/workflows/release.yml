@@ -96,7 +96,7 @@ jobs:
 
       - name: Write release notes from CHANGELOG
         run: |
-          node .github/scripts/changelog-section.mjs "${NOTES_SECTION:-${VERSION}}" CHANGELOG.md > notes.md
+          node .github/scripts/release-notes.mjs "${NOTES_SECTION:-${VERSION}}" CHANGELOG.md > notes.md
           VT=https://www.virustotal.com/gui/file
           {
             echo
