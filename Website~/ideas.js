@@ -20,7 +20,7 @@
   var BASE = 'media/v4/';
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
-  var reduced = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var reduced = (!!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || document.documentElement.classList.contains('perf'));
   var noAuto = reduced || !!(navigator.connection && navigator.connection.saveData);
   var phone = window.matchMedia ? matchMedia('(max-width: 639px)') : { matches: false };
 
@@ -43,6 +43,56 @@
   function label(prefix, id) {
     var v = T(prefix + id);
     return v != null && v !== '' ? v : null;
+  }
+
+  /* ---------- the view: "Scroll" holds the layers and the blend modes full screen while you scroll, "Overview" lays
+     them all out at once. Performance mode and reduced motion always get the overview. Switching keeps your place. ---------- */
+  var forced = reduced;
+  /* links from the Learn page ask for the overview (?view=overview): every tool at a glance is easier to follow */
+  var overview = forced || /[?&]view=overview/.test(location.search) || (function () { try { return localStorage.getItem('ats-fview') === 'overview'; } catch (e) { return false; } })();
+  var views = [];
+  function flash(node) {
+    if (!node) return;
+    node.classList.remove('is-here'); void node.offsetWidth; node.classList.add('is-here');
+    setTimeout(function () { node.classList.remove('is-here'); }, 1800);
+  }
+  /* the card nearest the middle of the screen */
+  function nearest(nodes) {
+    var mid = window.innerHeight / 2, best = null, bd = 1e9;
+    nodes.forEach(function (n) {
+      var r = n.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > window.innerHeight) return;
+      var dd = Math.abs(r.top + r.height / 2 - mid);
+      if (dd < bd) { bd = dd; best = n; }
+    });
+    return best;
+  }
+  function setView(ov) {
+    if (forced || ov === overview) return;
+    var at = null;
+    views.some(function (v) { var i = v.current(); if (i != null) { at = { v: v, i: i }; return true; } return false; });
+    overview = ov;
+    try { localStorage.setItem('ats-fview', ov ? 'overview' : 'scroll'); } catch (e) {}
+    document.documentElement.classList.toggle('fv-overview', ov);
+    views.forEach(function (v) { v.mode(ov); });
+    renderSwitch();
+    if (at) requestAnimationFrame(function () { at.v.show(at.i); });
+  }
+  function renderSwitch() {
+    $$('.fview button').forEach(function (b) {
+      var on = (b.getAttribute('data-fv') === 'overview') === overview;
+      b.setAttribute('aria-pressed', String(on));
+      if (forced && b.getAttribute('data-fv') === 'scroll') { b.disabled = true; b.title = T('fv.forced') || 'Performance mode always shows the overview.'; }
+    });
+  }
+  function initView() {
+    document.documentElement.classList.toggle('fv-overview', overview);
+    var sw = $('.fview');
+    if (!sw) return;
+    sw.hidden = false;
+    $$('button', sw).forEach(function (b) { b.addEventListener('click', function () { setView(b.getAttribute('data-fv') === 'overview'); }); });
+    renderSwitch();
+    onLang(renderSwitch);
   }
 
   function initStack() {
@@ -121,6 +171,32 @@
     });
     scene.appendChild(pile);
 
+    /* the overview: the texture, then every layer from the bottom up, each with its blend mode and opacity */
+    var cards = el('ol', 'stack-cards wrap');
+    cards.setAttribute('role', 'list');
+    cards.hidden = true;
+    root.insertBefore(cards, $('#stack-still'));
+    function renderCards() {
+      cards.textContent = '';
+      var list = (d.texture ? [{ img: d.texture, i: 0 }] : []).concat(d.layers.map(function (L, i) { return { img: L.img, L: L, i: i + 1 }; }));
+      list.forEach(function (c) {
+        var li = el('li', 'stack-card' + (c.L ? '' : ' is-base'));
+        li.setAttribute('data-i', c.i);
+        var pic = el('div', 'stack-card-pic'), im = document.createElement('img');
+        im.alt = ''; im.loading = 'lazy'; im.decoding = 'async'; im.width = 360; im.height = 360; im.src = BASE + c.img;
+        pic.appendChild(im);
+        pic.appendChild(el('span', 'stack-card-n tnum', String(c.i)));
+        li.appendChild(pic);
+        li.appendChild(el('b', 'stack-card-t', c.L ? (label('stack.layer.', c.L.id) || pretty(c.L.id.replace(/_/g, '-'))) : (T('stack.base') || 'The texture')));
+        if (c.L) {
+          var bk = c.L.blend === 'source-over' || !c.L.blend ? 'normal' : c.L.blend;
+          var blend = T('mode.b.' + bk) || bk.replace(/-/g, ' ');
+          li.appendChild(el('span', 'stack-card-m', blend + ' · ' + Math.round((c.L.opacity != null ? c.L.opacity : 1) * 100) + '%'));
+        } else li.appendChild(el('span', 'stack-card-m', T('mode.kind.o') || 'The texture, no layers'));
+        cards.appendChild(li);
+      });
+    }
+
     var items = [];
     function labelText(L) {
       var nm = label('stack.layer.', L.id);
@@ -138,16 +214,16 @@
         labels.appendChild(li);
         items.push(li);
       });
-      if (lead) {
-        lead.removeAttribute('data-i18n');
-        var setLead = function () { lead.textContent = F(T('stack.lead') || '', { n: n }); };
-        setLead();
-        onLang(setLead);
-      }
+      setLead();
       update(lastE, lastQ);
     }
+    function setLead() {
+      if (!lead) return;
+      lead.removeAttribute('data-i18n');
+      lead.textContent = F(T(pinned ? 'stack.lead' : 'stack.lead.ov') || T('stack.lead') || '', { n: n });
+    }
 
-    var lastE = 1, lastQ = 0.5, pinned = false, pin = { top: 76, h: 560 }, OPEN = 0.2;
+    var lastE = 1, lastQ = 0.5, lastCur = -1, pinned = false, pin = { top: 76, h: 560 }, OPEN = 0.2;
     function size() {
       var w = stage.clientWidth || window.innerWidth;
       if (pinned) {
@@ -175,6 +251,7 @@
       root.classList.toggle('is-focusing', focusing);
       root.classList.toggle('is-deep', pinned && q > OPEN * 0.8);
       var cur = m ? Math.round(f) : -1;
+      lastCur = q > OPEN ? cur : -1;
       var focus = m ? Number(items[cur].getAttribute('data-i')) : -1;
       if (pinned) paintStrip(items, f);
       items.forEach(function (li, k) { li.classList.toggle('is-near', pinned && k === cur); });
@@ -183,25 +260,53 @@
     }
 
     root.setAttribute('data-state', 'ready');
-    track.hidden = false;
-    pinned = !reduced;
-    if (pinned) {
-      root.setAttribute('data-pin', '');
-      if (head) stage.insertBefore(head, stage.firstChild);
+    var sched = null;
+    function mode(ov) {
+      pinned = !ov;
+      track.hidden = ov;
+      cards.hidden = !ov;
+      if (pinned) { root.setAttribute('data-pin', ''); if (head) stage.insertBefore(head, stage.firstChild); }
+      else { root.removeAttribute('data-pin'); if (head) root.insertBefore(head, root.firstChild); }
+      size();
+      setLead();
+      if (!pinned) { update(1, 0.5); return; }
+      if (!sched) {
+        sched = scrollLoop(track, function (r) {
+          if (!pinned) return;
+          /* it arrives folded into one texture and pulls apart once it holds */
+          var q = clamp01((pin.top - r.top) / Math.max(1, r.height - pin.h));
+          update(smooth(clamp01(q / OPEN)), q);
+        });
+        window.addEventListener('resize', function () { size(); if (pinned) sched(); });
+      }
+      sched();
     }
-    size();
+    renderCards();
     renderLabels();
+    mode(overview);
     if (window.ATS) window.ATS.setLayerCount(n);
-    if (!pinned) { update(1, 0.5); } else {
-      var sched = scrollLoop(track, function (r, vh) {
-        /* it arrives folded into one texture and pulls apart once it holds */
-        var q = clamp01((pin.top - r.top) / Math.max(1, r.height - pin.h));
-        var e = smooth(clamp01(q / OPEN));
-        update(e, q);
-      });
-      window.addEventListener('resize', function () { size(); sched(); });
-    }
-    onLang(renderLabels);
+    onLang(function () { renderLabels(); renderCards(); });
+    views.push({
+      mode: mode,
+      current: function () {
+        var r = root.getBoundingClientRect();
+        if (r.bottom < window.innerHeight * 0.4 || r.top > window.innerHeight * 0.6) return null;
+        if (!pinned) { var c = nearest($$('.stack-card', cards)); return c ? Number(c.getAttribute('data-i')) : 0; }
+        return lastCur >= 0 && items[lastCur] ? Number(items[lastCur].getAttribute('data-i')) : 0;
+      },
+      show: function (i) {
+        if (!pinned) {
+          var c = $('.stack-card[data-i="' + i + '"]', cards) || $('.stack-card', cards);
+          if (c) { c.scrollIntoView({ block: 'center' }); flash(c); }
+          return;
+        }
+        var m = items.length, k = -1;
+        items.forEach(function (li, j) { if (Number(li.getAttribute('data-i')) === i) k = j; });
+        var q = k < 0 ? OPEN * 0.5 : OPEN + 0.03 + (m > 1 ? k / (m - 1) : 0) * (0.92 - OPEN);
+        var r = track.getBoundingClientRect();
+        window.scrollTo(0, Math.round(window.scrollY + r.top - pin.top + q * (r.height - pin.h)) + 1);
+      }
+    });
   }
 
   /* ---------- 1b. every blend mode and adjustment layer, rendered by Avistry's own compositor ---------- */
@@ -237,38 +342,49 @@
       return r.kind === 'b' ? F(T('mode.kind.b') || '{n} blend modes', { n: nb }) : F(T('mode.kind.a') || '{n} adjustment layers', { n: na });
     }
 
-    if (reduced) {
-      /* no motion: every result as a still, in two groups */
-      var renderGrid = function () {
-        grid.textContent = '';
-        ['b', 'a'].forEach(function (k) {
-          var group = rows.filter(function (r) { return r.kind === k; });
-          if (!group.length) return;
-          grid.appendChild(el('h3', null, kindOf(group[0])));
-          group.forEach(function (r) {
-            var fig = el('figure'), im = document.createElement('img');
-            im.src = BASE + r.img; im.alt = ''; im.loading = 'lazy'; im.decoding = 'async'; im.width = 360; im.height = 360;
-            fig.appendChild(im); fig.appendChild(el('figcaption', null, nameOf(r)));
-            grid.appendChild(fig);
-          });
-        });
-      };
-      grid.hidden = false;
-      renderGrid();
-      onLang(renderGrid);
-      root.setAttribute('data-state', 'ready');
-      return;
+    /* the overview: the blend modes in their families (the texture first, to compare), then the adjustment layers */
+    var ORDER = ['', 'darken', 'lighten', 'contrast', 'compare', 'colour'];
+    function card(r, i) {
+      var fig = el('figure', 'modes-card'), im = document.createElement('img');
+      fig.setAttribute('data-i', i);
+      im.src = BASE + r.img; im.alt = ''; im.loading = 'lazy'; im.decoding = 'async'; im.width = 360; im.height = 360;
+      fig.appendChild(im);
+      fig.appendChild(el('figcaption', null, nameOf(r)));
+      return fig;
+    }
+    function renderGrid() {
+      grid.textContent = '';
+      var idx = rows.map(function (r, i) { return { r: r, i: i }; });
+      var blend = idx.filter(function (x) { return x.r.kind !== 'a'; }), adj = idx.filter(function (x) { return x.r.kind === 'a'; });
+      var g = function (x) { return x.r.kind === 'b' ? (GROUP[x.r.id] || '') : ''; };
+      blend.sort(function (a, b) { return (ORDER.indexOf(g(a)) - ORDER.indexOf(g(b))) || (a.i - b.i); });
+      grid.appendChild(el('h3', 'modes-gh', F(T('mode.kind.b') || '{n} blend modes', { n: nb })));
+      var last = null;
+      blend.forEach(function (x) {
+        var k = g(x);
+        if (k && k !== last) grid.appendChild(el('p', 'modes-sub', T('mode.g.' + k) || pretty(k)));
+        last = k;
+        grid.appendChild(card(x.r, x.i));
+      });
+      if (adj.length) {
+        grid.appendChild(el('h3', 'modes-gh', F(T('mode.kind.a') || '{n} adjustment layers', { n: na })));
+        adj.forEach(function (x) { grid.appendChild(card(x.r, x.i)); });
+      }
     }
 
-    var imgs = rows.map(function (r, i) {
-      var im = document.createElement('img');
-      im.alt = ''; im.decoding = 'async'; im.width = 720; im.height = 720;
-      if (i < 3) im.src = BASE + r.img; else im.setAttribute('data-src', BASE + r.img);
-      view.insertBefore(im, nameEl);
-      return im;
-    });
-    /* the rest load right after, while the section is still on its way */
-    setTimeout(function () { imgs.forEach(function (im) { var s = im.getAttribute('data-src'); if (s) { im.src = s; im.removeAttribute('data-src'); } }); }, 300);
+    var imgs = [];
+    function setupTrack() {
+      if (imgs.length) return;
+      imgs = rows.map(function (r, i) {
+        var im = document.createElement('img');
+        im.alt = ''; im.decoding = 'async'; im.width = 720; im.height = 720;
+        if (i < 3) im.src = BASE + r.img; else im.setAttribute('data-src', BASE + r.img);
+        view.insertBefore(im, nameEl);
+        return im;
+      });
+      /* the rest load right after, while the section is still on its way */
+      setTimeout(function () { imgs.forEach(function (im) { var s = im.getAttribute('data-src'); if (s) { im.src = s; im.removeAttribute('data-src'); } }); }, 300);
+    }
 
     var items = [], cur = -1, lastQ = 0, pin = { top: 76, h: 560 };
     function renderList() {
@@ -290,6 +406,7 @@
       track.style.height = Math.round(pin.h + rows.length * window.innerHeight * 0.11) + 'px';
     }
     function update(q) {
+      if (!items.length) return;
       lastQ = q;
       var f = clamp01((q - 0.02) / 0.94) * (rows.length - 1);
       var i = Math.round(f);
@@ -305,13 +422,45 @@
       counter(count, r.kind === 'b' ? i - off + 1 : i - off - nb + 1, r.kind === 'b' ? nb : na);
     }
     root.setAttribute('data-state', 'ready');
-    root.setAttribute('data-pin', '');
-    track.hidden = false;
-    size();
+    var sched = null, pinned = false;
+    function mode(ov) {
+      pinned = !ov;
+      track.hidden = ov;
+      grid.hidden = !ov;
+      if (ov) { root.removeAttribute('data-pin'); return; }
+      root.setAttribute('data-pin', '');
+      setupTrack();
+      size();
+      cur = -1;
+      if (!sched) {
+        sched = scrollLoop(track, function (r) { if (pinned) update(clamp01((pin.top - r.top) / Math.max(1, r.height - pin.h))); });
+        window.addEventListener('resize', function () { if (pinned) { size(); sched(); } });
+      }
+      sched();
+    }
+    renderGrid();
     renderList();
-    var sched = scrollLoop(track, function (r) { update(clamp01((pin.top - r.top) / Math.max(1, r.height - pin.h))); });
-    window.addEventListener('resize', function () { size(); sched(); });
-    onLang(renderList);
+    mode(overview);
+    onLang(function () { renderList(); renderGrid(); });
+    views.push({
+      mode: mode,
+      current: function () {
+        var r = root.getBoundingClientRect();
+        if (r.bottom < window.innerHeight * 0.4 || r.top > window.innerHeight * 0.6) return null;
+        if (!pinned) { var c = nearest($$('.modes-card', grid)); return c ? Number(c.getAttribute('data-i')) : 0; }
+        return cur < 0 ? 0 : cur;
+      },
+      show: function (i) {
+        if (!pinned) {
+          var c = $('.modes-card[data-i="' + i + '"]', grid);
+          if (c) { c.scrollIntoView({ block: 'center' }); flash(c); }
+          return;
+        }
+        var q = 0.02 + (rows.length > 1 ? i / (rows.length - 1) : 0) * 0.94;
+        var r = track.getBoundingClientRect();
+        window.scrollTo(0, Math.round(window.scrollY + r.top - pin.top + q * (r.height - pin.h)) + 1);
+      }
+    });
   }
 
   /* ---------- statements between sections: they slide in from their side as they scroll into view ---------- */
@@ -430,7 +579,36 @@
       });
       show(cur);
     }
-    range.addEventListener('input', function () { show(Number(range.value)); });
+    /* it plays through the history by itself while in view, then starts over; touching the slider, a step or the
+       button stops it */
+    var play = $('#undo-play'), auto = !reduced, timer = 0, inView = false;
+    function tick() {
+      clearTimeout(timer);
+      if (!auto || !inView) return;
+      timer = setTimeout(function () {
+        var atEnd = cur >= n - 1;
+        show(atEnd ? 0 : cur + 1);
+        tick();
+      }, cur >= n - 1 ? 2200 : 950);
+    }
+    function paintPlay() {
+      if (!play) return;
+      play.classList.toggle('is-paused', !auto);
+      play.setAttribute('aria-label', T(auto ? 'ui.pause' : 'ui.play') || (auto ? 'Pause' : 'Play'));
+    }
+    function stop() { auto = false; clearTimeout(timer); paintPlay(); }
+    if (play) {
+      play.hidden = reduced;
+      play.addEventListener('click', function () { auto = !auto; if (auto && cur >= n - 1) show(0); paintPlay(); tick(); });
+    }
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (en) { inView = en[0].isIntersecting; if (inView) tick(); else clearTimeout(timer); }, { threshold: 0.4 }).observe(view);
+    }
+    if (auto) cur = 0;
+    paintPlay();
+    onLang(paintPlay);
+    range.addEventListener('input', function () { stop(); show(Number(range.value)); });
+    list.addEventListener('click', stop);
     root.setAttribute('data-ready', '');
     bar.hidden = false; list.hidden = false;
     var h = $('#undo-h');
@@ -444,15 +622,22 @@
     var root = $('#files'), btn = $('#files-replay');
     if (!root || !('IntersectionObserver' in window) || reduced) return;
     root.classList.add('is-armed');
-    var played = false;
-    new IntersectionObserver(function (en, io) {
-      if (en[0].isIntersecting && !played) { played = true; root.classList.add('is-in'); if (btn) btn.hidden = false; io.disconnect(); }
-    }, { threshold: 0.5 }).observe(root);
-    if (btn) btn.addEventListener('click', function () {
+    /* it plays when the window is well in view (the middle of the screen), and again each time it comes back */
+    var plate = $('.files-plate', root) || root;
+    function play() {
       root.classList.remove('is-in');
       void root.offsetWidth;
       root.classList.add('is-in');
-    });
+      var v = $('#files-loop video');
+      if (v && !$('#files-loop').hidden) { try { v.currentTime = 0; } catch (e) {} }
+    }
+    new IntersectionObserver(function (en) {
+      if (en[0].isIntersecting) { play(); if (btn) btn.hidden = false; }
+    }, { rootMargin: '-30% 0px -30% 0px' }).observe(plate);
+    new IntersectionObserver(function (en) {
+      if (!en[0].isIntersecting) root.classList.remove('is-in');
+    }).observe(plate);
+    if (btn) btn.addEventListener('click', play);
   }
 
   /* ---------- 8. report card ---------- */
@@ -493,8 +678,10 @@
     var track = $('#lw-track'), shots = Array.prototype.slice.call(root.querySelectorAll('.lw-shot')), dots = Array.prototype.slice.call(root.querySelectorAll('.lw-dots li'));
     var n = shots.length, pin = pinMetrics(), copy = $('.lw-copy', root), lastW = 0, lastH = 0;
     if (n < 2) return;
-    root.setAttribute('data-pin', '');
+    var pinned = !overview;
+    if (pinned) root.setAttribute('data-pin', '');
     function size() {
+      if (!pinned) return;
       pin = pinMetrics();
       root.style.setProperty('--pin-top', pin.top + 'px');
       root.style.setProperty('--stage-h', pin.h + 'px');
@@ -503,6 +690,7 @@
       lastW = window.innerWidth; lastH = window.innerHeight;
     }
     function update(q) {
+      if (!pinned) return;
       /* each light holds for a while, then hands over to the next */
       var x = q * (n - 1), i = Math.min(n - 2, Math.floor(x)), t = smooth(clamp01((x - i - 0.3) / 0.4)), p = i + t;
       root.style.setProperty('--flash', (Math.sin(Math.PI * t) * 0.6).toFixed(3));
@@ -529,10 +717,34 @@
     });
     document.addEventListener('ats:lang', again);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(again);
+    /* Overview: the three lights side by side, nothing held */
+    views.push({
+      mode: function (ov) {
+        pinned = !ov;
+        if (ov) {
+          root.removeAttribute('data-pin');
+          track.style.height = '';
+          shots.forEach(function (s) { ['--o', '--c', '--z'].forEach(function (p) { s.style.removeProperty(p); }); });
+        } else { root.setAttribute('data-pin', ''); again(); }
+      },
+      current: function () { var r = root.getBoundingClientRect(); return r.top < window.innerHeight * 0.5 && r.bottom > window.innerHeight * 0.5 ? 0 : null; },
+      show: function () { root.scrollIntoView({ block: 'start' }); }
+    });
+  }
+
+  /* gallery close-ups: one big row each while scrolling, a grid in the overview */
+  function initCloseups() {
+    var rows = $$('.cu-row');
+    if (!rows.length) return;
+    views.push({
+      mode: function () {},
+      current: function () { var n = nearest(rows); return n ? rows.indexOf(n) : null; },
+      show: function (i) { if (rows[i]) { rows[i].scrollIntoView({ block: 'center' }); flash(rows[i]); } }
+    });
   }
 
   function boot() {
-    initStack(); initModes(); initSays(); initLight(); initMakeover(); initUndo(); initFiles(); initReport();
+    initView(); initStack(); initModes(); initSays(); initLight(); initCloseups(); initMakeover(); initUndo(); initFiles(); initReport();
   }
   if (window.ATS) window.ATS.ready(boot); else document.addEventListener('DOMContentLoaded', boot);
 })();

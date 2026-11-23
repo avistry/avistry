@@ -138,6 +138,55 @@
 
 全機能は[機能ページ](https://avistry.github.io/avistry/features.html)にまとめています。
 
+<!-- site-pages:start -->
+## ウェブサイトのページ一覧
+
+ページごとに画像があります。クリックするとそのページが開きます。
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/features.html?lang=ja"><img alt="機能: ピースを選び、レイヤーに描き、色替えし、マテリアルを調整して、マップをベイク。" src="../../Website~/media/og-features-ja.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/features.html?lang=ja"><b>機能</b></a> · <sub>ピースを選び、レイヤーに描き、色替えし、マテリアルを調整して、マップをベイク。</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/gallery.html?lang=ja"><img alt="ギャラリー: 回して見て、クローズアップを元の姿と比べ、3 種類の光で確かめましょう。" src="../../Website~/media/og-gallery-ja.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/gallery.html?lang=ja"><b>ギャラリー</b></a> · <sub>回して見て、クローズアップを元の姿と比べ、3 種類の光で確かめましょう。</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/learn.html?lang=ja"><img alt="学ぶ: ツール内の短いコース、全用語の用語集、各ツールの動き。" src="../../Website~/media/og-learn-ja.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/learn.html?lang=ja"><b>学ぶ</b></a> · <sub>ツール内の短いコース、全用語の用語集、各ツールの動き。</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/skills.html?lang=ja"><img alt="スキルツリー: Hierarchy の見つけ方からマップのベイクまで、6 ステージ・40 の短いスキル。" src="../../Website~/media/og-skills-ja.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/skills.html?lang=ja"><b>スキルツリー</b></a> · <sub>Hierarchy の見つけ方からマップのベイクまで、6 ステージ・40 の短いスキル。</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/glossary.html?lang=ja"><img alt="用語集: Unity、テクスチャ、VRChat アバターの 41 語を、Unity での場所つきで。" src="../../Website~/media/og-glossary-ja.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/glossary.html?lang=ja"><b>用語集</b></a> · <sub>Unity、テクスチャ、VRChat アバターの 41 語を、Unity での場所つきで。</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/about.html?lang=ja"><img alt="概要: できること・できないこと、ダウンロードの確かめ方、そして協力する方法。" src="../../Website~/media/og-about-ja.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/about.html?lang=ja"><b>概要</b></a> · <sub>できること・できないこと、ダウンロードの確かめ方、そして協力する方法。</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/download.html?lang=ja"><img alt="ダウンロード: VCC がいちばん簡単で、Avistry を最新に保ってくれます。" src="../../Website~/media/og-download-ja.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/download.html?lang=ja"><b>ダウンロード</b></a> · <sub>VCC がいちばん簡単で、Avistry を最新に保ってくれます。</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/?lang=ja"><img alt="ホーム: パーツを色替えし、レイヤーに描いて、新しい PNG に保存。元のファイルは変わりません。" src="../../Website~/media/og-ja.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/?lang=ja"><b>ホーム</b></a> · <sub>パーツを色替えし、レイヤーに描いて、新しい PNG に保存。元のファイルは変わりません。</sub>
+    </td>
+  </tr>
+</table>
+<!-- site-pages:end -->
+
 ## なぜAvistryなのか
 
 アバターを手に入れたら、Avistryで自分のものにしましょう。Avistryは、丁寧に作ったVRChatアバター用ツールキットです。どのツールも、クリエイターの実際の困りごとをわかりやすい言葉で解決し、公開する前に完成した状態になっていることを大切にしています。
@@ -150,6 +199,13 @@
   <img alt="元のHair.matとHair.pngは変わらず、Avistryが新しいPNG、マテリアルのコピー、編集レシピを追加する" src="../../.github/media/ja/files.webp" width="640">
   <br><sub>保存では必ず新しいファイルを作ります。元のテクスチャとマテリアルはそのままです。</sub>
 </p>
+
+<!-- release-banner:start -->
+<p align="center">
+  <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0"><img alt="Avistry 0.2.0" src="../../Website~/media/release/0.2.0/banner-ja.jpg" width="880"></a>
+  <br><sub>最新版 0.2.0 · <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0">リリースノートを読む</a></sub>
+</p>
+<!-- release-banner:end -->
 
 ## インストール
 

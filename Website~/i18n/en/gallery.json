@@ -91,5 +91,9 @@
  "cu.t.body": "From the front",
  "cu.k.body": "Saved as a new texture and a copy of the material.",
  "cu.t.back": "From behind",
- "light.lead": "Avistry changes the texture, not the light. The colours you pick keep their shading, so the same avatar holds up in daylight, at sunset and in a club."
+ "light.lead": "Avistry changes the texture, not the light. The colours you pick keep their shading, so the same avatar holds up in daylight, at sunset and in a club.",
+ "fv.scroll": "Scroll",
+ "fv.overview": "Overview",
+ "fv.forced": "Performance mode always shows the overview.",
+ "gv.label": "How to show the gallery"
 }

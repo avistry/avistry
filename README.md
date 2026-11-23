@@ -143,6 +143,55 @@ Also in the box:
 
 Every feature is listed on the [Features page](https://avistry.github.io/avistry/features.html).
 
+<!-- site-pages:start -->
+## The website, page by page
+
+Every page has its own picture. Click one to open it.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/features.html"><img alt="Features: Select pieces, paint on layers, recolour, tune the material and bake maps." src="Website~/media/og-features.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/features.html"><b>Features</b></a> · <sub>Select pieces, paint on layers, recolour, tune the material and bake maps.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/gallery.html"><img alt="Gallery: Spin it, compare close-ups with the original and see it in three kinds of light." src="Website~/media/og-gallery.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/gallery.html"><b>Gallery</b></a> · <sub>Spin it, compare close-ups with the original and see it in three kinds of light.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/learn.html"><img alt="Learn: A short course inside the tool, a glossary of every word and each tool at work." src="Website~/media/og-learn.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/learn.html"><b>Learn</b></a> · <sub>A short course inside the tool, a glossary of every word and each tool at work.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/skills.html"><img alt="Skill tree: 40 short skills in 6 tiers, from finding the Hierarchy to baking maps." src="Website~/media/og-skills.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/skills.html"><b>Skill tree</b></a> · <sub>40 short skills in 6 tiers, from finding the Hierarchy to baking maps.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/glossary.html"><img alt="Glossary: 41 words from Unity, textures and VRChat avatars, with where to find each one." src="Website~/media/og-glossary.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/glossary.html"><b>Glossary</b></a> · <sub>41 words from Unity, textures and VRChat avatars, with where to find each one.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/about.html"><img alt="About: What it is and is not, how to check a download yourself, and how to help." src="Website~/media/og-about.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/about.html"><b>About</b></a> · <sub>What it is and is not, how to check a download yourself, and how to help.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/download.html"><img alt="Download: VCC is the easiest way, and it keeps Avistry up to date." src="Website~/media/og-download.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/download.html"><b>Download</b></a> · <sub>VCC is the easiest way, and it keeps Avistry up to date.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/"><img alt="Home: Recolour parts, paint on layers and save a new PNG. Your original files never change." src="Website~/media/og.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/"><b>Home</b></a> · <sub>Recolour parts, paint on layers and save a new PNG. Your original files never change.</sub>
+    </td>
+  </tr>
+</table>
+<!-- site-pages:end -->
+
 ## Why Avistry
 
 You bought an avatar. Avistry is how it becomes yours. It is a VRChat avatar toolkit made with care: every tool has to
@@ -158,6 +207,13 @@ solve a real creator's problem, in plain words, and feel finished before it ship
   <img alt="Your originals, Hair.mat and Hair.png, stay as they were; Avistry adds a new PNG, a material copy and the edit recipe" src=".github/media/en/files.webp" width="640">
   <br><sub>Saving always makes new files. The original texture and material stay as they were.</sub>
 </p>
+
+<!-- release-banner:start -->
+<p align="center">
+  <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0"><img alt="Avistry 0.2.0" src="Website~/media/release/0.2.0/banner.jpg" width="880"></a>
+  <br><sub>What's new in 0.2.0 · <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0">Read the release notes</a></sub>
+</p>
+<!-- release-banner:end -->
 
 ## Install
 

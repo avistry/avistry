@@ -136,6 +136,55 @@
 
 所有功能都列在[功能页面](https://avistry.github.io/avistry/features.html)里。
 
+<!-- site-pages:start -->
+## 网站各页面一览
+
+每个页面都有自己的图片，点击即可打开该页面。
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/features.html?lang=zh-CN"><img alt="功能: 选择区块、在图层上绘制、换色、调整材质、烘焙贴图。" src="../../Website~/media/og-features-zh-CN.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/features.html?lang=zh-CN"><b>功能</b></a> · <sub>选择区块、在图层上绘制、换色、调整材质、烘焙贴图。</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/gallery.html?lang=zh-CN"><img alt="画廊: 旋转查看，把特写与原版对比，在三种光线下看效果。" src="../../Website~/media/og-gallery-zh-CN.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/gallery.html?lang=zh-CN"><b>画廊</b></a> · <sub>旋转查看，把特写与原版对比，在三种光线下看效果。</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/learn.html?lang=zh-CN"><img alt="学习: 工具内的短课程、涵盖每个词的术语表，以及每个工具的实际演示。" src="../../Website~/media/og-learn-zh-CN.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/learn.html?lang=zh-CN"><b>学习</b></a> · <sub>工具内的短课程、涵盖每个词的术语表，以及每个工具的实际演示。</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/skills.html?lang=zh-CN"><img alt="技能树: 从找到 Hierarchy 到烘焙贴图，6 个阶段，40 项简短技能。" src="../../Website~/media/og-skills-zh-CN.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/skills.html?lang=zh-CN"><b>技能树</b></a> · <sub>从找到 Hierarchy 到烘焙贴图，6 个阶段，40 项简短技能。</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/glossary.html?lang=zh-CN"><img alt="术语表: Unity、贴图和 VRChat Avatar 的 41 个词，并告诉你每个词在哪里找。" src="../../Website~/media/og-glossary-zh-CN.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/glossary.html?lang=zh-CN"><b>术语表</b></a> · <sub>Unity、贴图和 VRChat Avatar 的 41 个词，并告诉你每个词在哪里找。</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/about.html?lang=zh-CN"><img alt="关于: 它能做什么、不能做什么，如何自己检查下载，以及如何参与。" src="../../Website~/media/og-about-zh-CN.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/about.html?lang=zh-CN"><b>关于</b></a> · <sub>它能做什么、不能做什么，如何自己检查下载，以及如何参与。</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/download.html?lang=zh-CN"><img alt="下载: VCC 是最简单的方式，还会让 Avistry 保持最新。" src="../../Website~/media/og-download-zh-CN.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/download.html?lang=zh-CN"><b>下载</b></a> · <sub>VCC 是最简单的方式，还会让 Avistry 保持最新。</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/?lang=zh-CN"><img alt="首页: 给部位换色，在图层上绘制，另存为新的 PNG。原始文件不会改变。" src="../../Website~/media/og-zh-CN.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/?lang=zh-CN"><b>首页</b></a> · <sub>给部位换色，在图层上绘制，另存为新的 PNG。原始文件不会改变。</sub>
+    </td>
+  </tr>
+</table>
+<!-- site-pages:end -->
+
 ## 为什么选 Avistry
 
 你买下了一个模型，Avistry 能让它变成你自己的。这是一个用心打造的 VRChat 模型工具包：每个工具都要用大白话解决创作者的真实问题，并且在发布前就已经做到完善、好用。
@@ -148,6 +197,13 @@
   <img alt="你的原始文件 Hair.mat 和 Hair.png 保持原样；Avistry 另外添加了一张新的 PNG、一个材质副本和编辑配方" src="../../.github/media/zh-CN/files.webp" width="640">
   <br><sub>保存总是生成新文件。原来的贴图和材质保持原样。</sub>
 </p>
+
+<!-- release-banner:start -->
+<p align="center">
+  <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0"><img alt="Avistry 0.2.0" src="../../Website~/media/release/0.2.0/banner-zh-CN.jpg" width="880"></a>
+  <br><sub>最新版本 0.2.0 · <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0">阅读发布说明</a></sub>
+</p>
+<!-- release-banner:end -->
 
 ## 安装
 

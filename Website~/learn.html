@@ -11,6 +11,12 @@
 <meta property="og:title" content="Learn Avistry and Unity">
 <meta property="og:url" content="https://avistry.github.io/avistry/learn.html">
 <meta property="og:image" content="https://avistry.github.io/avistry/media/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:alt" content="The same avatar before and after an Avistry recolour, split down the middle.">
+<meta property="og:site_name" content="Avistry">
+<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://avistry.github.io/avistry/learn.html">
 <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
@@ -26,10 +32,36 @@
   try {
     var theme = localStorage.getItem('ats-theme');
     root.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+    /* Performance mode by itself: on weak devices, with data saver, or after this tab crashed or ran short of memory
+       (app.js keeps ats-alive set while the page is on screen); never just for being a phone on strong hardware */
+    var perf = localStorage.getItem('ats-perf'), nav = navigator, mem = nav.deviceMemory, cores = nav.hardwareConcurrency, con = nav.connection || {};
+    var ss = sessionStorage, sick = ss.getItem('ats-sick') === '1' || ss.getItem('ats-alive') === '1';
+    if (sick) ss.setItem('ats-sick', '1');
+    var strong = mem >= 8 || (!mem && cores >= 8);
+    var low = con.saveData || /2g/.test(con.effectiveType || '') || (window.matchMedia && matchMedia('(prefers-reduced-data: reduce)').matches) || mem <= 2 || cores <= 2 || (mem <= 4 && cores <= 4);
+    var auto = perf === null && (sick || (low && !strong));
+    if (perf === '1' || auto) root.classList.add('perf');
+    if (auto) root.classList.add('perf-auto');
+    var lk = /[?&]look=(\w+)/.exec(location.search);
+    lk = lk ? lk[1] : localStorage.getItem('ats-look');
+    root.setAttribute('data-tint', /^(original|crimson|frost|venom)$/.test(lk || '') ? lk : 'crimson');
+    var q = /\/(ja|ko|zh-CN)\/[^/]*$/.exec(location.pathname) || /[?&]lang=([\w-]+)/.exec(location.search), lang = q ? q[1] : localStorage.getItem('ats-lang');
+    if (!lang) {
+      var prefs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en'];
+      for (var i = 0; i < prefs.length && !lang; i++) {
+        var p = String(prefs[i]).toLowerCase();
+        lang = p.indexOf('ja') === 0 ? 'ja' : p.indexOf('ko') === 0 ? 'ko' : p.indexOf('zh') === 0 ? 'zh-CN' : p.indexOf('en') === 0 ? 'en' : null;
+      }
+    }
+    if (lang === 'ja' || lang === 'ko' || lang === 'zh-CN') {
+      root.lang = lang;
+      root.classList.add('i18n-wait');
+      setTimeout(function () { root.classList.remove('i18n-wait'); }, 1200);
+    }
   } catch (e) {}
 })();
 </script>
-<style>html{background:#141218}html[data-theme="light"]{background:#F3F1F6}</style>
+<style>html{background:#141218}html[data-theme="light"]{background:#F3F1F6}html.i18n-wait body{visibility:hidden}</style>
 <link rel="stylesheet" href="style.css">
 </head>
 <body class="v4 sub-page page-learn">
@@ -47,6 +79,10 @@
     <symbol id="i-shield" viewBox="0 0 20 20"><path d="M10 2.500 16 4.800V10c0 3.400-2.400 5.800-6 7.500C6.400 15.800 4 13.400 4 10V4.800z"/><path d="m7.200 10 2 2 3.600-4"/></symbol>
     <symbol id="i-undo" viewBox="0 0 20 20"><path d="M7.500 4.500 3.500 8.500l4 4"/><path d="M3.500 8.500H12a4.500 4.500 0 0 1 0 9H8"/></symbol>
     <symbol id="i-arrow" viewBox="0 0 20 20"><path d="M4 10h12M11 5l5 5-5 5"/></symbol>
+    <symbol id="lk-original" viewBox="0 0 24 24"><path fill="#F29AC4" d="M10 2c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7z"/><path fill="#A9B4F0" d="M18 13c.4 2.6 1.4 3.6 4 4-2.6.4-3.6 1.4-4 4-.4-2.6-1.4-3.6-4-4 2.6-.4 3.6-1.4 4-4z"/><circle fill="#A9B4F0" cx="5" cy="19.5" r="1.3"/></symbol>
+    <symbol id="lk-crimson" viewBox="0 0 24 24"><path fill="#E8242B" d="M12 1.5c1 4.2 6.5 6.6 6.5 12.8a6.5 6.5 0 0 1-13 0c0-3.2 1.6-5 3.3-6.6 0 2.200.9 3.400 2 4C10.300 8 11 4.800 12 1.500z"/><path fill="#F2B544" d="M12.2 11c.5 2.200 3.300 3.300 3.300 5.900a3.500 3.500 0 0 1-7 0c0-1.600.9-2.700 1.800-3.300.1 1.100.6 1.800 1.300 2.100-.3-1.700-.1-3.200.6-4.700z"/></symbol>
+    <symbol id="lk-frost" viewBox="0 0 24 24"><g fill="none" stroke="#BFE6FF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M9.4 5.2 12 7.6l2.6-2.4M9.4 18.8 12 16.4l2.6 2.4"/><g transform="rotate(60 12 12)"><path d="M12 3v18M9.4 5.2 12 7.6l2.6-2.4M9.4 18.8 12 16.4l2.6 2.4"/></g><g transform="rotate(120 12 12)"><path d="M12 3v18M9.4 5.2 12 7.6l2.6-2.4M9.4 18.8 12 16.4l2.6 2.4"/></g></g><path fill="#8FD3FF" d="M12 9.6 14.1 10.8v2.4L12 14.4 9.9 13.2v-2.4z"/></symbol>
+    <symbol id="lk-venom" viewBox="0 0 24 24"><path fill="#3CDC78" d="M11 3s-6.5 7.300-6.500 11.800a6.500 6.500 0 0 0 13 0C17.500 10.300 11 3 11 3z"/><path fill="none" stroke="#D9FFE6" stroke-width="1.6" stroke-linecap="round" d="M7.800 14.300a3.400 3.400 0 0 0 2.300 3.700"/><circle fill="#B8F25C" cx="19.300" cy="5.600" r="1.900"/><circle fill="#B8F25C" cx="16.200" cy="2.800" r="1.100"/></symbol>
   </defs>
 </svg>
 
@@ -63,8 +99,25 @@
       <a href="gallery.html" data-i18n="nav.gallery">Gallery</a>
       <a href="learn.html" aria-current="page" data-i18n="nav.learn">Learn</a>
       <a href="about.html" data-i18n="nav.about">About</a>
+      <a href="download.html" data-i18n="nav.download">Download</a>
     </nav>
-    <a class="btn btn-primary btn-sm hdr-get" href="index.html#install" data-i18n="nav.get">Get it</a>
+    <div class="looks hdr-looks" role="radiogroup" aria-label="Look" data-i18n-attr="aria-label:look.pick">
+      <button type="button" role="radio" aria-checked="false" tabindex="-1" data-look="original" style="--a:#E58AB8;--b:#2A3555" aria-label="Original" title="Original" data-i18n-attr="aria-label:look.original,title:look.original"><svg class="look-ic" aria-hidden="true" focusable="false"><use href="#lk-original"/></svg></button>
+      <button type="button" role="radio" aria-checked="true" tabindex="0" data-look="crimson" style="--a:#CF0A11;--b:#93611A" aria-label="Crimson" title="Crimson" data-i18n-attr="aria-label:look.crimson,title:look.crimson"><svg class="look-ic" aria-hidden="true" focusable="false"><use href="#lk-crimson"/></svg></button>
+      <button type="button" role="radio" aria-checked="false" tabindex="-1" data-look="frost" style="--a:#8FD3FF;--b:#C9D6E8" aria-label="Frost" title="Frost" data-i18n-attr="aria-label:look.frost,title:look.frost"><svg class="look-ic" aria-hidden="true" focusable="false"><use href="#lk-frost"/></svg></button>
+      <button type="button" role="radio" aria-checked="false" tabindex="-1" data-look="venom" style="--a:#3CDC78;--b:#2A2A30" aria-label="Venom" title="Venom" data-i18n-attr="aria-label:look.venom,title:look.venom"><svg class="look-ic" aria-hidden="true" focusable="false"><use href="#lk-venom"/></svg></button>
+    </div>
+    <div class="hdr-lang" id="hdr-lang">
+      <button type="button" class="hdr-lang-btn" aria-haspopup="true" aria-expanded="false" aria-controls="hdr-lang-menu" aria-label="Language" data-i18n-attr="aria-label:a11y.lang"><svg class="lang-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg><span class="hdr-lang-code" aria-hidden="true">EN</span></button>
+      <div class="hdr-lang-menu" id="hdr-lang-menu" role="menu" hidden>
+        <button type="button" role="menuitemradio" aria-checked="true" data-lang="en" lang="en"><b>EN</b>English</button>
+        <button type="button" role="menuitemradio" aria-checked="false" data-lang="ja" lang="ja"><b>JA</b>日本語</button>
+        <button type="button" role="menuitemradio" aria-checked="false" data-lang="ko" lang="ko"><b>KO</b>한국어</button>
+        <button type="button" role="menuitemradio" aria-checked="false" data-lang="zh-CN" lang="zh-CN"><b>ZH</b>中文 (简体)</button>
+      </div>
+    </div>
+    <a class="hdr-icon" href="https://github.com/avistry/avistry" rel="noopener" aria-label="Avistry on GitHub" data-i18n-attr="aria-label:hdr.github"><svg class="brand-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg></a>
+    <a class="hdr-icon hdr-icon--dc" href="https://discord.gg/sSeWgDJJjY" rel="noopener" aria-label="Join the Avistry Discord" data-i18n-attr="aria-label:hdr.discord"><svg class="brand-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.38-.44.87-.61 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.62-1.25.08.08 0 0 0-.08-.04 19.74 19.74 0 0 0-4.88 1.52.07.07 0 0 0-.03.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 5.99 3.03.08.08 0 0 0 .09-.03c.46-.63.87-1.3 1.22-1.99a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.89.08.08 0 0 1-.01-.13l.37-.29a.07.07 0 0 1 .08-.01c3.93 1.79 8.18 1.79 12.06 0a.07.07 0 0 1 .08.01l.37.29a.08.08 0 0 1-.01.13c-.6.35-1.22.65-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.36 1.22 1.99a.08.08 0 0 0 .09.03 19.84 19.84 0 0 0 6-3.03.08.08 0 0 0 .03-.06c.5-5.18-.84-9.67-3.55-13.66a.06.06 0 0 0-.03-.03zM8.02 15.33c-1.18 0-2.16-1.09-2.16-2.42 0-1.33.96-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.96 2.42-2.16 2.42zm7.97 0c-1.18 0-2.15-1.09-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.95 2.42-2.16 2.42z"/></svg></a>
     <button type="button" class="menu-btn" id="menu-btn" aria-expanded="false" aria-controls="sheet"><span data-i18n="nav.menu">Menu</span></button>
   </div>
 </header>
@@ -77,6 +130,9 @@
       <a href="gallery.html" data-i18n="nav.gallery">Gallery</a>
       <a href="learn.html" aria-current="page" data-i18n="nav.learn">Learn</a>
       <a href="about.html" data-i18n="nav.about">About</a>
+      <a href="download.html" data-i18n="nav.download">Download</a>
+      <a class="sheet-ext" href="https://github.com/avistry/avistry" rel="noopener"><svg class="brand-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg>GitHub</a>
+      <a class="sheet-ext" href="https://discord.gg/sSeWgDJJjY" rel="noopener"><svg class="brand-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.38-.44.87-.61 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.62-1.25.08.08 0 0 0-.08-.04 19.74 19.74 0 0 0-4.88 1.52.07.07 0 0 0-.03.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 5.99 3.03.08.08 0 0 0 .09-.03c.46-.63.87-1.3 1.22-1.99a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.89.08.08 0 0 1-.01-.13l.37-.29a.07.07 0 0 1 .08-.01c3.93 1.79 8.18 1.79 12.06 0a.07.07 0 0 1 .08.01l.37.29a.08.08 0 0 1-.01.13c-.6.35-1.22.65-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.36 1.22 1.99a.08.08 0 0 0 .09.03 19.84 19.84 0 0 0 6-3.03.08.08 0 0 0 .03-.06c.5-5.18-.84-9.67-3.55-13.66a.06.06 0 0 0-.03-.03zM8.02 15.33c-1.18 0-2.16-1.09-2.16-2.42 0-1.33.96-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.96 2.42-2.16 2.42zm7.97 0c-1.18 0-2.15-1.09-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.95 2.42-2.16 2.42z"/></svg>Discord</a>
     </nav>
     <div class="tools" data-where="sheet">
       <div class="langs" role="group" aria-label="Language" data-i18n-attr="aria-label:a11y.lang">
@@ -106,7 +162,8 @@
   <section class="sec" aria-labelledby="lr-path-title">
     <div class="wrap lr-path-wrap">
       <div>
-        <h2 class="h-display" id="lr-path-title" data-i18n="lr.path.title">Six tiers, from the first click to baked maps.</h2>
+        <h2 class="h-display" id="lr-path-title" data-i18n="lr.path.title">Six tiers.</h2>
+        <p class="lead lr-path-lead" data-i18n="lr.path.lead">From the first click to baked maps.</p>
         <ol class="lr-path" id="lr-path" role="list" aria-labelledby="lr-path-title">
           <noscript><li><a href="skills.html" data-i18n="lb.start">Start the skill tree</a></li></noscript>
         </ol>
@@ -119,7 +176,7 @@
     </div>
   </section>
 
-  <section class="sec lr-unity" aria-labelledby="in-unity-title">
+  <section class="sec lr-unity" aria-labelledby="in-unity-title" data-fx>
     <div class="wrap sk-how">
       <h2 class="h-display" id="in-unity-title" data-i18n="sk.how.title">Start it in Unity.</h2>
       <ol class="steps-list sk-steps">
@@ -128,34 +185,51 @@
         <li data-i18n-html="sk.how.3">Or open the <strong>?</strong> Help menu and choose <strong>Glossary and skill tree</strong>. Pick a skill, read the card and press <strong>Show me</strong> to try it.</li>
       </ol>
       <p class="small sk-fine" data-i18n="sk.how.note">Progress is kept on your computer only, with medals for each tier. Reset skill progress clears it.</p>
+      <div class="community community--help">
+        <svg class="brand-ic community-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.38-.44.87-.61 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.62-1.25.08.08 0 0 0-.08-.04 19.74 19.74 0 0 0-4.88 1.52.07.07 0 0 0-.03.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 5.99 3.03.08.08 0 0 0 .09-.03c.46-.63.87-1.3 1.22-1.99a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.89.08.08 0 0 1-.01-.13l.37-.29a.07.07 0 0 1 .08-.01c3.93 1.79 8.18 1.79 12.06 0a.07.07 0 0 1 .08.01l.37.29a.08.08 0 0 1-.01.13c-.6.35-1.22.65-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.36 1.22 1.99a.08.08 0 0 0 .09.03 19.84 19.84 0 0 0 6-3.03.08.08 0 0 0 .03-.06c.5-5.18-.84-9.67-3.55-13.66a.06.06 0 0 0-.03-.03zM8.02 15.33c-1.18 0-2.16-1.09-2.16-2.42 0-1.33.96-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.96 2.42-2.16 2.42zm7.97 0c-1.18 0-2.15-1.09-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.95 2.42-2.16 2.42z"/></svg>
+        <div class="community-text">
+          <h3 data-i18n="lr.help.title">Stuck? Ask on Discord.</h3>
+          <p data-i18n="lr.help.body">Struggling with Avistry or with Unity itself? Ask in our Discord. Other creators and the maintainers help out, and no question is too small.</p>
+          <span class="help-typing" aria-hidden="true"><i></i><i></i><i></i></span>
+        </div>
+        <a class="btn btn-primary community-btn" href="https://discord.gg/sSeWgDJJjY" rel="noopener" data-i18n="lr.help.join">Ask for help</a>
+      </div>
     </div>
   </section>
 
-  <section class="sec" aria-labelledby="lr-tools-title">
+  <section class="sec lr-tools-sec" aria-labelledby="lr-tools-title" data-fx>
     <div class="wrap">
       <h2 class="h-display" id="lr-tools-title" data-i18n="lr.tools.title">See each tool at work.</h2>
       <p class="lead lr-tools-lead" data-i18n="lr.tools.lead">Each one has a short loop on the features page.</p>
       <ul class="lr-tools" role="list">
-        <li><a href="features.html#select"><span class="lr-tool" data-i18n="lr.t.select">Select</span><span class="lr-tool-say" data-i18n="lr.t.select.p">Select exactly what you mean.</span></a></li>
-        <li><a href="features.html#paint"><span class="lr-tool" data-i18n="lr.t.paint">Paint</span><span class="lr-tool-say" data-i18n="lr.t.paint.p">Paint like in your art app.</span></a></li>
-        <li><a href="features.html#layers"><span class="lr-tool" data-i18n="lr.t.layers">Layers</span><span class="lr-tool-say" data-i18n="lr.t.layers.p">Every edit is its own layer.</span></a></li>
-        <li><a href="features.html#colour"><span class="lr-tool" data-i18n="lr.t.colour">Colour</span><span class="lr-tool-say" data-i18n="lr.t.colour.p">Recolour and match.</span></a></li>
-        <li><a href="features.html#material"><span class="lr-tool" data-i18n="lr.t.material">Material</span><span class="lr-tool-say" data-i18n="lr.t.material.p">Tune the material.</span></a></li>
-        <li><a href="features.html#maps"><span class="lr-tool" data-i18n="lr.t.maps">Maps</span><span class="lr-tool-say" data-i18n="lr.t.maps.p">Bake maps.</span></a></li>
-        <li><a href="features.html#safety"><span class="lr-tool" data-i18n="lr.t.safety">Safety</span><span class="lr-tool-say" data-i18n="lr.t.safety.p">Undo any step. Your originals never change.</span></a></li>
+        <li><a href="features.html?view=overview#select"><span class="lr-tool" data-i18n="lr.t.select">Select</span><span class="lr-tool-say" data-i18n="lr.t.select.p">Select exactly what you mean.</span></a></li>
+        <li><a href="features.html?view=overview#paint"><span class="lr-tool" data-i18n="lr.t.paint">Paint</span><span class="lr-tool-say" data-i18n="lr.t.paint.p">Paint like in your art app.</span></a></li>
+        <li><a href="features.html?view=overview#layers"><span class="lr-tool" data-i18n="lr.t.layers">Layers</span><span class="lr-tool-say" data-i18n="lr.t.layers.p">Every edit is its own layer.</span></a></li>
+        <li><a href="features.html?view=overview#colour"><span class="lr-tool" data-i18n="lr.t.colour">Colour</span><span class="lr-tool-say" data-i18n="lr.t.colour.p">Recolour and match.</span></a></li>
+        <li><a href="features.html?view=overview#material"><span class="lr-tool" data-i18n="lr.t.material">Material</span><span class="lr-tool-say" data-i18n="lr.t.material.p">Tune the material.</span></a></li>
+        <li><a href="features.html?view=overview#maps"><span class="lr-tool" data-i18n="lr.t.maps">Maps</span><span class="lr-tool-say" data-i18n="lr.t.maps.p">Bake maps.</span></a></li>
+        <li><a href="features.html?view=overview#safety"><span class="lr-tool" data-i18n="lr.t.safety">Safety</span><span class="lr-tool-say" data-i18n="lr.t.safety.p">Undo any step. Your originals never change.</span></a></li>
       </ul>
       <div class="pg-cta">
-        <a class="btn btn-primary btn-lg" href="index.html#install" data-i18n="nav.get">Get it</a>
+        <a class="btn btn-primary btn-lg" href="download.html" data-i18n="nav.get">Get it</a>
         <a class="btn btn-outline btn-lg" href="index.html" data-i18n="pg.home">Back to the front page</a>
       </div>
     </div>
   </section>
 </main>
 
+<section class="sec next-up" data-next="about,download" aria-labelledby="next-title">
+  <div class="wrap">
+    <h2 class="next-h" id="next-title" data-i18n="next.title">Keep going</h2>
+    <div class="next-grid"></div>
+  </div>
+</section>
+
 <footer class="foot">
   <div class="wrap foot-in">
     <div class="foot-cols">
       <nav class="foot-links" aria-label="Project" data-i18n-attr="aria-label:footer.project">
+        <a href="download.html" data-i18n="nav.download">Download</a>
         <a href="https://github.com/avistry/avistry" data-i18n="nav.github">GitHub</a>
         <a href="https://github.com/avistry/avistry/releases" data-i18n="footer.releases">Releases</a>
         <a href="https://discord.gg/sSeWgDJJjY" data-i18n="footer.discord">Discord</a>
@@ -179,6 +253,7 @@
         <button type="button" data-lang="zh-CN" lang="zh-CN" aria-pressed="false">中文 (简体)</button>
       </div>
       <button type="button" class="theme-toggle" aria-label="Light mode"><svg class="ic ic-sun" aria-hidden="true" focusable="false"><use href="#i-sun"/></svg><svg class="ic ic-moon" aria-hidden="true" focusable="false"><use href="#i-moon"/></svg><span class="theme-text">Light mode</span></button>
+      <button type="button" class="perf-toggle" aria-pressed="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/></svg><span data-i18n="skin.perf">Performance mode</span></button>
     </div>
     <p class="foot-small" data-i18n="footer.disclaimer">Not affiliated with VRChat Inc., Unity Technologies, Adobe, Poiyomi or lilToon.</p>
   </div>
@@ -192,6 +267,7 @@
 <p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
 
 <script src="tour.js" defer></script>
+<script src="paint.js" defer></script>
 <script src="app.js" defer></script>
 <script src="learn.js" defer></script>
 </body>

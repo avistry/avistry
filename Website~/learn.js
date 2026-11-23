@@ -213,6 +213,47 @@
       li.appendChild(a);
       root.appendChild(li);
     });
+    trackPath();
+  }
+
+  /* the path lights up as it scrolls by: the tier that has reached the middle of the screen is the current one, the
+     line fills down to it, and the badge on the screenshot counts along */
+  var pathUpdate = null;
+  function trackPath() {
+    if (pathUpdate) { pathUpdate(); return; }
+    var root = $('#lr-path'), shot = $('.lr-shot'), badge = null, raf = 0;
+    if (!root) return;
+    root.classList.add('is-live');
+    if (shot) {
+      badge = el('div', 'lr-tier-badge');
+      badge.setAttribute('aria-hidden', 'true');
+      badge.appendChild(el('span', 'lr-tb-word'));
+      badge.appendChild(el('b', null, '1'));
+      badge.appendChild(el('span', 'lr-tb-of', '/ 6'));
+      shot.appendChild(badge);
+    }
+    pathUpdate = function () {
+      raf = 0;
+      var stops = root.querySelectorAll('.lr-stop');
+      if (!stops.length) return;
+      var mid = window.innerHeight * 0.55, on = -1;
+      stops.forEach(function (s, i) { if (s.getBoundingClientRect().top < mid) on = i; });
+      stops.forEach(function (s, i) { s.classList.toggle('is-on', i <= on); s.classList.toggle('is-now', i === on); });
+      /* the line runs from the first number's centre to the current one's, never past it */
+      function centre(s) { var n = s.querySelector('.lr-num') || s, r = n.getBoundingClientRect(); return r.top + r.height / 2; }
+      var top0 = root.getBoundingClientRect().top, a = centre(stops[0]);
+      root.style.setProperty('--line-top', Math.round(a - top0) + 'px');
+      root.style.setProperty('--fill-h', on < 0 ? '0px' : Math.round(centre(stops[on]) - a) + 'px');
+      if (badge) {
+        var n = String(Math.max(1, on + 1)), bn = $('b', badge);
+        $('.lr-tb-word', badge).textContent = T('lr.tier', 'Tier');
+        if (bn.textContent !== n) { bn.textContent = n; badge.classList.remove('is-tick'); void badge.offsetWidth; badge.classList.add('is-tick'); }
+      }
+    };
+    function soon() { if (!raf) raf = requestAnimationFrame(pathUpdate); }
+    window.addEventListener('scroll', soon, { passive: true });
+    window.addEventListener('resize', soon);
+    pathUpdate();
   }
 
   function initSkills() {

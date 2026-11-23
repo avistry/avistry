@@ -1,6 +1,7 @@
 name: Pages
 
-# Publishes the landing page (Website~/), the VPM listing (index.json) and latest.json to GitHub Pages.
+# Publishes the landing page (Website~/), the VPM listing (index.json), latest.json and releases.json (every version
+# with its download counts) to GitHub Pages.
 # Repository setting required once: Settings > Pages > Source = "GitHub Actions".
 on:
   push:
@@ -9,9 +10,13 @@ on:
       - 'Website~/**'
       - '.github/vpm/**'
       - '.github/scripts/build-listing.mjs'
+      - '.github/scripts/build-releases.mjs'
       - '.github/scripts/lib.mjs'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
+  # keeps the download counts on the Download page fresh
+  schedule:
+    - cron: '23 */6 * * *'
 
 permissions:
   contents: read
@@ -38,9 +43,12 @@ jobs:
           cp -r Website~/. _site/
           rm -f _site/latest.example.json
           touch _site/.nojekyll
+          node .github/scripts/build-langs.mjs --site _site
           GITHUB_TOKEN="${GH_TOKEN}" node .github/scripts/build-listing.mjs --source .github/vpm/source.json --out _site/index.json
           gh release download --pattern latest.json --dir _site --clobber \
             || echo "::warning::No release with latest.json yet; the page uses its built-in fallback links."
+          GITHUB_TOKEN="${GH_TOKEN}" node .github/scripts/build-releases.mjs --out _site/releases.json \
+            || echo "::warning::Could not list the releases; the Download page shows the latest version only."
           ls -la _site
 
       - uses: actions/configure-pages@v6

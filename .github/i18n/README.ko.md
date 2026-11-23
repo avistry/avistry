@@ -141,6 +141,55 @@
 
 모든 기능은 [기능 페이지](https://avistry.github.io/avistry/features.html)에 정리되어 있습니다.
 
+<!-- site-pages:start -->
+## 웹사이트 페이지 둘러보기
+
+페이지마다 그림이 있습니다. 클릭하면 해당 페이지가 열립니다.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/features.html?lang=ko"><img alt="기능: 조각을 고르고, 레이어에 칠하고, 색을 바꾸고, 머티리얼을 다듬고, 맵을 베이크하세요." src="../../Website~/media/og-features-ko.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/features.html?lang=ko"><b>기능</b></a> · <sub>조각을 고르고, 레이어에 칠하고, 색을 바꾸고, 머티리얼을 다듬고, 맵을 베이크하세요.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/gallery.html?lang=ko"><img alt="갤러리: 돌려 보고, 클로즈업을 원본과 비교하고, 세 가지 조명에서 확인하세요." src="../../Website~/media/og-gallery-ko.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/gallery.html?lang=ko"><b>갤러리</b></a> · <sub>돌려 보고, 클로즈업을 원본과 비교하고, 세 가지 조명에서 확인하세요.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/learn.html?lang=ko"><img alt="배우기: 도구 안의 짧은 강좌, 모든 용어를 담은 용어집, 각 도구가 작동하는 모습." src="../../Website~/media/og-learn-ko.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/learn.html?lang=ko"><b>배우기</b></a> · <sub>도구 안의 짧은 강좌, 모든 용어를 담은 용어집, 각 도구가 작동하는 모습.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/skills.html?lang=ko"><img alt="스킬 트리: Hierarchy 찾기부터 맵 베이크까지, 6단계로 나눈 40개의 짧은 스킬." src="../../Website~/media/og-skills-ko.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/skills.html?lang=ko"><b>스킬 트리</b></a> · <sub>Hierarchy 찾기부터 맵 베이크까지, 6단계로 나눈 40개의 짧은 스킬.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/glossary.html?lang=ko"><img alt="용어집: Unity, 텍스처, VRChat 아바타 용어 41개와 각각 찾는 위치." src="../../Website~/media/og-glossary-ko.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/glossary.html?lang=ko"><b>용어집</b></a> · <sub>Unity, 텍스처, VRChat 아바타 용어 41개와 각각 찾는 위치.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/about.html?lang=ko"><img alt="소개: 할 수 있는 것과 없는 것, 다운로드를 직접 확인하는 방법, 그리고 돕는 방법." src="../../Website~/media/og-about-ko.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/about.html?lang=ko"><b>소개</b></a> · <sub>할 수 있는 것과 없는 것, 다운로드를 직접 확인하는 방법, 그리고 돕는 방법.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/download.html?lang=ko"><img alt="다운로드: VCC가 가장 쉬운 방법이고, Avistry를 최신으로 유지해 줍니다." src="../../Website~/media/og-download-ko.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/download.html?lang=ko"><b>다운로드</b></a> · <sub>VCC가 가장 쉬운 방법이고, Avistry를 최신으로 유지해 줍니다.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="https://avistry.github.io/avistry/?lang=ko"><img alt="홈: 부위 색을 바꾸고, 레이어에 칠하고, 새 PNG로 저장하세요. 원본 파일은 바뀌지 않습니다." src="../../Website~/media/og-ko.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/?lang=ko"><b>홈</b></a> · <sub>부위 색을 바꾸고, 레이어에 칠하고, 새 PNG로 저장하세요. 원본 파일은 바뀌지 않습니다.</sub>
+    </td>
+  </tr>
+</table>
+<!-- site-pages:end -->
+
 ## 왜 Avistry인가
 
 아바타를 샀다면, Avistry는 그 아바타를 나만의 것으로 만드는 도구입니다. 정성 들여 만든 VRChat 아바타 툴킷으로, 모든 도구는 크리에이터의 실제 문제를 쉬운 말로 풀어야 하고, 내놓기 전에 완성도를 갖춰야 합니다.
@@ -153,6 +202,13 @@
   <img alt="원본인 Hair.mat과 Hair.png는 그대로 남고, Avistry가 새 PNG, 머티리얼 복사본, 편집 레시피를 추가하는 모습" src="../../.github/media/ko/files.webp" width="640">
   <br><sub>저장하면 항상 새 파일이 만들어집니다. 원본 텍스처와 머티리얼은 그대로 남습니다.</sub>
 </p>
+
+<!-- release-banner:start -->
+<p align="center">
+  <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0"><img alt="Avistry 0.2.0" src="../../Website~/media/release/0.2.0/banner-ko.jpg" width="880"></a>
+  <br><sub>최신 버전 0.2.0 · <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0">릴리스 노트 읽기</a></sub>
+</p>
+<!-- release-banner:end -->
 
 ## 설치
 

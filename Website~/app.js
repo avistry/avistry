@@ -2,6 +2,20 @@
   'use strict';
 
   var LANGS = ['en', 'ja', 'ko', 'zh-CN'];
+  /* the language lives in the address: /ja/page.html on the published site (copies made by build-langs.mjs, so a
+     shared link previews in its language), ?lang=ja where those copies do not exist, as in a local preview */
+  var LANG_DIRS = !!document.querySelector('meta[name="ats-lang-dirs"]');
+  function langRoot() {
+    var p = location.pathname, d = p.slice(0, p.lastIndexOf('/') + 1), m = /([^/]+)\/$/.exec(d);
+    var l = m && LANGS.indexOf(m[1]) > 0 ? m[1] : null;
+    if (l) d = d.slice(0, d.length - l.length - 1);
+    return { dir: d, file: p.slice(p.lastIndexOf('/') + 1), lang: l };
+  }
+  if (LANG_DIRS) {
+    /* one fixed base for every relative file, whichever language folder the address shows */
+    var baseEl = document.querySelector('base') || document.head.appendChild(document.createElement('base'));
+    baseEl.href = location.origin + langRoot().dir;
+  }
   var FONT_LINKS = {
     ja: 'https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap',
     ko: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap',
@@ -11,7 +25,7 @@
   var PAGE = document.documentElement.getAttribute('data-page') || 'home';
   var dicts = {};
   var state = { lang: 'en', release: null, loadFailed: false, look: 'crimson', layerCount: null };
-  var reduced = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var reduced = (!!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) || document.documentElement.classList.contains('perf'));
   var saveData = !!(navigator.connection && navigator.connection.saveData);
   var noAuto = reduced || saveData;
 
@@ -34,6 +48,9 @@
   function validLook(l) { return LOOKS.indexOf(l) !== -1; }
   state.look = (function () {
     var q = /[?&]look=(\w+)/.exec(location.search);
+    /* the home page picked its look in index.html before the first paint */
+    var picked = document.getElementById('hero-bg');
+    if (picked && picked.getAttribute('data-pick')) return picked.getAttribute('data-look');
     /* the gallery opens on the next edited look each visit; a shared link from outside the site still wins */
     if (document.getElementById('gal-looks')) {
       var inside = false;
@@ -49,6 +66,12 @@
     var saved = store('ats-look');
     return validLook(saved) ? saved : 'crimson';
   })();
+  /* the look tints the site (style.css [data-tint]); paint.js repaints its banner */
+  function tint() {
+    document.documentElement.setAttribute('data-tint', state.look);
+    try { window.dispatchEvent(new Event('ats-tint')); } catch (e) {}
+  }
+  tint();
   /* the inline script in index.html may already have pointed the hero at the remembered look */
   state.heroShown = (function () {
     var bg = document.getElementById('hero-bg');
@@ -122,6 +145,8 @@
 
   /* ---------- language: common strings plus this page's strings, English as the fallback ---------- */
   function detectLang() {
+    var dirLang = LANG_DIRS && langRoot().lang;
+    if (dirLang) return dirLang;
     var q = /[?&]lang=([\w-]+)/.exec(location.search);
     if (q && LANGS.indexOf(q[1]) !== -1) return q[1];
     var saved = store('ats-lang');
@@ -159,7 +184,20 @@
     link.rel = 'stylesheet';
     link.href = href;
     link.setAttribute('data-font', lang);
+    link.onload = function () { link._loaded = true; };
     document.head.appendChild(link);
+  }
+  /* when switching by hand, wait a moment for the language's font, so the words do not jump again when it arrives */
+  var FONT_FAMILY = { ja: '"M PLUS Rounded 1c"', ko: '"Noto Sans KR"', 'zh-CN': '"Noto Sans SC"' };
+  function fontReady(lang) {
+    var link = document.querySelector('link[data-font="' + lang + '"]');
+    if (!link || !document.fonts || !document.fonts.load) return Promise.resolve();
+    var sample = (POOL[lang] || '').slice(0, 12);
+    var wait = new Promise(function (res) {
+      function go() { document.fonts.load('700 1em ' + FONT_FAMILY[lang], sample).then(res, res); }
+      if (link._loaded || link.sheet) go(); else { link.addEventListener('load', go); link.addEventListener('error', res); }
+    });
+    return Promise.race([wait, new Promise(function (res) { setTimeout(res, 900); })]);
   }
 
   /* the coral full stop on display headings (the logo's dot) */
@@ -189,6 +227,11 @@
       var v = t(el.getAttribute('data-i18n-html'));
       if (v != null) el.innerHTML = v;
     });
+    if (careWant) { careWant = false; careToast(); }
+    renderNext();
+    renderNavPics();
+    renderMorePics();
+    renderBanner();
     $$('[data-i18n-attr]').forEach(function (el) {
       el.getAttribute('data-i18n-attr').split(',').forEach(function (pair) {
         var i = pair.indexOf(':');
@@ -203,13 +246,16 @@
     $$('.langs button[data-lang]').forEach(function (b) {
       b.setAttribute('aria-pressed', String(b.getAttribute('data-lang') === lang));
     });
+    renderLangMenu();
 
     decorateHeadings();
+    $$('[data-look-legend]').forEach(setLegend);
     fillRepo();
     renderTheme();
     renderRelease();
     updateCompareText();
     renderStepButtons();
+    renderSel();
     renderCount();
     renderLook();
     paintAllButtons();
@@ -238,10 +284,339 @@
     if (LANGS.indexOf(lang) === -1) lang = 'en';
     loadCjkFont(lang);
     loadDict('en').then(function () { return loadDict(lang); }).then(function () {
+      return state.applied && state.lang !== lang ? fontReady(lang) : null;
+    }).then(function () {
+      var fx = state.applied && state.lang !== lang && !reduced;
       state.lang = lang;
       if (persist) store('ats-lang', lang);
+      langFx = fx ? [] : null;
+      var words = fx ? onScreenWords() : null;
       applyLang();
+      document.documentElement.classList.remove('i18n-wait');
+      if (fx) langGlitch(words, langFx);
+      langFx = null;
+      syncLangUrl();
+      syncLinks();
     });
+  }
+
+  function syncLangUrl() {
+    try {
+      var u = new URL(location.href);
+      if (LANG_DIRS) {
+        var r = langRoot();
+        u.pathname = r.dir + (state.lang === 'en' ? '' : state.lang + '/') + r.file;
+        u.searchParams.delete('lang');
+      } else if (state.lang === 'en') u.searchParams.delete('lang');
+      else u.searchParams.set('lang', state.lang);
+      if (u.href !== location.href) history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+    } catch (e) {}
+  }
+
+  /* ---------- switching language: the words on screen scramble into the new language, swapped pictures glitch ---------- */
+  var langFx = null;
+  var POOL = {
+    en: 'ABCDEFGHJKLMNPRSTUVWXYZabcdefghkmnprstuvwxyz0123456789#%&*+=?',
+    ja: 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモラリルレロワンあいうえおかきくけこ',
+    ko: '가나다라마바사아자차카타파하거너더러머버서어저처커터퍼허고노도로모보소오조초',
+    'zh-CN': '的一是不了人我在有他这中大来上国个到说们为子和你地出道也时年得就那要下以生会自着去'
+  };
+  function onScreenWords() {
+    var vh = window.innerHeight, out = [];
+    $$('[data-i18n]').forEach(function (el) {
+      if (out.length > 160 || !el.offsetParent) return;
+      var r = el.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > vh || !r.width) return;
+      out.push(el);
+    });
+    return out;
+  }
+  /* every text node inside the element scrambles, so styled words in a title do too */
+  function scramble(el, pool) {
+    var nodes = [], w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), tn, total = 0;
+    while ((tn = w.nextNode())) { if (tn.nodeValue.trim() && !(tn.parentNode.closest && tn.parentNode.closest('svg'))) { nodes.push({ n: tn, fin: tn.nodeValue, last: tn.nodeValue }); total += tn.nodeValue.length; } }
+    if (!nodes.length || total > 200) return;
+    var t0 = performance.now(), dur = 380 + Math.min(260, total * 6), unlock = steady(el);
+    function frame(now) {
+      var p = Math.min(1, (now - t0) / dur), at = 0;
+      for (var k = 0; k < nodes.length; k++) {
+        var o = nodes[k];
+        if (o.n.nodeValue !== o.last) { at += o.fin.length; continue; } /* something else changed it: leave it */
+        var s = '';
+        for (var i = 0; i < o.fin.length; i++) {
+          var c = o.fin.charAt(i);
+          s += p >= 1 || /\s/.test(c) || (at + i) / total < p * 1.2 - 0.2 ? c : pool.charAt((Math.random() * pool.length) | 0);
+        }
+        o.n.nodeValue = o.last = s;
+        at += o.fin.length;
+      }
+      if (p < 1) requestAnimationFrame(frame); else unlock();
+    }
+    requestAnimationFrame(frame);
+  }
+  /* random letters are wider or narrower than the real ones, so lines would rewrap on every frame; the box keeps the
+     size of the finished text until the scramble is done, and nothing around it moves */
+  function steady(el) {
+    var cs = getComputedStyle(el);
+    if (cs.display === 'inline' && el.parentElement) { el = el.parentElement; cs = getComputedStyle(el); }
+    if (el._steady) { el._steady++; return function () { if (--el._steady === 0) el._unsteady(); }; }
+    var r = el.getBoundingClientRect(), st = el.style, keep = { h: st.height, w: st.width, b: st.boxSizing };
+    var par = el.parentElement ? getComputedStyle(el.parentElement).display : '';
+    st.boxSizing = 'border-box';
+    st.height = r.height + 'px';
+    if (cs.display !== 'block' || /flex|grid/.test(par)) st.width = r.width + 'px';
+    el._steady = 1;
+    el._unsteady = function () { st.height = keep.h; st.width = keep.w; st.boxSizing = keep.b; el._steady = 0; };
+    return function () { if (--el._steady === 0) el._unsteady(); };
+  }
+  function flicker(el, cls, ms) {
+    el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+    clearTimeout(el['_' + cls]);
+    el['_' + cls] = setTimeout(function () { el.classList.remove(cls); }, ms);
+  }
+  function langGlitch(words, media) {
+    var pool = POOL[state.lang] || POOL.en;
+    words.forEach(function (el) {
+      flicker(el, 'lang-txt', 520);
+      scramble(el, pool);
+    });
+    (media || []).forEach(function (h) { flicker(h, 'lang-media', 620); });
+    var bars = document.createElement('div');
+    bars.className = 'lang-scan';
+    bars.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(bars);
+    setTimeout(function () { bars.remove(); }, 700);
+  }
+  function mediaHost(el) {
+    var v = el.tagName === 'SOURCE' ? el.parentNode : el;
+    return v.closest('.plate-body, .vwrap, .cmp, .hero, picture') || v;
+  }
+
+  /* ---------- keep going: the next page and Download, each with its share picture in this language ---------- */
+  function renderNext() {
+    var box = $('.next-up');
+    if (!box) return;
+    var grid = $('.next-grid', box), targets = (box.getAttribute('data-next') || '').split(',');
+    if (!grid.children.length) targets.forEach(function (p, i) {
+      var a = mk('a', 'next-card' + (i === 0 ? ' is-main' : ''));
+      a.href = (p === 'home' ? 'index' : p) + '.html';
+      a.setAttribute('data-p', p);
+      var pic = mk('span', 'next-pic');
+      var img = mk('img');
+      img.loading = 'lazy'; img.decoding = 'async'; img.width = 1200; img.height = 630; img.alt = '';
+      pic.appendChild(img);
+      var bar = mk('span', 'next-bar');
+      bar.appendChild(mk('span', 'next-tag'));
+      bar.appendChild(mk('b', 'next-name'));
+      var go = mk('span', 'next-go');
+      go.innerHTML = '<svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg>';
+      bar.appendChild(go);
+      a.appendChild(pic); a.appendChild(bar);
+      grid.appendChild(a);
+    });
+    $$('.next-card', grid).forEach(function (a, i) {
+      var p = a.getAttribute('data-p');
+      var tag = PAGE === 'download' ? t('next.see') || 'See it first' : p === 'download' ? t('nav.get') || 'Get it' : t('next.next') || 'Next';
+      $('.next-tag', a).textContent = tag;
+      $('.next-name', a).textContent = t('nav.' + (p === 'index' ? 'home' : p)) || p;
+      var img = $('img', a), src = 'media/og' + (p === 'index' || p === 'home' ? '' : '-' + p) + (state.lang === 'en' ? '' : '-' + state.lang) + '.jpg';
+      if (img.getAttribute('src') !== src) {
+        if (img.getAttribute('src') && langFx) langFx.push(a.firstChild);
+        img.setAttribute('src', src);
+      }
+    });
+  }
+
+  function ogPic(p) { return 'media/og' + (p === 'index' ? '' : '-' + p) + (state.lang === 'en' ? '' : '-' + state.lang) + '.jpg'; }
+  /* the link text moves into a span the first time, so the translation can change it without removing the picture */
+  function renderNavPics() {
+    $$('.nav a, .sheet-nav a').forEach(function (a) {
+      var m = /^(index|features|gallery|learn|about|download)\.html/.exec(a._h0 || a.getAttribute('href') || '');
+      if (!m) return;
+      var sheet = !!a.closest('.sheet-nav'), img = a._pic;
+      if (!img) {
+        var key = a.getAttribute('data-i18n'), label = mk('span', 'nav-label', a.textContent);
+        if (key) { label.setAttribute('data-i18n', key); a.removeAttribute('data-i18n'); }
+        a.textContent = '';
+        img = mk('img');
+        img.alt = ''; img.decoding = 'async'; img.width = 1200; img.height = 630;
+        if (sheet) {
+          img.className = 'sheet-pic'; img.loading = 'lazy';
+          a.appendChild(img); a.appendChild(label);
+        } else {
+          /* desktop: the preview loads the first time the link is pointed at or focused */
+          var peek = mk('span', 'nav-peek');
+          peek.setAttribute('aria-hidden', 'true');
+          peek.appendChild(img);
+          a.appendChild(label); a.appendChild(peek);
+          var load = function () { if (!img.getAttribute('src')) img.setAttribute('src', ogPic(m[1])); };
+          a.addEventListener('pointerenter', load);
+          a.addEventListener('focus', load);
+        }
+        a._pic = img;
+      }
+      if (sheet || img.getAttribute('src')) { if (img.getAttribute('src') !== ogPic(m[1])) img.setAttribute('src', ogPic(m[1])); }
+    });
+  }
+
+  /* the home page's "Want more?" cards: the page's picture on top */
+  function renderMorePics() {
+    $$('.more-card').forEach(function (a) {
+      var m = /^(features|gallery|about|learn|download)\.html/.exec(a._h0 || a.getAttribute('href') || '');
+      if (!m) return;
+      var img = a._pic;
+      if (!img) {
+        var pic = mk('span', 'mc-pic');
+        img = mk('img');
+        img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.width = 1200; img.height = 630;
+        pic.appendChild(img);
+        a.insertBefore(pic, a.firstChild);
+        a._pic = img;
+      }
+      var src = ogPic(m[1]);
+      if (img.getAttribute('src') !== src) {
+        if (img.getAttribute('src') && langFx) langFx.push(img.parentNode);
+        img.setAttribute('src', src);
+      }
+    });
+  }
+
+  /* the Download page's release banner, in this language */
+  function renderBanner() {
+    var a = $('.dl-banner');
+    if (!a) return;
+    var img = $('img', a), v = a.getAttribute('data-banner');
+    var src = 'media/release/' + v + '/banner' + (state.lang === 'en' ? '' : '-' + state.lang) + '.jpg';
+    if (img.getAttribute('src') !== src) { if (langFx) langFx.push(a); img.setAttribute('src', src); }
+  }
+
+  /* ---------- a glow beside the scrollbar while the page moves ---------- */
+  function initScrollGlow() {
+    if (reduced || $('.scroll-glow')) return;
+    var g = document.createElement('div');
+    g.className = 'scroll-glow';
+    g.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(g);
+    var raf = 0, timer = 0;
+    function place() {
+      raf = 0;
+      var vh = window.innerHeight, H = document.documentElement.scrollHeight;
+      if (H <= vh + 4) { g.classList.remove('is-on'); return; }
+      var th = Math.max(56, vh * vh / H), top = window.scrollY / (H - vh) * (vh - th);
+      /* a little taller than the thumb so the light spills softly above and below it */
+      g.style.height = Math.round(th + 120) + 'px';
+      g.style.transform = 'translate3d(0,' + (top - 60).toFixed(1) + 'px,0)';
+    }
+    window.addEventListener('scroll', function () {
+      if (!raf) raf = requestAnimationFrame(place);
+      g.classList.add('is-on');
+      clearTimeout(timer);
+      timer = setTimeout(function () { g.classList.remove('is-on'); }, 650);
+    }, { passive: true });
+    window.addEventListener('resize', function () { if (!raf) raf = requestAnimationFrame(place); });
+    place();
+  }
+
+  /* ---------- the page looks after itself ----------
+     While the page is on screen, sessionStorage keeps ats-alive set; a clean leave or a hidden tab clears it. If a
+     page finds it still set (the head script checks), the tab crashed, so the rest of the visit runs in Performance
+     mode. While scrolling, very slow frames or a nearly full memory switch it on too, unless it was turned off by hand. */
+  var careShown = false, careWant = false;
+  function careToast() {
+    if (careShown) return;
+    careShown = true;
+    var box = document.createElement('div');
+    box.className = 'care-toast';
+    box.setAttribute('role', 'status');
+    var p = document.createElement('p');
+    p.textContent = t('perf.auto.msg') || 'This device was struggling, so Performance mode is on for this visit.';
+    var off = document.createElement('button');
+    off.type = 'button'; off.className = 'btn btn-sm btn-outline';
+    off.textContent = t('perf.auto.off') || 'Turn it off';
+    off.addEventListener('click', function () {
+      store('ats-perf', '0');
+      try { sessionStorage.removeItem('ats-sick'); } catch (e) {}
+      location.reload();
+    });
+    var ok = document.createElement('button');
+    ok.type = 'button'; ok.className = 'btn btn-sm btn-primary';
+    ok.textContent = t('perf.auto.ok') || 'OK';
+    ok.addEventListener('click', function () { box.remove(); });
+    box.appendChild(p); box.appendChild(off); box.appendChild(ok);
+    document.body.appendChild(box);
+    setTimeout(function () { if (box.isConnected) box.classList.add('is-out'); }, 12000);
+    setTimeout(function () { box.remove(); }, 12600);
+    try { sessionStorage.setItem('ats-sick-told', '1'); } catch (e) {}
+  }
+  function initCare() {
+    var root = document.documentElement, ss = null, pref = null;
+    try { ss = window.sessionStorage; pref = localStorage.getItem('ats-perf'); } catch (e) { return; }
+    function alive(on) { try { if (on) ss.setItem('ats-alive', '1'); else ss.removeItem('ats-alive'); } catch (e) {} }
+    alive(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', function () { alive(document.visibilityState === 'visible'); });
+    window.addEventListener('pagehide', function () { alive(false); });
+    window.addEventListener('pageshow', function (e) { if (e.persisted) alive(true); });
+    if (root.classList.contains('perf-auto') && ss.getItem('ats-sick') === '1' && !ss.getItem('ats-sick-told')) careWant = true;
+    if (root.classList.contains('perf') || pref === '0') return;
+    function relieve() {
+      try { ss.setItem('ats-sick', '1'); } catch (e) {}
+      root.classList.add('perf', 'perf-auto');
+      regs.forEach(function (r) { if (r.el && !r.el.paused && r.want !== 'on') r.el.pause(); });
+      careToast();
+    }
+    /* frames are only measured while scrolling, so an idle page costs nothing */
+    var sampling = false, until = 0, last = 0, frames = 0, slow = 0, bad = 0, done = false;
+    function tick(now) {
+      if (done) return;
+      if (last) { frames++; if (now - last > 50) slow++; }
+      last = now;
+      if (now < until) { requestAnimationFrame(tick); return; }
+      sampling = false; last = 0;
+      if (frames >= 30) { bad = slow / frames > 0.35 ? bad + 1 : 0; frames = slow = 0; }
+      if (bad >= 3) { done = true; relieve(); }
+    }
+    setTimeout(function () {
+      window.addEventListener('scroll', function () {
+        if (done || document.visibilityState !== 'visible') return;
+        until = performance.now() + 2000;
+        if (!sampling) { sampling = true; requestAnimationFrame(tick); }
+      }, { passive: true });
+    }, 4000);
+    var m = window.performance && performance.memory;
+    if (m && m.jsHeapSizeLimit) {
+      var iv = setInterval(function () { if (done) { clearInterval(iv); return; } if (m.usedJSHeapSize / m.jsHeapSizeLimit > 0.85) { done = true; clearInterval(iv); relieve(); } }, 15000);
+    }
+  }
+
+  /* ---------- the language button in the top bar ---------- */
+  function initLangMenu() {
+    var wrap = $('#hdr-lang');
+    if (!wrap) return;
+    var btn = $('.hdr-lang-btn', wrap), menu = $('.hdr-lang-menu', wrap), items = $$('button[data-lang]', menu);
+    function open(on, focus) {
+      menu.hidden = !on;
+      btn.setAttribute('aria-expanded', String(on));
+      wrap.classList.toggle('is-open', on);
+      if (on && focus) { var cur = $('button[aria-checked="true"]', menu) || items[0]; cur.focus(); }
+    }
+    btn.addEventListener('click', function () { open(menu.hidden, true); });
+    items.forEach(function (b, i) {
+      b.addEventListener('click', function () { open(false); btn.focus(); setLang(b.getAttribute('data-lang'), true); });
+      b.addEventListener('keydown', function (e) {
+        var k = e.key, j = k === 'ArrowDown' ? i + 1 : k === 'ArrowUp' ? i - 1 : k === 'Home' ? 0 : k === 'End' ? items.length - 1 : -2;
+        if (j !== -2) { e.preventDefault(); items[(j + items.length) % items.length].focus(); }
+      });
+    });
+    wrap.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !menu.hidden) { open(false); btn.focus(); } });
+    document.addEventListener('click', function (e) { if (!menu.hidden && !wrap.contains(e.target)) open(false); });
+    wrap.addEventListener('focusout', function (e) { if (!menu.hidden && e.relatedTarget && !wrap.contains(e.relatedTarget)) open(false); });
+  }
+  function renderLangMenu() {
+    var wrap = $('#hdr-lang');
+    if (!wrap) return;
+    $$('button[data-lang]', wrap).forEach(function (b) { b.setAttribute('aria-checked', String(b.getAttribute('data-lang') === state.lang)); });
+    var code = $('.hdr-lang-code', wrap);
+    if (code) code.textContent = { en: 'EN', ja: 'JA', ko: 'KO', 'zh-CN': 'ZH' }[state.lang] || 'EN';
   }
 
   /* ---------- release (./latest.json, written by the release workflow) ---------- */
@@ -263,9 +638,24 @@
     };
   }
 
+  /* releases.json (written by the Pages build from GitHub Releases): every version with its files and download
+     counts. Without it, latest.json alone */
+  function fromReleases(d) {
+    if (!d || !d.releases || !d.releases.length) throw new Error('no releases');
+    state.releases = d;
+    var L = d.releases.filter(function (r) { return r.version === d.latest; })[0] || d.releases[0], files = {};
+    (L.files || []).forEach(function (f) { files[f.kind] = f.url; });
+    return { version: L.version, date: L.date, releaseUrl: L.url, unitypackage: files.unitypackage, zip: files.zip,
+      sha256: L.sha256 || {}, virustotal: L.virustotal || {} };
+  }
+
   function loadRelease() {
-    fetch('latest.json', { cache: 'no-store' })
+    fetch('releases.json', { cache: 'no-store' })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(fromReleases)
+      .catch(function () {
+        return fetch('latest.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+      })
       .then(function (d) {
         d = normalizeRelease(d);
         if (d && typeof d.version === 'string' && /^\d+\.\d+\.\d+/.test(d.version)) {
@@ -281,10 +671,10 @@
       });
   }
 
-  function formatDate(value) {
+  function formatDate(value, short) {
     var d = value ? new Date(value) : null;
     if (!d || isNaN(d)) return '';
-    return d.toLocaleDateString(state.lang, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+    return d.toLocaleDateString(state.lang, { year: 'numeric', month: short ? 'short' : 'long', day: 'numeric', timeZone: 'UTC' });
   }
 
   function hide(sel, yes) { var el = $(sel); if (el) el.hidden = yes; }
@@ -295,6 +685,7 @@
     var fallback = $('#release-fallback');
     if (!r) {
       if (state.loadFailed && fallback) { fallback.removeAttribute('data-wait'); fallback.hidden = false; }
+      if (state.loadFailed) renderReleases();
       return;
     }
     if (fallback) fallback.hidden = true;
@@ -363,6 +754,93 @@
     }
     var more = $('#release-more');
     if (more) more.hidden = $('#row-sha').hidden && $('#row-files').hidden;
+    setText('#dl-ver', r.version);
+    var vs = $('#dl-ver-stat');
+    if (vs) vs.hidden = !r.version;
+    setText('#dl-date', releasedText);
+    renderReleases();
+  }
+
+  /* the download count (all versions) counts up once when it comes into view */
+  function countUp(el, n) {
+    var text = function (v) { return Math.round(v).toLocaleString(state.lang); };
+    if (el._n === n) { el.textContent = text(n); return; }
+    el._n = n;
+    if (reduced || !('IntersectionObserver' in window)) { el.textContent = text(n); return; }
+    el.textContent = text(0);
+    var io = new IntersectionObserver(function (en) {
+      if (!en[0].isIntersecting) return;
+      io.disconnect();
+      var t0 = performance.now(), dur = 900;
+      (function step(now) {
+        var k = Math.min(1, (now - t0) / dur);
+        el.textContent = text(n * (1 - Math.pow(1 - k, 3)));
+        if (k < 1) requestAnimationFrame(step);
+      })(t0);
+    });
+    io.observe(el);
+  }
+
+  function mk(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  function renderReleases() {
+    var d = state.releases;
+    var total = d && typeof d.total_downloads === 'number' ? d.total_downloads : -1;
+    $$('.js-dl-line').forEach(function (b) { b.hidden = total <= 0; });
+    if (total > 0) $$('.js-dl-total').forEach(function (el) { countUp(el, total); });
+    var list = $('#dl-history'), none = $('#dl-history-none');
+    if (!list) return;
+    if (!d) { if (none) none.hidden = false; return; }
+    if (none) none.hidden = true;
+    list.textContent = '';
+    /* a timeline: version, date and count on one line, the two files and the notes as small buttons; the newest few
+       show, the rest open with one button */
+    var SHOW = 4, more = $('#dl-more'), open = !!list._open;
+    function icon(id) { var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'), u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); s.setAttribute('class', 'ic'); s.setAttribute('aria-hidden', 'true'); u.setAttribute('href', '#' + id); s.appendChild(u); return s; }
+    d.releases.forEach(function (r, i) {
+      var li = mk('li', 'dl-row' + (r.version === d.latest ? ' is-latest' : ''));
+      if (i >= SHOW && !open) li.hidden = true;
+      var head = mk('div', 'dl-row-h');
+      head.appendChild(mk('b', 'dl-row-v tnum', 'v' + r.version));
+      if (r.version === d.latest) head.appendChild(mk('span', 'tag tag--new', t('dl.newest') || 'Latest'));
+      else if (r.prerelease) head.appendChild(mk('span', 'tag', t('dl.pre') || 'Pre-release'));
+      var meta = mk('span', 'dl-row-d tnum', formatDate(r.date, true));
+      head.appendChild(meta);
+      var n = mk('span', 'dl-row-n tnum');
+      n.appendChild(icon('i-dl'));
+      n.appendChild(document.createTextNode((r.downloads || 0).toLocaleString(state.lang)));
+      n.title = fmt(t('dl.count') || '{n} downloads', { n: (r.downloads || 0).toLocaleString(state.lang) });
+      n.setAttribute('aria-label', n.title);
+      head.appendChild(n);
+      li.appendChild(head);
+      var links = mk('div', 'dl-row-a');
+      (r.files || []).slice().sort(function (a, b) { return a.kind === 'unitypackage' ? -1 : b.kind === 'unitypackage' ? 1 : 0; }).forEach(function (f) {
+        var u = safeUrl(f.url);
+        if (!u) return;
+        var a = mk('a', 'dl-file' + (f.kind === 'unitypackage' ? ' is-main' : ''));
+        a.appendChild(icon('i-dl'));
+        a.appendChild(document.createTextNode(f.kind === 'unitypackage' ? '.unitypackage' : '.zip'));
+        if (f.size) a.title = (f.size / 1048576).toFixed(1) + ' MB';
+        a.href = u;
+        links.appendChild(a);
+      });
+      var notes = safeUrl(r.url);
+      if (notes) {
+        var na = mk('a', 'dl-file dl-notes');
+        na.appendChild(icon('i-ext'));
+        na.appendChild(document.createTextNode(t('dl.notes') || 'Notes'));
+        na.href = notes; na.rel = 'noopener';
+        links.appendChild(na);
+      }
+      li.appendChild(links);
+      list.appendChild(li);
+    });
+    var hiddenN = Math.max(0, d.releases.length - SHOW);
+    if (more) {
+      more.hidden = open || !hiddenN;
+      more.textContent = fmt(t('dl.older') || 'Show {n} older versions', { n: hiddenN });
+      if (!more._bound) { more._bound = true; more.addEventListener('click', function () { list._open = true; $$('li[hidden]', list).forEach(function (li) { li.hidden = false; }); more.hidden = true; }); }
+    }
   }
 
   /* ---------- install: copy, send to PC ---------- */
@@ -453,7 +931,22 @@
     $$('meta[name="theme-color"]').forEach(function (m) { m.setAttribute('content', ground); });
   }
 
+  /* performance mode: everything moves as it does with reduced motion, without the drawing canvases or blur; the
+     page reloads so every script starts in the new mode */
+  function initPerf() {
+    var on = document.documentElement.classList.contains('perf');
+    $$('.perf-toggle').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(on));
+      b.addEventListener('click', function () {
+        store('ats-perf', on ? '0' : '1');
+        document.documentElement.classList.toggle('perf', !on);
+        location.reload();
+      });
+    });
+  }
+
   function initTheme() {
+    initPerf();
     $$('.theme-toggle').forEach(function (toggle) {
       toggle.addEventListener('click', function () {
         var next = currentTheme() === 'dark' ? 'light' : 'dark';
@@ -471,7 +964,36 @@
     var btn = $('#menu-btn'), sheet = $('#sheet');
     var hero = $('#top.hero');
     var clearOk = hdr.classList.contains('is-clear') && !!hero;
+    /* home: the bar's look icons come in once the hero's own chips have scrolled away */
+    var heroLooks = $('#looks');
+    if (heroLooks && 'IntersectionObserver' in window) {
+      new IntersectionObserver(function (en) { hdr.classList.toggle('show-looks', !en[0].isIntersecting); }).observe(heroLooks);
+    } else hdr.classList.add('show-looks');
     var ticking = false;
+    /* home: at the very top the painted name stands in for the logo and the links sit in the middle; the first bit
+       of scrolling folds it all back into the normal bar */
+    var word = clearOk && $('.hdr-word', hdr), nav = $('#nav', hdr);
+    if (word) hdr.classList.add('has-word', 'is-big');
+    /* the first load plays a short entrance: the name slides in and paints, a brush swipes under it, the dot drops,
+       then the links and buttons come in one after another */
+    /* index.html started it (and picked one of four) while the bar was read; not when the page opens scrolled down */
+    if (hdr.classList.contains('is-intro')) {
+      if (window.scrollY >= 48) hdr.classList.remove('is-intro');
+      else setTimeout(function () { hdr.classList.remove('is-intro'); }, 1700);
+    }
+    function navShift() {
+      if (!word || !nav || !nav.offsetWidth) return;
+      var right = $$('.hdr-lang, .hdr-icon', hdr).filter(function (n) { return n.offsetWidth; })[0];
+      var navR = nav.offsetLeft + nav.offsetWidth;
+      var want = hdr.clientWidth / 2 - (nav.offsetLeft + nav.offsetWidth / 2);
+      var room = right ? right.offsetLeft - 16 - navR : want;
+      hdr.style.setProperty('--nav-x', Math.max(0, Math.round(Math.min(want, room))) + 'px');
+    }
+    if (word) {
+      navShift();
+      window.addEventListener('resize', navShift);
+      if (window.ResizeObserver && nav) new ResizeObserver(navShift).observe(nav);
+    }
 
     function paintHeader() {
       ticking = false;
@@ -479,6 +1001,7 @@
       var open = sheet && !sheet.hidden;
       var past = hero.getBoundingClientRect().bottom < 120 || window.scrollY > hero.offsetHeight - 120;
       hdr.classList.toggle('is-clear', !past && !open);
+      if (word) hdr.classList.toggle('is-big', window.scrollY < 48 && !open);
     }
     function onScroll() { if (!ticking) { ticking = true; requestAnimationFrame(paintHeader); } }
     if (clearOk) { window.addEventListener('scroll', onScroll, { passive: true }); paintHeader(); }
@@ -553,12 +1076,20 @@
     var d = el.tagName === 'DETAILS' ? el : el.closest('details');
     if (d && !d.open) d.open = true;
     if (el.tagName === 'DETAILS') { try { el.scrollIntoView(); } catch (e) {} }
+    /* a home thumbnail opens its close-up: centre it, so the picture is not under the header and the look chips.
+       The browser's own jump to the anchor comes later on a fresh page, so centre again once the page has loaded. */
+    if (el.classList.contains('cu')) {
+      var centre = function () { try { el.scrollIntoView({ block: 'center' }); } catch (e) {} };
+      centre();
+      if (document.readyState !== 'complete') window.addEventListener('load', centre, { once: true });
+    }
   }
 
   /* ---------- compare sliders ---------- */
   var compares = [];
   var hint = { raf: 0, timer: 0 };
   var renderStepButtons = function () {};
+  var renderSel = function () {};
   var hero = null;
 
   /* the resting seam sits just left of the face so the first look is the saved face: phones 25%, desktop at a fixed spot in the picture (about 55% of the art, 60% on 21:9) */
@@ -687,6 +1218,38 @@
       });
     }, { threshold: 0.2 });
     rail.querySelectorAll('.cu-row').forEach(function (r) { io.observe(r); });
+  }
+
+  /* sections marked data-fx come in when they reach the screen (style.css has each one's look); the wings then
+     sweep their seam once, like the close-ups */
+  function initReveals() {
+    var els = $$('[data-fx]');
+    if (!els.length || reduced || !('IntersectionObserver' in window)) return;
+    /* data-fx="again" plays each time the section comes back: it resets once it has left the screen */
+    var away = new IntersectionObserver(function (en) {
+      en.forEach(function (e) { if (!e.isIntersecting) e.target.classList.remove('is-in'); });
+    });
+    var io = new IntersectionObserver(function (en) {
+      en.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var sec = e.target;
+        if (sec.getAttribute('data-fx') !== 'again') io.unobserve(sec);
+        else if (sec.classList.contains('is-in')) return;
+        sec.classList.add('is-in');
+        var cmp = $('.cmp', sec), c = cmp && compares.filter(function (x) { return x.set === cmp; })[0];
+        if (!c || cmp.classList.contains('is-single')) return;
+        c.touched = false;
+        var steps = [[22, 700], [50, 600]], k = 0;
+        function next() {
+          if (c.touched || k === steps.length || cmp.classList.contains('is-single')) { sec.classList.remove('is-sweeping'); return; }
+          var st = steps[k++];
+          c.glide(st[0], st[1]);
+          setTimeout(next, st[1] + 80);
+        }
+        setTimeout(function () { sec.classList.add('is-sweeping'); next(); }, 650);
+      });
+    }, { threshold: 0.18, rootMargin: '0px 0px -22% 0px' });
+    els.forEach(function (el) { el.classList.add('fx-on'); io.observe(el); if (el.getAttribute('data-fx') === 'again') away.observe(el); });
   }
 
   /* every .cmp on the page (wings, close-ups) */
@@ -931,18 +1494,20 @@
   /* ---------- one look for the whole site ---------- */
   var mediaReady = false;
 
-  /* internal links carry ?look= so the next page opens on the same look even without storage */
+  /* internal links carry ?look= so the next page opens on the same look even without storage, and point into the
+     language folder so the next page keeps the language too */
   function syncLinks() {
     $$('a[href]').forEach(function (a) {
       if (a._h0 === undefined) a._h0 = a.getAttribute('href');
       var h = a._h0;
-      if (!/^(?:index|features|gallery|about|glossary|skills|learn)\.html(?:[?#]|$)/.test(h)) return;
+      if (!/^(?:index|features|gallery|about|glossary|skills|learn|download)\.html(?:[?#]|$)/.test(h)) return;
       var hash = '', q = '', i = h.indexOf('#');
       if (i !== -1) { hash = h.slice(i); h = h.slice(0, i); }
       i = h.indexOf('?');
       if (i !== -1) { q = h.slice(i + 1); h = h.slice(0, i); }
       var p = new URLSearchParams(q);
       p.set('look', state.look);
+      if (LANG_DIRS && state.lang !== 'en') h = state.lang + '/' + h;
       a.setAttribute('href', h + '?' + p.toString() + hash);
     });
   }
@@ -1002,13 +1567,30 @@
     var look = state.look;
     var key = look === 'crimson' ? el._k0 : (look !== 'original' && el.hasAttribute('data-legend-neutral') ? el.getAttribute('data-legend-neutral') : 'look.' + look + '.legend');
     el.setAttribute('data-i18n', key);
-    var v = t(key); if (v) el.textContent = v;
+    var v = t(key);
+    if (!v) return;
+    /* an edited look is named in a label in its own colours; the "Venom:" that opens its line moves into it */
+    var name = look !== 'original' ? t('look.' + look) : '';
+    var lead = name && v.indexOf(name) === 0 ? /^[^:：]+[:：]\s*/.exec(v) : null;
+    el.textContent = '';
+    if (name) { el.appendChild(mk('span', 'cu-look', name)); el.appendChild(document.createTextNode(' ')); }
+    el.appendChild(document.createTextNode(lead ? v.slice(lead[0].length) : v));
+  }
+
+  /* a picture glitches once its new look has loaded */
+  function glitchLoaded(host) {
+    if (reduced || !host) return;
+    var im = $('.cmp-saved img', host) || $('img', host), go = function () { glitch(host); };
+    if (im && im.decode) im.decode().then(go, go); else go();
   }
 
   function applyPictures() {
     if (!mediaReady) return;
     applyAlts();
     var look = state.look, single = look === 'original';
+    var changed = applyPictures.last && applyPictures.last !== look;
+    applyPictures.last = look;
+    if (changed) { $$('.cmp[data-see]').forEach(glitchLoaded); $$('[data-light]').forEach(glitchLoaded); }
     $$('.cmp[data-see]').forEach(function (cmp) {
       var tab = cmp.getAttribute('data-see');
       var fig = cmp.closest('figure');
@@ -1124,6 +1706,12 @@
       if (state.heroShown !== look) return;
       requestAnimationFrame(function () {
         pairs.forEach(function (p) { p.pic.style.opacity = '1'; });
+        /* a quick glitch as the new look lands */
+        if (hero && !reduced) {
+          hero.classList.remove('is-glitch'); void hero.offsetWidth; hero.classList.add('is-glitch');
+          clearTimeout(hero._glitch);
+          hero._glitch = setTimeout(function () { hero.classList.remove('is-glitch'); }, 360);
+        }
         setTimeout(function () {
           pairs.forEach(function (p) { p.old.forEach(function (n) { if (n.parentNode && n !== p.pic) n.parentNode.removeChild(n); }); });
         }, reduced ? 0 : 320);
@@ -1135,6 +1723,7 @@
   function setLook(look, silent) {
     if (!validLook(look)) return Promise.resolve();
     state.look = look;
+    tint();
     if (!silent) rememberLook();
     syncLinks();
     applyPictures();
@@ -1178,16 +1767,45 @@
     }
   }
 
-  /* every look picker on the page (home hero, gallery bar): same state, same keys */
+  /* switching looks: the new look paints over the page in a circle from the button (View Transitions); where the
+     browser has none, a ring in the new colours runs out from the button instead */
+  function lookSwitch(btn, run) {
+    btn.classList.remove('is-picked'); void btn.offsetWidth; btn.classList.add('is-picked');
+    setTimeout(function () { btn.classList.remove('is-picked'); }, 520);
+    if (reduced) { run(); return; }
+    var root = document.documentElement, rc = btn.getBoundingClientRect();
+    var x = rc.left + rc.width / 2, y = rc.top + rc.height / 2;
+    var far = Math.ceil(Math.sqrt(Math.pow(Math.max(x, innerWidth - x), 2) + Math.pow(Math.max(y, innerHeight - y), 2)));
+    if (!document.startViewTransition) { run(); burst(x, y, far); return; }
+    root.style.setProperty('--vt-x', x + 'px');
+    root.style.setProperty('--vt-y', y + 'px');
+    root.style.setProperty('--vt-r', far + 'px');
+    root.classList.add('look-vt');
+    var done = function () { root.classList.remove('look-vt'); };
+    try { document.startViewTransition(run).finished.then(done, done); } catch (e) { done(); run(); }
+  }
+  function burst(x, y, far) {
+    var b = mk('span', 'look-burst');
+    b.style.setProperty('--bx', x + 'px');
+    b.style.setProperty('--by', y + 'px');
+    b.style.setProperty('--bs', String(Math.round(far / 12)));
+    document.body.appendChild(b);
+    b.addEventListener('animationend', function () { if (b.parentNode) b.parentNode.removeChild(b); });
+  }
+
+  /* every look picker on the page (top bar, home hero, gallery bar): same state, same keys */
   function initLookChips() {
     $$('.looks').forEach(function (group) {
       var chips = $$('button[data-look]', group);
       function pick(b) {
         var look = b.getAttribute('data-look');
         if (look === state.look) return;
-        var r = hero && heroCmp ? restSeam() : 0;
+        /* the top bar paints the whole page in a circle; the hero chips and the gallery bar switch in place, so the
+           picture's own glitch shows right where you are looking and the hero seam stays where you left it */
+        if (group.classList.contains('hdr-looks')) { lookSwitch(b, function () { setLook(look); }); return; }
+        b.classList.remove('is-picked'); void b.offsetWidth; b.classList.add('is-picked');
+        setTimeout(function () { b.classList.remove('is-picked'); }, 520);
         setLook(look);
-        if (heroCmp && look !== 'original') heroCmp.glide(r, 400);
       }
       chips.forEach(function (b) {
         b.addEventListener('click', function () { pick(b); });
@@ -1228,10 +1846,11 @@
         var nv = MEDIA + langDir(el[key]) + el[key];
         if (nv === v) return;
         el.setAttribute(a, nv);
+        if (langFx) langFx.push(mediaHost(el));
         if (el.tagName === 'SOURCE' && el.parentNode && el.parentNode.tagName === 'VIDEO') el.parentNode.load();
       });
     });
-    $$('video[data-loop]').forEach(function (v) { if ('_lm' in v && v._lm !== loopFile(v)) bindLoop(v); });
+    $$('video[data-loop]').forEach(function (v) { if ('_lm' in v && v._lm !== loopFile(v)) { if (langFx) langFx.push(mediaHost(v)); bindLoop(v); } });
     relangHow();
   }
 
@@ -1293,7 +1912,7 @@
       var score = 0;
       if (r.ready && r.ratio > 0) {
         if (r.want === 'on') score = 2 + r.ratio;
-        else if (!ext && r.want === 'auto' && !noAuto && r.ratio >= 0.6) score = 1 + r.ratio;
+        else if (!ext && r.want === 'auto' && !noAuto && r.ratio >= r.at) score = 1 + r.ratio;
       }
       if (score > top) { top = score; best = r; }
     });
@@ -1301,7 +1920,8 @@
       if (r === best) {
         if (r.el.paused) {
           var p = r.el.play();
-          if (p && p.catch) p.catch(function () { r.want = 'off'; paintButton(r); });
+          /* a new file loading (a quick look switch) aborts the play; only a browser refusal means stay still */
+          if (p && p.catch) p.catch(function (e) { if (e && e.name === 'NotAllowedError') r.want = 'off'; paintButton(r); });
         }
       } else if (!r.el.paused) r.el.pause();
       paintButton(r);
@@ -1362,7 +1982,7 @@
 
   function register(video, btn) {
     if (video._r) return video._r;
-    var r = { el: video, btn: btn || (video.parentNode && $('.pp', video.parentNode)), ratio: 0, want: 'auto', ready: false };
+    var r = { el: video, btn: btn || (video.parentNode && $('.pp', video.parentNode)), ratio: 0, want: 'auto', ready: false, at: parseFloat(video.getAttribute('data-play-at')) || 0.6 };
     video._r = r;
     regs.push(r);
     if (!vio && 'IntersectionObserver' in window) {
@@ -1410,21 +2030,34 @@
   }
 
   /* switching a look-following loop (spin, wings orbit) keeps the angle: the current frame is held on a canvas
-     while the new file loads, then the new file jumps to the same point in the turn */
+     while the new file loads, then the new file jumps to the same point in the turn and a recolour seam sweeps the
+     old look away, the way the tool shows a saved look over the original */
   function holdFrame(video) {
     if (!video.duration || video.readyState < 2 || !video.videoWidth) return null;
     var old = video.parentNode && $('.v-hold', video.parentNode);
     if (old) old.remove();
-    var cv = document.createElement('canvas');
+    var cv = document.createElement('canvas'), box = null;
     cv.width = video.videoWidth; cv.height = video.videoHeight;
     try { cv.getContext('2d').drawImage(video, 0, 0); } catch (e) { cv = null; }
     if (cv) {
-      cv.className = 'v-hold';
-      cv.setAttribute('aria-hidden', 'true');
-      cv.style.cssText = 'position:absolute;pointer-events:none;left:' + video.offsetLeft + 'px;top:' + video.offsetTop + 'px;width:' + video.offsetWidth + 'px;height:' + video.offsetHeight + 'px;object-fit:' + getComputedStyle(video).objectFit;
-      video.parentNode.insertBefore(cv, video.nextSibling);
+      box = document.createElement('div');
+      box.className = 'v-hold';
+      box.setAttribute('aria-hidden', 'true');
+      box.style.cssText = 'left:' + video.offsetLeft + 'px;top:' + video.offsetTop + 'px;width:' + video.offsetWidth + 'px;height:' + video.offsetHeight + 'px';
+      cv.style.objectFit = getComputedStyle(video).objectFit;
+      box.appendChild(cv);
+      box.appendChild(document.createElement('i'));
+      video.parentNode.insertBefore(box, video.nextSibling);
     }
-    return { frac: (video.currentTime % video.duration) / video.duration, cv: cv };
+    return { frac: (video.currentTime % video.duration) / video.duration, cv: box };
+  }
+
+  /* a quick glitch on a look loop as the new look lands */
+  function glitch(host) {
+    if (reduced || !host) return;
+    host.classList.remove('is-glitch'); void host.offsetWidth; host.classList.add('is-glitch');
+    clearTimeout(host._glitch);
+    host._glitch = setTimeout(function () { host.classList.remove('is-glitch'); }, 360);
   }
 
   function resumeAt(video, hold) {
@@ -1434,7 +2067,17 @@
       done = true;
       video.removeEventListener('seeked', onSeeked);
       video.removeEventListener('error', onSeeked, true);
-      if (hold.cv) requestAnimationFrame(function () { hold.cv.remove(); });
+      glitch(video.parentNode);
+      var box = hold.cv;
+      if (!box) return;
+      if (reduced || !box.isConnected) { box.remove(); return; }
+      requestAnimationFrame(function () {
+        /* by now the chips show the new look: the seam takes its colours */
+        var chip = $('.looks button[aria-checked="true"]');
+        if (chip) { box.style.setProperty('--a', chip.style.getPropertyValue('--a')); box.style.setProperty('--b', chip.style.getPropertyValue('--b')); }
+        box.classList.add('is-wipe');
+        setTimeout(function () { box.remove(); }, 540);
+      });
     }
     function onSeeked() { drop(); }
     video.preload = 'auto';
@@ -1471,9 +2114,17 @@
     }
     if (ok) {
       r.ready = true;
-      var hold = holdFrame(video);
+      var hold = video.hasAttribute('data-look-loop') ? holdFrame(video) : null;
+      /* the loop's own first frame as the still: the page's placeholder picture can be a different shape, and it
+         stays on screen whenever the loop does not play on its own (reduced motion, performance mode, data saver) */
+      var pn = file.replace(/^.*\//, '') + '-poster.webp';
+      if (isReady(pn)) video.setAttribute('poster', MEDIA + langDir(pn) + pn);
       addSources(video, MEDIA + file);
       if (hold) resumeAt(video, hold);
+      else if (video._shown && video._shown !== file && video.hasAttribute('data-look-loop')) {
+        video.addEventListener('loadeddata', function once() { video.removeEventListener('loadeddata', once); glitch(video.parentNode); });
+      }
+      video._shown = file;
     } else {
       r.ready = false;
       video.pause();
@@ -1551,6 +2202,58 @@
     setStep(0, false);
   }
 
+  /* features: the selection tools play one after another; the list picks one, back / pause / next steer it */
+  function initSel() {
+    var list = $('#sel-steps'), video = $('#sel-plate video');
+    if (!list || !video) return;
+    var steps = $$('.sel-step', list), r = register(video), cur = 0;
+    var cap = $('#sel-cap'), count = $('#sel-n'), play = $('.sel-play'), prev = $('.sel-prev'), next = $('.sel-next');
+    function stopped() { return r.want === 'off' || (r.want === 'auto' && noAuto); }
+    /* a little quicker than real time; load() resets the rate to the default, so set both */
+    video.defaultPlaybackRate = 1.3;
+    video.addEventListener('loadedmetadata', function () { video.playbackRate = 1.3; });
+    renderSel = function () {
+      if (count) count.textContent = (cur + 1) + ' / ' + steps.length;
+      if (!play) return;
+      var s = stopped();
+      play.classList.toggle('is-paused', s);
+      play.setAttribute('aria-label', t(s ? 'ui.play' : 'ui.pause') || (s ? 'Play video' : 'Pause video'));
+    };
+    function setStep(i) {
+      cur = (i + steps.length) % steps.length;
+      round = 0;
+      var li = steps[cur], key = li.getAttribute('data-cap');
+      steps.forEach(function (s, j) {
+        s.classList.toggle('is-on', j === cur);
+        s.style.setProperty('--p', '0');
+        $('button', s).setAttribute('aria-pressed', String(j === cur));
+      });
+      if (cap && key) { cap.setAttribute('data-i18n', key); var v = t(key); if (v) cap.textContent = v; }
+      video.setAttribute('data-loop', li.getAttribute('data-loop'));
+      bindLoop(video);
+      renderSel();
+    }
+    steps.forEach(function (s, i) { $('button', s).addEventListener('click', function () { r.want = 'on'; setStep(i); }); });
+    if (prev) prev.addEventListener('click', function () { setStep(cur - 1); });
+    if (next) next.addEventListener('click', function () { setStep(cur + 1); });
+    if (play) play.addEventListener('click', function () {
+      r.want = stopped() ? 'on' : 'off';
+      arbitrate();
+      renderSel();
+    });
+    /* the clips are short: each plays twice before the next tool, and the bar fills over both */
+    var round = 0;
+    video.addEventListener('timeupdate', function () { if (video.duration) steps[cur].style.setProperty('--p', String((round + video.currentTime / video.duration) / 2)); });
+    video.addEventListener('ended', function () {
+      if (r.want === 'off') return;
+      if (round === 0) { round = 1; video.currentTime = 0; arbitrate(); return; }
+      setStep(cur + 1);
+    });
+    video.addEventListener('play', renderSel);
+    video.addEventListener('pause', renderSel);
+    renderSel();
+  }
+
   /* ---------- the honest step count ---------- */
   var foldMq = mq('(max-width: 639px)');
   function renderCount() {
@@ -1595,10 +2298,14 @@
     initSharePc();
     initTheme();
     initHeader();
+    initLangMenu();
+    initScrollGlow();
+    initCare();
     initJump();
     initHero(); foldSteps();
     initCmps();
     initCuReveal();
+    initReveals();
     initCount();
     initFaq();
     initOneAtATime();
@@ -1619,6 +2326,7 @@
       applyVideos(false);
       initLoops();
       initHow();
+      initSel();
       initTurn();
       applyLangMedia();
     });
