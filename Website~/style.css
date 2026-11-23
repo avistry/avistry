@@ -895,6 +895,13 @@ p { max-width: var(--measure); }
 .menu-btn::after { content: "+"; margin-left: 8px; }
 .menu-btn[aria-expanded="true"]::after { content: "\2212"; }
 @media (max-width: 399px) { .lockup { width: 96px; height: 30px; } .menu-btn { padding: 0 10px; } }
+/* phones: Menu is a round + button, so the bar fits next to the look buttons in every language
+   (the word stays for screen readers) */
+@media (max-width: 519px) {
+  .menu-btn { width: 44px; flex: none; padding: 0; justify-content: center; }
+  .menu-btn span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .menu-btn::after { margin-left: 0; font-size: 1.25em; }
+}
 @media (min-width: 768px) {
   .hdr-in { gap: 12px; }
   .brand { margin-right: 24px; }
@@ -2875,3 +2882,103 @@ html::-webkit-scrollbar { width: 13px; }
 /* on a phone the banner's right side carries the avatar; keep it in view */
 @media (max-width: 599px) { .dl-banner img { aspect-ratio: 16 / 9; object-position: 18% 50%; } }
 .perf .dl-banner, .perf .dl-banner-go .ic { transition: none; }
+
+/* mascot emoji and stickers: decoration only, never content. Emoji sit beside the translated text (an .emo after a
+   heading's text, or ::after on a line), so a language switch, which replaces the text, keeps them. Stickers fetch their picture near the screen (app.js). With
+   reduced motion or Performance mode both show a still frame. */
+p[data-emo]::after, span[data-emo]::after, .emo {
+  content: ""; display: inline-block; width: 1.08em; height: 1.08em; margin-inline-start: 0.2em; vertical-align: -0.16em;
+  background: var(--ea) center / contain no-repeat;
+}
+p[data-emo]::after, h3 .emo { width: 1.45em; height: 1.45em; vertical-align: -0.34em; }
+.stk {
+  position: absolute; z-index: 4; display: block; width: var(--s, 150px); aspect-ratio: 1; rotate: var(--r, -8deg);
+  background: center / contain no-repeat; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  filter: drop-shadow(0 12px 16px rgb(10 8 15 / 0.35)); transition: scale 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.stk.is-in { background-image: var(--ea); animation: stk-slap 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+@media (hover: hover) { .stk:hover { scale: 1.08; } }
+@keyframes stk-slap { from { transform: scale(1.7) rotate(-16deg); opacity: 0; } 55% { opacity: 1; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { p[data-emo]::after, span[data-emo]::after, .emo, .stk.is-in { background-image: var(--es, var(--ea)); animation: none; } }
+html.perf p[data-emo]::after, html.perf span[data-emo]::after, html.perf .emo, html.perf .stk.is-in { background-image: var(--es, var(--ea)); }
+@media (max-width: 639px) { .stk { --s: 104px; } }
+[data-emo="avistry_bounce"] { --ea: url(media/mascot/avistry_bounce.webp); --es: url(media/mascot/avistry_bounce-still.webp); }
+[data-emo="avistry_vibe"] { --ea: url(media/mascot/avistry_vibe.webp); --es: url(media/mascot/avistry_vibe-still.webp); }
+[data-emo="avistry_party"] { --ea: url(media/mascot/avistry_party.webp); --es: url(media/mascot/avistry_party-still.webp); }
+[data-emo="avistry_blink"] { --ea: url(media/mascot/avistry_blink.webp); --es: url(media/mascot/avistry_blink-still.webp); }
+[data-emo="avistry_spin"] { --ea: url(media/mascot/avistry_spin.webp); --es: url(media/mascot/avistry_spin-still.webp); }
+[data-emo="avistry_rainbow"] { --ea: url(media/mascot/avistry_rainbow.webp); --es: url(media/mascot/avistry_rainbow-still.webp); }
+[data-emo="typing"] { --ea: url(media/mascot/typing.webp); --es: url(media/mascot/typing-still.webp); }
+[data-emo="ship_it_go"] { --ea: url(media/mascot/ship_it_go.webp); --es: url(media/mascot/ship_it_go-still.webp); }
+[data-emo="shader_glitch"] { --ea: url(media/mascot/shader_glitch.webp); --es: url(media/mascot/shader_glitch-still.webp); }
+[data-emo="hue_spin"] { --ea: url(media/mascot/hue_spin.webp); --es: url(media/mascot/hue_spin-still.webp); }
+[data-emo="e_avistry_lurk"] { --ea: url(media/mascot/e_avistry_lurk.webp); }
+[data-emo="e_avistry_think"] { --ea: url(media/mascot/e_avistry_think.webp); }
+[data-emo="e_avistry_hearts"] { --ea: url(media/mascot/e_avistry_hearts.webp); }
+[data-emo="e_avistry_cool"] { --ea: url(media/mascot/e_avistry_cool.webp); }
+[data-emo="e_avistry_happy"] { --ea: url(media/mascot/e_avistry_happy.webp); }
+[data-emo="e_ctrl_z"] { --ea: url(media/mascot/e_ctrl_z.webp); }
+[data-emo="e_uv_spaghetti"] { --ea: url(media/mascot/e_uv_spaghetti.webp); }
+[data-emo="e_missing_shader"] { --ea: url(media/mascot/e_missing_shader.webp); }
+[data-emo="e_fresh_bake"] { --ea: url(media/mascot/e_fresh_bake.webp); }
+[data-emo="e_plus_one"] { --ea: url(media/mascot/e_plus_one.webp); }
+[data-emo="e_avistry"] { --ea: url(media/mascot/e_avistry.webp); }
+[data-emo="e_avistry_love"] { --ea: url(media/mascot/e_avistry_love.webp); }
+[data-emo="e_palette"] { --ea: url(media/mascot/e_palette.webp); }
+[data-emo="e_magic_wand"] { --ea: url(media/mascot/e_magic_wand.webp); }
+[data-emo="e_brush"] { --ea: url(media/mascot/e_brush.webp); }
+[data-emo="e_layers"] { --ea: url(media/mascot/e_layers.webp); }
+[data-emo="e_originals_safe"] { --ea: url(media/mascot/e_originals_safe.webp); }
+[data-emo="e_new_png"] { --ea: url(media/mascot/e_new_png.webp); }
+[data-emo="e_vcc_package"] { --ea: url(media/mascot/e_vcc_package.webp); }
+[data-emo="e_ai_helper"] { --ea: url(media/mascot/e_ai_helper.webp); }
+[data-stk="recoloured"] { --ea: url(media/mascot/recoloured.webp); --es: url(media/mascot/recoloured-still.webp); }
+[data-stk="saved"] { --ea: url(media/mascot/saved.webp); --es: url(media/mascot/saved-still.webp); }
+[data-stk="originals_safe"] { --ea: url(media/mascot/originals_safe.webp); --es: url(media/mascot/originals_safe-still.webp); }
+[data-stk="ship_it"] { --ea: url(media/mascot/ship_it.webp); --es: url(media/mascot/ship_it-still.webp); }
+[data-stk="need_help"] { --ea: url(media/mascot/need_help.webp); --es: url(media/mascot/need_help-still.webp); }
+[data-stk="pink_again"] { --ea: url(media/mascot/pink_again.webp); --es: url(media/mascot/pink_again-still.webp); }
+[data-stk="baking"] { --ea: url(media/mascot/baking.webp); --es: url(media/mascot/baking-still.webp); }
+[data-stk="my_uvs"] { --ea: url(media/mascot/my_uvs.webp); --es: url(media/mascot/my_uvs-still.webp); }
+[data-stk="lgtm"] { --ea: url(media/mascot/lgtm.webp); --es: url(media/mascot/lgtm-still.webp); }
+[data-stk="undo"] { --ea: url(media/mascot/undo.webp); --es: url(media/mascot/undo-still.webp); }
+/* in the button row, right after the .unitypackage link, so it never covers the title in any language */
+.hero-copy .stk-hero { position: relative; flex: none; --s: 136px; --r: 9deg; margin: -48px 0 -48px 4px; }
+@media (max-width: 639px) { .hero-copy .stk-hero { --s: 96px; margin: -30px 0 -30px auto; } }
+.safe-grid { position: relative; }
+.stk-safe { --s: 150px; --r: -9deg; top: -96px; right: -28px; }
+.inst-quick { position: relative; }
+.stk-inst { --s: 140px; --r: 10deg; top: -150px; right: 0; }
+.community { position: relative; }
+.stk-community { --s: 120px; --r: -7deg; top: -58px; right: 12px; }
+.foot-lurk { position: absolute; z-index: 2; top: -30px; right: 9%; pointer-events: none; font-size: 64px; line-height: 0; }
+.foot-lurk::after { margin: 0; width: 1em; height: 1em; }
+.emo-ic { width: 1.5em; height: 1.5em; margin: 0; flex: none; vertical-align: middle; }
+.proof-list .emo-ic { width: 22px; height: 22px; }
+.facts .emo-ic { width: 32px; height: 32px; margin-top: -2px; }
+.how-step .st[data-emo]::after { width: 1.15em; height: 1.15em; }
+.pg-hero > .stk-corner { top: auto; bottom: 8px; --r: -8deg; }
+.foot-lurk { opacity: 0; translate: 0 45%; transition: translate 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) 0.25s, opacity 0.3s 0.25s; }
+.foot-lurk.is-in { opacity: 1; translate: 0 0; }
+@media (prefers-reduced-motion: reduce) { .foot-lurk { transition: none; } }
+
+@media (max-width: 639px) {
+  .stk-safe { --s: 92px; top: -100px; right: -4px; }
+  .stk-inst { display: none; }
+  .stk-community { top: -40px; right: 6px; }
+  .foot-lurk { font-size: 48px; top: -22px; }
+}
+section:has(> .stk-corner) { position: relative; }
+.stk-corner { --s: 140px; --r: 8deg; top: -36px; right: max(16px, calc(50% - 640px)); }
+.page-head > .stk-corner { top: auto; bottom: 8px; --r: -8deg; }
+@media (max-width: 639px) { .stk-corner { --s: 92px; top: -24px; } .page-head > .stk-corner { bottom: 0; } }
+[data-emo="e_avistry_sus"] { --ea: url(media/mascot/e_avistry_sus.webp); }
+[data-emo="e_avistry_sleep"] { --ea: url(media/mascot/e_avistry_sleep.webp); }
+[data-emo="e_avistry_sweat"] { --ea: url(media/mascot/e_avistry_sweat.webp); }
+[data-emo="e_done"] { --ea: url(media/mascot/e_done.webp); }
+[data-emo="e_idea"] { --ea: url(media/mascot/e_idea.webp); }
+[data-emo="e_bug"] { --ea: url(media/mascot/e_bug.webp); }
+[data-emo="e_heart_gradient"] { --ea: url(media/mascot/e_heart_gradient.webp); }
+[data-emo="e_hue_wheel"] { --ea: url(media/mascot/e_hue_wheel.webp); }
+[data-emo="e_lasso"] { --ea: url(media/mascot/e_lasso.webp); }
+[data-emo="e_eyedropper"] { --ea: url(media/mascot/e_eyedropper.webp); }

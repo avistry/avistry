@@ -200,18 +200,27 @@
     return Promise.race([wait, new Promise(function (res) { setTimeout(res, 900); })]);
   }
 
-  /* the coral full stop on display headings (the logo's dot) */
+  /* the coral full stop on display headings (the logo's dot), then the heading's mascot emoji (data-emo) */
   function decorateHeadings() {
     $$('.h-display').forEach(function (h) {
-      if (h.querySelector('.accent-dot')) return;
+      if (h.querySelector('.accent-dot, .emo')) return;
       var m = /^([\s\S]*?)([.。])\s*$/.exec(h.textContent);
-      if (!m) return;
-      h.textContent = '';
-      h.appendChild(document.createTextNode(m[1]));
-      var dot = document.createElement('span');
-      dot.className = 'accent-dot';
-      dot.textContent = m[2];
-      h.appendChild(dot);
+      if (m) {
+        h.textContent = '';
+        h.appendChild(document.createTextNode(m[1]));
+        var dot = document.createElement('span');
+        dot.className = 'accent-dot';
+        dot.textContent = m[2];
+        h.appendChild(dot);
+      }
+      var e = h.getAttribute('data-emo');
+      if (e) {
+        var i = document.createElement('i');
+        i.className = 'emo';
+        i.setAttribute('data-emo', e);
+        i.setAttribute('aria-hidden', 'true');
+        h.appendChild(i);
+      }
     });
   }
 
@@ -2292,8 +2301,23 @@
     });
   }
 
+  /* stickers fetch their picture only when they come near the screen, then slap on (a tap slaps them on again);
+     the footer mascot peeks up the same way */
+  function initStickers() {
+    var st = $$('.stk, .foot-lurk');
+    if (!st.length) return;
+    function slap(s) { s.classList.remove('is-in'); void s.offsetWidth; s.classList.add('is-in'); }
+    st.forEach(function (s) { s.addEventListener('click', function () { slap(s); }); });
+    if (!('IntersectionObserver' in window)) { st.forEach(slap); return; }
+    var io = new IntersectionObserver(function (en) {
+      en.forEach(function (e) { if (e.isIntersecting) { slap(e.target); io.unobserve(e.target); } });
+    }, { rootMargin: '0px 0px -12% 0px' });
+    st.forEach(function (s) { io.observe(s); });
+  }
+
   /* ---------- start (tour.js sets ATS_SOFT when it swaps a page in and runs this file again) ---------- */
   function start() {
+    initStickers();
     initCopy();
     initSharePc();
     initTheme();
