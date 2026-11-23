@@ -14,7 +14,7 @@ Please do not paste file paths, your Windows user name, or avatar files you are 
 
 ## Ask for a feature
 
-New features are discussed with the maintainers on our [Discord](https://discord.gg/PM8uC2UnT) first, so the work fits the plan and nobody builds the same thing twice. You are welcome to join. Then open a [feature request](https://github.com/avistry/avistry/issues/new?template=feature_request.yml) and pick the idea from the list, or "Something else".
+New features are discussed with the maintainers on our [Discord](https://discord.gg/sSeWgDJJjY) first, so the work fits the plan and nobody builds the same thing twice. You are welcome to join. Then open a [feature request](https://github.com/avistry/avistry/issues/new?template=feature_request.yml) and pick the idea from the list, or "Something else".
 
 We plan with real demand: a planned idea moves up when enough people ask for it. A 👍 on an existing request counts too, so search before opening a new one.
 
@@ -38,7 +38,7 @@ The README is available in English, [日本語](i18n/README.ja.md), [한국어](
 
 ### AI help
 
-AI help is welcome; slop is not. You stay responsible for what you submit: read the code, try it in Unity, and make sure you understand it. A good contribution has intent and taste and fits the vision in the [README](../README.md#why-avistry). Questions and ideas are welcome on our [Discord](https://discord.gg/PM8uC2UnT).
+AI help is welcome; slop is not. You stay responsible for what you submit: read the code, try it in Unity, and make sure you understand it. A good contribution has intent and taste and fits the vision in the [README](../README.md#why-avistry). Questions and ideas are welcome on our [Discord](https://discord.gg/sSeWgDJJjY).
 
 ### Before you open a pull request
 - [ ] Unity compiles with **no errors and no warnings** from this package.

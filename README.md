@@ -21,7 +21,7 @@
   <a href="https://avistry.github.io/avistry/"><img alt="Add to VCC" height="36" src="https://img.shields.io/badge/Add%20to%20VCC-1f6feb?style=for-the-badge"></a>
   <a href="https://github.com/avistry/avistry/releases/latest"><img alt="Download .unitypackage" height="36" src="https://img.shields.io/badge/Download%20.unitypackage-2ea44f?style=for-the-badge&logo=unity&logoColor=white"></a>
   <a href="https://avistry.github.io/avistry/"><img alt="Website" height="36" src="https://img.shields.io/badge/Website-30363d?style=for-the-badge"></a>
-  <a href="https://discord.gg/PM8uC2UnT"><img alt="Discord" height="36" src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
+  <a href="https://discord.gg/sSeWgDJJjY"><img alt="Discord" height="36" src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -32,13 +32,116 @@
 </p>
 
 <p align="center">
-  <img alt="Four steps in Unity: click the forearm sleeve to pick it, tint it blue, paint a pink stroke that stays on the picked pieces, then save a new PNG next to the untouched original" src=".github/media/flow.webp" width="880">
+  <img alt="One avatar in its original look, then wiped over to three new looks made with Avistry: crimson, frost and venom green" src=".github/media/looks.webp" width="880">
+  <br><sub>One avatar, three looks, all made in Avistry. The original files never changed.</sub>
 </p>
 
-<p align="center">
-  <b>1</b> Pick a part &nbsp;·&nbsp; <b>2</b> Choose a colour &nbsp;·&nbsp; <b>3</b> Paint a detail &nbsp;·&nbsp; <b>4</b> Save a new copy
-  <br><sub>Recorded in Unity. <a href="https://avistry.github.io/avistry/#tour">Watch the three-minute tour</a> on the website.</sub>
-</p>
+## How it works
+
+Four steps, one window. Open **Tools › Avistry › Textures**, pick your avatar, and the avatar in the Scene view shows
+every change as you make it.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="A click on the forearm sleeve on the model picks it, and the same pieces light up on the texture" src=".github/media/en/how-1.webp" width="100%">
+      <br><b>1. Pick a part.</b> Click it on the model or on the texture. The same pieces light up in both.
+    </td>
+    <td width="50%" valign="top">
+      <img alt="The glove is tinted from black to blue while the colour bar is dragged" src=".github/media/en/how-2.webp" width="100%">
+      <br><b>2. Choose a colour.</b> Shift the colour. Shading and patterns stay where they were.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="A pink stroke dragged along the forearm lands only on the picked pieces" src=".github/media/en/how-3.webp" width="100%">
+      <br><b>3. Paint a detail.</b> Brushes and gradients, kept inside the pieces you picked.
+    </td>
+    <td width="50%" valign="top">
+      <img alt="Save as new PNG adds Glove_ats.png, a material copy and an edit recipe next to the unchanged originals" src=".github/media/en/how-4.webp" width="100%">
+      <br><b>4. Save a new copy.</b> A new PNG and material next to your originals, which stay as they were.
+    </td>
+  </tr>
+</table>
+
+<p align="center"><sub><a href="https://avistry.github.io/avistry/#tour">Watch the three-minute tour</a> on the website, with voice-over in English, Japanese, Korean and Chinese.</sub></p>
+
+## Select exactly what you mean
+
+An avatar texture is a flat sheet of many small pieces: a sleeve, a strap, a wing. Avistry knows where each piece sits
+on the model. Pick one on the texture and it lights up on the avatar, or click the avatar and it lights up on the
+texture. Colour, paint and layers then change only what you picked. There are six ways to pick:
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <img alt="Click: pieces picked one at a time on the model" src=".github/media/en/sel-click.webp" width="100%">
+      <br><b>Click.</b> One piece at a time. Shift adds, Ctrl removes.
+    </td>
+    <td width="33%" valign="top">
+      <img alt="Box: a rectangle dragged over the arm picks every piece inside it" src=".github/media/en/sel-box.webp" width="100%">
+      <br><b>Box.</b> Drag around pieces, on the texture or straight on the model.
+    </td>
+    <td width="33%" valign="top">
+      <img alt="Lasso: a free shape drawn around the arm picks the pieces inside it" src=".github/media/en/sel-lasso.webp" width="100%">
+      <br><b>Lasso.</b> Draw any shape around the pieces you want.
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <img alt="Magic wand: one click picks every piece of the same colour" src=".github/media/en/sel-wand.webp" width="100%">
+      <br><b>Magic wand.</b> Click a colour and every piece that has it is picked.
+    </td>
+    <td width="33%" valign="top">
+      <img alt="By part: one click takes every piece of the part" src=".github/media/en/sel-part.webp" width="100%">
+      <br><b>By part.</b> One click takes every piece of a part.
+    </td>
+    <td width="33%" valign="top">
+      <img alt="By UV tile: every piece in one tile is picked" src=".github/media/en/sel-tile.webp" width="100%">
+      <br><b>By UV tile.</b> Every piece in a tile, for avatars spread over several tiles.
+    </td>
+  </tr>
+</table>
+
+## What else it does
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="Quick material: the Poiyomi glow and glitter colours change on an editable copy of the material" src=".github/media/en/material.webp" width="100%">
+      <br><b>Recolour a whole material.</b> On Poiyomi and lilToon the shadow, rim, matcap, outline and emission
+      colours follow along, through the shader's own settings.
+    </td>
+    <td width="50%" valign="top">
+      <img alt="Face paint drawn on one side is mirrored to the other, then a gradient dragged across the texture turns the hair from red to violet" src=".github/media/en/paint.webp" width="100%">
+      <br><b>Paint.</b> 11 brushes with pen pressure, fill, gradients, blur and smudge. Paint on the texture or straight
+      onto the 3D model, mirrored if you like.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="Colour Match: the horn is picked and the wing trim takes on its colours" src=".github/media/en/match.webp" width="100%">
+      <br><b>Match colours.</b> Give the hair the colours of the outfit, or the other way round, and keep the original
+      shading.
+    </td>
+    <td width="50%" valign="top">
+      <img alt="Blend modes cycling on the top layer while the wings update" src=".github/media/en/blend.webp" width="100%">
+      <br><b>Work in layers.</b> 28 blend modes, masks, clipping, image layers and adjustment layers. Hide, reorder or
+      undo any step.
+    </td>
+  </tr>
+</table>
+
+Also in the box:
+
+- **Bake helper maps.** Ambient occlusion, a normal map from the texture and a face shadow map for anime-style faces.
+- **Check your materials.** Pink shaders, empty slots, missing textures and wrong import settings, explained in plain
+  words, with a one-click fix where it is safe.
+- **Learn as you go.** Simple and Advanced modes, info icons, a 41-word glossary and a skill tree for Unity beginners.
+- **Your language.** The whole tool is in English, Japanese, Korean and Simplified Chinese, and follows the Unity
+  Editor's language by default.
+
+Every feature is listed on the [Features page](https://avistry.github.io/avistry/features.html).
 
 ## Why Avistry
 
@@ -51,47 +154,8 @@ solve a real creator's problem, in plain words, and feel finished before it ship
 - **Grown with the community.** Ideas are discussed on Discord, contributions are often built with AI agents, and the
   maintainers review and test every change in Unity. AI is a tool here, never the author.
 
-## What it does
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <img alt="Quick material: the Poiyomi glow and glitter colours change on an editable copy of the material" src=".github/media/material.webp" width="100%">
-      <br><b>Recolour a whole material.</b> On Poiyomi and lilToon the shadow, rim, matcap, outline and emission
-      colours follow along, through the shader's own settings.
-    </td>
-    <td width="50%" valign="top">
-      <img alt="A gradient dragged across the texture, shown live on the avatar's hair" src=".github/media/paint.webp" width="100%">
-      <br><b>Paint.</b> 11 brushes with pen pressure, fill, gradients, blur and smudge. Paint on the texture or straight
-      onto the 3D model, mirrored if you like.
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <img alt="Colour Match: the horn is picked and the wing trim takes on its colours" src=".github/media/match.webp" width="100%">
-      <br><b>Match colours.</b> Give the hair the colours of the outfit, or the other way round, and keep the original
-      shading.
-    </td>
-    <td width="50%" valign="top">
-      <img alt="Blend modes cycling on the top layer while the wings update" src=".github/media/blend.webp" width="100%">
-      <br><b>Work in layers.</b> 28 blend modes, masks, clipping, image layers and adjustment layers. Hide, reorder or
-      undo any step.
-    </td>
-  </tr>
-</table>
-
-Also in the box:
-
-- **Edit one piece at a time.** Click a sleeve, a ribbon or a belt; only that piece changes, in the Scene view too.
-- **Bake helper maps.** Ambient occlusion, a normal map from the texture and a face shadow map for anime-style faces.
-- **Check your materials.** Pink shaders, empty slots, missing textures and wrong import settings, explained in plain
-  words, with a one-click fix where it is safe.
-- **Learn as you go.** Simple and Advanced modes, info icons, a 41-word glossary and a skill tree for Unity beginners.
-
-Every feature is listed on the [Features page](https://avistry.github.io/avistry/features.html).
-
 <p align="center">
-  <img alt="Saving adds Hair_ats.png, a material copy and an edit recipe next to the unchanged Hair.png and Hair.mat" src=".github/media/files.webp" width="640">
+  <img alt="Your originals, Hair.mat and Hair.png, stay as they were; Avistry adds a new PNG, a material copy and the edit recipe" src=".github/media/en/files.webp" width="640">
   <br><sub>Saving always makes new files. The original texture and material stay as they were.</sub>
 </p>
 
@@ -200,7 +264,7 @@ is a guarantee, so if you find a problem, please [open an issue](https://github.
 
 ## Contribute
 
-Pull requests are welcome. New features are discussed with the maintainers on [Discord](https://discord.gg/PM8uC2UnT) first; you are welcome
+Pull requests are welcome. New features are discussed with the maintainers on [Discord](https://discord.gg/sSeWgDJJjY) first; you are welcome
 to join. The [contributing guide](.github/CONTRIBUTING.md) explains how to report a bug, ask for a feature or send a fix.
 
 | Folder | What is in it |

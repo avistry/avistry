@@ -21,6 +21,7 @@
   <a href="https://avistry.github.io/avistry/"><img alt="Add to VCC" height="36" src="https://img.shields.io/badge/Add%20to%20VCC-1f6feb?style=for-the-badge"></a>
   <a href="https://github.com/avistry/avistry/releases/latest"><img alt="Download .unitypackage" height="36" src="https://img.shields.io/badge/Download%20.unitypackage-2ea44f?style=for-the-badge&logo=unity&logoColor=white"></a>
   <a href="https://avistry.github.io/avistry/"><img alt="웹사이트" height="36" src="https://img.shields.io/badge/Website-30363d?style=for-the-badge"></a>
+  <a href="https://discord.gg/sSeWgDJJjY"><img alt="Discord" height="36" src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -31,13 +32,114 @@
 </p>
 
 <p align="center">
-  <img alt="Unity에서 진행되는 네 단계: 팔뚝 소매를 클릭해 고르고, 파란색으로 물들이고, 고른 조각 안에만 남는 분홍색 선을 칠한 뒤, 손대지 않은 원본 옆에 새 PNG로 저장합니다" src="../../.github/media/flow.webp" width="880">
+  <img alt="원래 모습 그대로인 아바타 하나가 Avistry로 만든 세 가지 새 룩(크림슨, 프로스트, 베놈 그린)으로 차례로 바뀌는 모습" src="../../.github/media/looks.webp" width="880">
+  <br><sub>아바타 하나, 룩 세 가지, 모두 Avistry로 만들었습니다. 원본 파일은 바뀌지 않았습니다.</sub>
 </p>
 
-<p align="center">
-  <b>1</b> 부위 고르기 &nbsp;·&nbsp; <b>2</b> 색 고르기 &nbsp;·&nbsp; <b>3</b> 디테일 칠하기 &nbsp;·&nbsp; <b>4</b> 새 복사본으로 저장
-  <br><sub>Unity에서 녹화한 화면입니다.</sub>
-</p>
+## 사용 방법
+
+네 단계, 창 하나. **Tools › Avistry › Textures**를 열고 아바타를 고르면, Scene 뷰의 아바타에 작업하는 대로 바로
+반영됩니다.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="모델의 팔뚝 소매를 클릭해 고르면 텍스처에서도 같은 조각이 밝아지는 모습" src="../../.github/media/ko/how-1.webp" width="100%">
+      <br><b>1. 부위 고르기.</b> 모델이나 텍스처에서 클릭하세요. 같은 조각이 양쪽에서 함께 밝아집니다.
+    </td>
+    <td width="50%" valign="top">
+      <img alt="색 막대를 끌자 장갑이 검정에서 파랑으로 물드는 모습" src="../../.github/media/ko/how-2.webp" width="100%">
+      <br><b>2. 색 고르기.</b> 색을 옮겨도 음영과 무늬는 제자리에 남습니다.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="앞팔을 따라 끈 분홍색 선이 고른 조각에만 묻는 모습" src="../../.github/media/ko/how-3.webp" width="100%">
+      <br><b>3. 디테일 칠하기.</b> 브러시와 그라데이션은 고른 조각 안에만 적용됩니다.
+    </td>
+    <td width="50%" valign="top">
+      <img alt="새 PNG로 저장을 누르면 바뀌지 않은 원본 옆에 Glove_ats.png, 머티리얼 복사본, 편집 레시피가 생기는 모습" src="../../.github/media/ko/how-4.webp" width="100%">
+      <br><b>4. 새 복사본으로 저장.</b> 원본은 그대로 두고, 그 옆에 새 PNG와 머티리얼이 만들어집니다.
+    </td>
+  </tr>
+</table>
+
+<p align="center"><sub>웹사이트에서 <a href="https://avistry.github.io/avistry/#tour">3분 투어</a>를 보세요. 영어, 일본어, 한국어, 중국어 내레이션이 있습니다.</sub></p>
+
+## 원하는 곳만 정확히 고르세요
+
+아바타 텍스처는 작은 조각이 많이 모인 평평한 한 장입니다. 소매, 스트랩, 날개 같은 것들이죠. Avistry는 각 조각이 모델의
+어디에 있는지 알고 있습니다. 텍스처에서 조각을 고르면 아바타에서 밝아지고, 아바타를 클릭하면 텍스처에서 밝아집니다.
+이후 색, 페인트, 레이어는 고른 곳만 바꿉니다. 고르는 방법은 여섯 가지입니다.
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <img alt="클릭: 모델에서 조각을 하나씩 고르는 모습" src="../../.github/media/ko/sel-click.webp" width="100%">
+      <br><b>클릭.</b> 조각을 하나씩 고릅니다. Shift는 추가, Ctrl은 제외.
+    </td>
+    <td width="33%" valign="top">
+      <img alt="사각형: 팔 위로 사각형을 끌면 안쪽의 모든 조각이 선택되는 모습" src="../../.github/media/ko/sel-box.webp" width="100%">
+      <br><b>사각형.</b> 조각을 드래그로 둘러쌉니다. 텍스처에서도, 모델에서 바로도 됩니다.
+    </td>
+    <td width="33%" valign="top">
+      <img alt="올가미: 팔 둘레에 자유롭게 그린 모양 안의 조각이 선택되는 모습" src="../../.github/media/ko/sel-lasso.webp" width="100%">
+      <br><b>올가미.</b> 원하는 조각을 아무 모양으로나 둘러 그리세요.
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <img alt="마법봉: 한 번 클릭하면 같은 색의 조각이 모두 선택되는 모습" src="../../.github/media/ko/sel-wand.webp" width="100%">
+      <br><b>마법봉.</b> 색을 클릭하면 그 색을 가진 조각이 모두 선택됩니다.
+    </td>
+    <td width="33%" valign="top">
+      <img alt="부위별: 한 번 클릭으로 부위의 모든 조각을 고르는 모습" src="../../.github/media/ko/sel-part.webp" width="100%">
+      <br><b>부위별.</b> 한 번 클릭하면 부위의 모든 조각이 선택됩니다.
+    </td>
+    <td width="33%" valign="top">
+      <img alt="UV 타일별: 한 타일 안의 모든 조각이 선택되는 모습" src="../../.github/media/ko/sel-tile.webp" width="100%">
+      <br><b>UV 타일별.</b> 타일 안의 조각을 모두 고릅니다. 여러 타일에 걸쳐 있는 아바타에 유용합니다.
+    </td>
+  </tr>
+</table>
+
+## 이런 걸 할 수 있어요
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="빠른 머티리얼: 편집 가능한 머티리얼 복사본에서 Poiyomi의 발광과 글리터 색이 바뀌는 모습" src="../../.github/media/ko/material.webp" width="100%">
+      <br><b>머티리얼 전체 색 바꾸기.</b> Poiyomi와 lilToon에서는 그림자, 림, 매트캡, 아웃라인, 발광 색이
+      셰이더 자체 설정을 통해 함께 따라 바뀝니다.
+    </td>
+    <td width="50%" valign="top">
+      <img alt="한쪽에 그린 페이스 페인트가 반대쪽에도 대칭으로 그려지고, 이어서 텍스처 위로 끈 그라디언트가 머리카락을 빨간색에서 보라색으로 바꾸는 모습" src="../../.github/media/ko/paint.webp" width="100%">
+      <br><b>페인팅.</b> 필압을 지원하는 브러시 11종에 채우기, 그라디언트, 블러, 스머지까지 있습니다. 텍스처 위에도,
+      3D 모델 위에도 바로 그릴 수 있고, 원하면 좌우 대칭으로 그려집니다.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="색상 일치: 뿔을 고르면 날개 장식이 뿔의 색을 입는 모습" src="../../.github/media/ko/match.webp" width="100%">
+      <br><b>색상 일치.</b> 머리카락에 옷의 색을 입히거나 그 반대로 할 수 있고, 원래의 음영은 그대로 유지됩니다.
+    </td>
+    <td width="50%" valign="top">
+      <img alt="맨 위 레이어의 합성 모드가 차례로 바뀌며 날개가 따라 바뀌는 모습" src="../../.github/media/ko/blend.webp" width="100%">
+      <br><b>레이어 작업.</b> 합성 모드 28종, 마스크, 클리핑, 이미지 레이어, 색조 보정 레이어를 쓸 수 있습니다.
+      레이어를 숨기거나, 순서를 바꾸거나, 어느 단계든 되돌릴 수 있습니다.
+    </td>
+  </tr>
+</table>
+
+그 밖의 기능입니다.
+
+- **보조 맵 굽기.** 앰비언트 오클루전, 텍스처로 만든 노멀 맵, 애니메 스타일 얼굴용 페이스 섀도우 맵을 구워 줍니다.
+- **머티리얼 점검.** 핑크색으로 깨진 셰이더, 빈 슬롯, 빠진 텍스처, 잘못된 임포트 설정을 쉬운 말로 설명해 주고,
+  안전하게 고칠 수 있는 건 버튼 하나로 고칠 수 있습니다.
+- **쓰면서 배우기.** Simple과 Advanced 모드, 정보 아이콘, 용어 41개의 용어집, Unity 입문자를 위한 스킬 트리가 있습니다.
+- **내 언어로.** 도구 전체가 영어, 일본어, 한국어, 중국어 간체로 되어 있고, 기본적으로 Unity 에디터의 언어를 따릅니다.
+
+모든 기능은 [기능 페이지](https://avistry.github.io/avistry/features.html)에 정리되어 있습니다.
 
 ## 왜 Avistry인가
 
@@ -47,46 +149,8 @@
 - **양보다 완성도.** 거의 되는 도구 열 개보다 제대로 되는 도구 하나가 낫습니다. 화면만 복잡해지는 기능은 만들지 않습니다.
 - **커뮤니티와 함께 성장.** 아이디어는 Discord에서 이야기하고, 기여는 AI 에이전트의 도움으로 만들어지는 경우가 많으며, 모든 변경은 메인테이너가 Unity에서 직접 검토하고 테스트합니다. 여기서 AI는 도구일 뿐, 작성자가 아닙니다.
 
-## 이런 걸 할 수 있어요
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <img alt="빠른 머티리얼: 편집 가능한 머티리얼 복사본에서 Poiyomi의 발광과 글리터 색이 바뀌는 모습" src="../../.github/media/material.webp" width="100%">
-      <br><b>머티리얼 전체 색 바꾸기.</b> Poiyomi와 lilToon에서는 그림자, 림, 매트캡, 아웃라인, 발광 색이
-      셰이더 자체 설정을 통해 함께 따라 바뀝니다.
-    </td>
-    <td width="50%" valign="top">
-      <img alt="텍스처 위로 그라디언트를 끌자 아바타의 머리카락에 바로 반영되는 모습" src="../../.github/media/paint.webp" width="100%">
-      <br><b>페인팅.</b> 필압을 지원하는 브러시 11종에 채우기, 그라디언트, 블러, 스머지까지 있습니다. 텍스처 위에도,
-      3D 모델 위에도 바로 그릴 수 있고, 원하면 좌우 대칭으로 그려집니다.
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <img alt="Colour Match: 뿔을 고르면 날개 장식이 뿔의 색을 입는 모습" src="../../.github/media/match.webp" width="100%">
-      <br><b>색 맞추기.</b> 머리카락에 옷의 색을 입히거나 그 반대로 할 수 있고, 원래의 음영은 그대로 유지됩니다.
-    </td>
-    <td width="50%" valign="top">
-      <img alt="맨 위 레이어의 합성 모드가 차례로 바뀌며 날개가 따라 바뀌는 모습" src="../../.github/media/blend.webp" width="100%">
-      <br><b>레이어 작업.</b> 합성 모드 28종, 마스크, 클리핑, 이미지 레이어, 색조 보정 레이어를 쓸 수 있습니다.
-      레이어를 숨기거나, 순서를 바꾸거나, 어느 단계든 되돌릴 수 있습니다.
-    </td>
-  </tr>
-</table>
-
-그 밖의 기능입니다.
-
-- **한 조각만 골라서 편집.** 소매, 리본, 벨트를 클릭하면 그 조각만 바뀝니다. Scene 뷰에서도 마찬가지입니다.
-- **보조 맵 굽기.** 앰비언트 오클루전, 텍스처로 만든 노멀 맵, 애니메 스타일 얼굴용 페이스 섀도우 맵을 구워 줍니다.
-- **머티리얼 점검.** 핑크색으로 깨진 셰이더, 빈 슬롯, 빠진 텍스처, 잘못된 임포트 설정을 쉬운 말로 설명해 주고,
-  안전하게 고칠 수 있는 건 버튼 하나로 고칠 수 있습니다.
-- **쓰면서 배우기.** Simple과 Advanced 모드, 정보 아이콘, 용어 41개의 용어집, Unity 입문자를 위한 스킬 트리가 있습니다.
-
-모든 기능은 [기능 페이지](https://avistry.github.io/avistry/features.html)에 정리되어 있습니다.
-
 <p align="center">
-  <img alt="저장하면 바뀌지 않은 Hair.png와 머티리얼 옆에 Hair_ats.png, 머티리얼 복사본, 편집 레시피가 생기는 모습" src="../../.github/media/files.webp" width="640">
+  <img alt="원본인 Hair.mat과 Hair.png는 그대로 남고, Avistry가 새 PNG, 머티리얼 복사본, 편집 레시피를 추가하는 모습" src="../../.github/media/ko/files.webp" width="640">
   <br><sub>저장하면 항상 새 파일이 만들어집니다. 원본 텍스처와 머티리얼은 그대로 남습니다.</sub>
 </p>
 
@@ -104,14 +168,14 @@ VCC의 *Settings › Packages › Add Repository*에 `https://avistry.github.io/
 **Git URL.** *Window › Package Manager*에서 **+**를 누르고 *Add package from git URL…*을 골라
 `https://github.com/avistry/avistry.git`을 붙여 넣으세요.
 
-다른 패키지는 필요 없습니다. Poiyomi나 lilToon이 설치되어 있으면 Colour 탭에 해당 셰이더용 옵션이 추가로 나타납니다.
+다른 패키지는 필요 없습니다. Poiyomi나 lilToon이 설치되어 있으면 색 바꾸기 탭에 해당 셰이더용 옵션이 추가로 나타납니다.
 맨 처음 테스트 빌드를 써 본 적이 있다면 먼저 `Assets/AvatarTextureStudio`를 지워 주세요(VCC로 설치하면 알아서 지워 줍니다).
 
 ## 빠른 시작
 
-1. **Tools › Avistry › Textures**를 고르고, 아바타의 한 부분을 선택한 뒤 텍스처를 고릅니다.
-2. 빠르게 색만 바꾸려면 **Colour**를, 한 조각을 골라 그리려면 **Select** 후 **Paint**를 쓰세요. 작업하는 대로 아바타에 바로 반영됩니다.
-3. **Save** 탭에서 **Save as new PNG**를 누릅니다.
+1. **Tools › Avistry › Textures**를 고르고, 아바타의 부위 하나를 선택한 뒤 텍스처를 고릅니다.
+2. 빠르게 색만 바꾸려면 **색 바꾸기**를, 일부만 고르려면 **범위**에서 조각을 고른 뒤 **그리기**를 쓰세요. 작업하는 대로 아바타에 바로 반영됩니다.
+3. **저장** 탭에서 **새 PNG 파일로 저장**을 누릅니다.
 
 저장하기 전에는 아무것도 기록되지 않습니다. 편집은 Ctrl+Z로 모두 되돌릴 수 있고, 저장하지 않은 작업이 있는 채로 닫으려 하면 먼저 물어봅니다.
 
@@ -121,7 +185,7 @@ VCC의 *Settings › Packages › Add Repository*에 `https://avistry.github.io/
   실행되는 것은 없습니다.
 - 릴리스 파일은 하나하나 VirusTotal로 검사하고, SHA-256을 `SHA256SUMS.txt`에 적어 둡니다. 내려받은 파일은 PowerShell에서
   `Get-FileHash <파일> -Algorithm SHA256`로 확인해 보세요.
-- 텔레메트리는 없습니다. 네트워크를 쓰는 건 선택 기능인 업데이트 확인(Help › Check for updates automatically) 하나뿐입니다.
+- 텔레메트리는 없습니다. 네트워크를 쓰는 건 선택 기능인 업데이트 확인(도움말(?) 아이콘 › 업데이트를 자동으로 확인) 하나뿐입니다.
   켜기 전에는 꺼져 있고, 하루에 한 번 GitHub 공개 API에 최신 버전을 물어보며, 사용자에 대한 정보는 보내지 않습니다.
 - 새 도구를 써 보기 전에는 프로젝트를 백업해 두세요. 이 도구도 마찬가지입니다.
 
@@ -133,9 +197,9 @@ MCP for Unity는 다른 팀이 만든 무료 패키지이며, Avistry는 이것 
 
 1. *Window › Package Manager*에서 git URL로 `https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity`를 추가합니다.
 2. *Window › MCP for Unity*를 열고 AI 앱을 연결합니다. 이 컴퓨터에서 서버가 실행됩니다.
-3. Avistry에서 **Help › Connect an AI helper…**를 열고 **Look only**(보기만) 또는 **Look and edit**(보기와 편집)를 고릅니다. 처음에는 **Off**입니다.
+3. Avistry에서 도움말(?) 아이콘 › **AI 도우미를 연결하세요…**를 열고 **보기만** 또는 **보기와 편집**을 고릅니다. 처음에는 **꺼짐**입니다.
 
-AI가 하는 작업 하나하나가 "AI: …"라는 이름의 Ctrl+Z 한 단계입니다. 저장과 텍스처 그림 보내기는 **Allow**를 누를 때까지
+AI가 하는 작업 하나하나가 "AI: …"라는 이름의 Ctrl+Z 한 단계입니다. 저장과 텍스처 그림 보내기는 **허용**을 누를 때까지
 실행되지 않습니다. 저희 도구는 파일을 덮어쓰거나 지우거나 코드를 실행하지 않습니다.
 
 알아 두세요. MCP for Unity에는 자체 도구가 있고, 그중 하나는 Unity에서 임의의 코드를 실행할 수 있으니 AI 앱의 승인 확인을
@@ -194,7 +258,7 @@ AI는 의도적으로 씁니다. 더 빨리 만들고, 보안 문제와 버그�
 
 ## 기여하기
 
-풀 리퀘스트는 언제든 환영입니다. 새 기능은 먼저 [Discord](https://discord.gg/PM8uC2UnT)에서 메인테이너와 의논합니다. 언제든 들어와 주세요. 버그 신고, 기능 요청, 수정을 보내는 방법은 [기여 가이드](../../.github/CONTRIBUTING.md)에 있습니다.
+풀 리퀘스트는 언제든 환영입니다. 새 기능은 먼저 [Discord](https://discord.gg/sSeWgDJJjY)에서 메인테이너와 의논합니다. 언제든 들어와 주세요. 버그 신고, 기능 요청, 수정을 보내는 방법은 [기여 가이드](../../.github/CONTRIBUTING.md)에 있습니다.
 
 | 폴더 | 들어 있는 것 |
 |---|---|

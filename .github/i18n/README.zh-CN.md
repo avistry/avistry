@@ -21,6 +21,7 @@
   <a href="https://avistry.github.io/avistry/"><img alt="添加到 VCC" height="36" src="https://img.shields.io/badge/Add%20to%20VCC-1f6feb?style=for-the-badge"></a>
   <a href="https://github.com/avistry/avistry/releases/latest"><img alt="下载 .unitypackage" height="36" src="https://img.shields.io/badge/Download%20.unitypackage-2ea44f?style=for-the-badge&logo=unity&logoColor=white"></a>
   <a href="https://avistry.github.io/avistry/"><img alt="网站" height="36" src="https://img.shields.io/badge/Website-30363d?style=for-the-badge"></a>
+  <a href="https://discord.gg/sSeWgDJJjY"><img alt="Discord" height="36" src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -31,13 +32,109 @@
 </p>
 
 <p align="center">
-  <img alt="Unity 里的四个步骤：点一下前臂的袖子选中它，把它调成蓝色，画一笔粉色且只落在选中的区块上，最后保存成新的 PNG，原图原封不动地放在旁边" src="../../.github/media/flow.webp" width="880">
+  <img alt="一个模型的原始外观，随后依次过渡成用 Avistry 做出的三种新外观：绯红、冰霜和毒绿" src="../../.github/media/looks.webp" width="880">
+  <br><sub>一个模型，三种外观，全都在 Avistry 里完成。原始文件从未改动。</sub>
 </p>
 
-<p align="center">
-  <b>1</b> 选择部位 &nbsp;·&nbsp; <b>2</b> 选择颜色 &nbsp;·&nbsp; <b>3</b> 绘制细节 &nbsp;·&nbsp; <b>4</b> 保存为新副本
-  <br><sub>在 Unity 中录制。</sub>
-</p>
+## 工作方式
+
+四步，一个窗口。打开 **Tools › Avistry › Textures**，选好你的模型，Scene 视图里的模型会随着你的每一步操作实时更新。
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="在模型上点一下前臂的袖子就选中了它，贴图上同样的区块也亮了起来" src="../../.github/media/zh-CN/how-1.webp" width="100%">
+      <br><b>1. 选择部位。</b>在模型或贴图上点一下，同样的区块会在两边一起亮起。
+    </td>
+    <td width="50%" valign="top">
+      <img alt="拖动颜色条时，手套从黑色变成蓝色" src="../../.github/media/zh-CN/how-2.webp" width="100%">
+      <br><b>2. 选择颜色。</b>改变颜色，明暗和图案保持原位。
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="沿前臂拖出一条粉色笔触，颜色只落在选中的区块上" src="../../.github/media/zh-CN/how-3.webp" width="100%">
+      <br><b>3. 绘制细节。</b>画笔和渐变只作用在你选中的区块内。
+    </td>
+    <td width="50%" valign="top">
+      <img alt="点击“另存为PNG”后，未改动的原文件旁边多出 Glove_ats.png、一个材质副本和一份编辑配方" src="../../.github/media/zh-CN/how-4.webp" width="100%">
+      <br><b>4. 保存为新副本。</b>新的 PNG 和材质会放在原文件旁边，原文件保持原样。
+    </td>
+  </tr>
+</table>
+
+<p align="center"><sub>在网站上<a href="https://avistry.github.io/avistry/#tour">观看 3 分钟导览</a>，配有英语、日语、韩语和中文旁白。</sub></p>
+
+## 想选哪里，就精确选哪里
+
+一张模型贴图是一大张平面，上面有许多小区块：一只袖子、一条肩带、一片翅膀。Avistry 知道每个区块在模型上的位置。在贴图上选一个，它就会在模型上亮起；点一下模型，它也会在贴图上亮起。之后的颜色、绘制和图层，只会改动你选中的部分。一共有六种选择方式：
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <img alt="点击：在模型上一次选一个区块" src="../../.github/media/zh-CN/sel-click.webp" width="100%">
+      <br><b>点击。</b>一次选一个区块。Shift 添加，Ctrl 移除。
+    </td>
+    <td width="33%" valign="top">
+      <img alt="框选：在手臂上拖出一个矩形，框内的区块全部被选中" src="../../.github/media/zh-CN/sel-box.webp" width="100%">
+      <br><b>框选。</b>拖拽圈住区块，可以在贴图上，也可以直接在模型上。
+    </td>
+    <td width="33%" valign="top">
+      <img alt="套索：围着手臂画出任意形状，圈内的区块被选中" src="../../.github/media/zh-CN/sel-lasso.webp" width="100%">
+      <br><b>套索。</b>围着想要的区块画出任意形状。
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <img alt="魔棒：点一下，所有同色的区块都被选中" src="../../.github/media/zh-CN/sel-wand.webp" width="100%">
+      <br><b>魔棒。</b>点一种颜色，就会选中所有含该颜色的区块。
+    </td>
+    <td width="33%" valign="top">
+      <img alt="按部位：点一下就选中该部位的所有区块" src="../../.github/media/zh-CN/sel-part.webp" width="100%">
+      <br><b>按部位。</b>单击一下，就选中某个部位的所有区块。
+    </td>
+    <td width="33%" valign="top">
+      <img alt="按 UV 图块：一个图块内的所有区块都被选中" src="../../.github/media/zh-CN/sel-tile.webp" width="100%">
+      <br><b>按 UV 图块。</b>选中一个图块内的全部区块，适合分布在多个图块上的模型。
+    </td>
+  </tr>
+</table>
+
+## 它还能做什么
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="Quick material：在材质的可编辑副本上，Poiyomi 的发光和闪粉颜色一起变化" src="../../.github/media/zh-CN/material.webp" width="100%">
+      <br><b>整个材质换色。</b>在 Poiyomi 和 lilToon 上，阴影、边缘光、Matcap、描边和自发光的颜色会跟着一起变，
+      走的是着色器自带的设置。
+    </td>
+    <td width="50%" valign="top">
+      <img alt="在一侧画的脸部彩绘会对称出现在另一侧，接着在贴图上拖出一条渐变，头发从红色变成紫色" src="../../.github/media/zh-CN/paint.webp" width="100%">
+      <br><b>绘制。</b>11 种画笔，支持压感，另有填充、渐变、模糊和涂抹。可以画在贴图上，也可以直接画在 3D 模型上，
+      需要的话还能镜像。
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="颜色匹配：选中角之后，翅膀的饰边换上了它的颜色" src="../../.github/media/zh-CN/match.webp" width="100%">
+      <br><b>匹配颜色。</b>让头发用上衣服的配色，或者反过来，同时保留原来的明暗。
+    </td>
+    <td width="50%" valign="top">
+      <img alt="最上层的图层依次切换混合模式，翅膀随之更新" src="../../.github/media/zh-CN/blend.webp" width="100%">
+      <br><b>用图层工作。</b>28 种混合模式、蒙版、剪贴、图片图层和调整图层。任何一步都能隐藏、调整顺序或撤销。
+    </td>
+  </tr>
+</table>
+
+还有这些：
+
+- **烘焙辅助贴图。**环境光遮蔽、由贴图生成的法线贴图，还有给动漫风脸部用的脸部阴影图。
+- **检查材质。**粉红色着色器、空槽位、缺失的贴图和不对的导入设置，都用大白话讲清楚，能安全修复的地方有一键修复按钮。
+- **边用边学。**有 Simple 和 Advanced 两种模式、信息图标、41 个词条的术语表，还有给 Unity 新手的技能树。
+- **你的语言。**整个工具支持英语、日语、韩语和简体中文，默认跟随 Unity 编辑器的语言。
+
+所有功能都列在[功能页面](https://avistry.github.io/avistry/features.html)里。
 
 ## 为什么选 Avistry
 
@@ -47,44 +144,8 @@
 - **精工胜过数量。**一个真正好用的工具，胜过十个差不多能用的。我们会拒绝只会增加杂乱的功能。
 - **和社区一起成长。**想法在 Discord 上讨论，贡献常常借助 AI 代理完成，维护者会在 Unity 里审查并测试每一处改动。在这里，AI 是工具，从来不是作者。
 
-## 它能做什么
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <img alt="Quick material：在材质的可编辑副本上，Poiyomi 的发光和闪粉颜色一起变化" src="../../.github/media/material.webp" width="100%">
-      <br><b>整个材质换色。</b>在 Poiyomi 和 lilToon 上，阴影、边缘光、Matcap、描边和自发光的颜色会跟着一起变，
-      走的是着色器自带的设置。
-    </td>
-    <td width="50%" valign="top">
-      <img alt="在贴图上拖出一条渐变，同时在模型的头发上实时显示" src="../../.github/media/paint.webp" width="100%">
-      <br><b>绘制。</b>11 种画笔，支持压感，另有填充、渐变、模糊和涂抹。可以画在贴图上，也可以直接画在 3D 模型上，
-      需要的话还能镜像。
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <img alt="Colour Match：选中角之后，翅膀的饰边换上了它的颜色" src="../../.github/media/match.webp" width="100%">
-      <br><b>匹配颜色。</b>让头发用上衣服的配色，或者反过来，同时保留原来的明暗。
-    </td>
-    <td width="50%" valign="top">
-      <img alt="最上层的图层依次切换混合模式，翅膀随之更新" src="../../.github/media/blend.webp" width="100%">
-      <br><b>用图层工作。</b>28 种混合模式、蒙版、剪贴、图片图层和调整图层。任何一步都能隐藏、调整顺序或撤销。
-    </td>
-  </tr>
-</table>
-
-还有这些：
-
-- **一次只改一块。**点一下袖子、丝带或腰带，只有那一块会变，Scene 视图里也一样。
-- **烘焙辅助贴图。**环境光遮蔽、由贴图生成的法线贴图，还有给动漫风脸部用的脸部阴影图。
-- **检查材质。**粉红色着色器、空槽位、缺失的贴图和不对的导入设置，都用大白话讲清楚，能安全修复的地方有一键修复按钮。
-- **边用边学。**有 Simple 和 Advanced 两种模式、信息图标、41 个词条的术语表，还有给 Unity 新手的技能树。
-
-所有功能都列在[功能页面](https://avistry.github.io/avistry/features.html)里。
-
 <p align="center">
-  <img alt="保存后，在没有改动的 Hair.png 和材质旁边多出了 Hair_ats.png、一个材质副本和一份编辑记录" src="../../.github/media/files.webp" width="640">
+  <img alt="你的原始文件 Hair.mat 和 Hair.png 保持原样；Avistry 另外添加了一张新的 PNG、一个材质副本和编辑配方" src="../../.github/media/zh-CN/files.webp" width="640">
   <br><sub>保存总是生成新文件。原来的贴图和材质保持原样。</sub>
 </p>
 
@@ -102,14 +163,14 @@
 **Git URL。**在 *Window › Package Manager* 里点 **+**，选 *Add package from git URL…*，然后粘贴
 `https://github.com/avistry/avistry.git`。
 
-不需要其他包。如果装了 Poiyomi 或 lilToon，Colour 标签页会多出针对它们的选项。
+不需要其他包。如果装了 Poiyomi 或 lilToon，**换色**标签页会多出针对它们的选项。
 如果你试过最早的测试版，请先删除 `Assets/AvatarTextureStudio`（VCC 会替你删掉）。
 
 ## 快速上手
 
 1. 选 **Tools › Avistry › Textures**，选中模型的某个部位，再挑出要编辑的贴图。
-2. 想快速换色就用 **Colour**，或者先 **Select** 选一块再 **Paint** 绘制。模型会随着你的操作实时更新。
-3. 在 **Save** 里点 **Save as new PNG**。
+2. 想快速换色就用 **换色**，或者先在 **范围** 里选一块，再用 **绘制** 来画。模型会随着你的操作实时更新。
+3. 在 **保存** 里点 **另存为PNG**。
 
 保存之前不会写入任何东西。Ctrl+Z 可以撤销每一步编辑，带着未保存的内容关闭窗口时会先问你。
 
@@ -118,7 +179,7 @@
 - 代码全部都在这里，采用 [MIT 许可证](../../LICENSE)。它只在编辑器里运行：不会有任何东西进入你的上传包，也不会在 VRChat 里运行。
 - 每个发布文件都扫描过 VirusTotal，SHA-256 校验值列在 `SHA256SUMS.txt` 里。在 PowerShell 里用
   `Get-FileHash <文件> -Algorithm SHA256` 就能核对下载的文件。
-- 没有遥测。唯一的网络请求是可选的更新检查（Help › Check for updates automatically）。它默认关闭，
+- 没有遥测。唯一的网络请求是可选的更新检查（帮助 › 自动检查更新）。它默认关闭，
   开启后每天只向 GitHub 的公开 API 询问一次最新版本，不会发送任何关于你的信息。
 - 试用任何新工具之前，包括这个，都请先备份项目。
 
@@ -130,9 +191,9 @@ MCP for Unity 是另一个团队制作的免费包。没有它，Avistry 的所�
 
 1. 在 *Window › Package Manager* 里，用 git URL 添加 `https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity`。
 2. 打开 *Window › MCP for Unity*，连接你的 AI 应用。它会在这台电脑上运行一个服务器。
-3. 在 Avistry 里打开 **Help › Connect an AI helper…**，选择 **Look only**（只看）或 **Look and edit**（看和改）。默认是 **Off**。
+3. 在 Avistry 里打开 **帮助 › 连接一个 AI 助手…**，选择 **仅查看** 或 **查看并编辑**。默认是 **关闭**。
 
-AI 的每个操作都是一步名为“AI: …”的 Ctrl+Z。保存，以及把你的贴图图片发出去，都要等你点 **Allow** 才会进行。
+AI 的每个操作都是一步名为“AI: …”的 Ctrl+Z。保存，以及把你的贴图图片发出去，都要等你点 **允许** 才会进行。
 我们的工具不会覆盖你的文件、删除文件或运行代码。
 
 请注意：MCP for Unity 有它自己的工具，其中一个可以在 Unity 里运行任意代码，所以请保持 AI 应用的批准提示开启。
@@ -144,7 +205,7 @@ AI 的每个操作都是一步名为“AI: …”的 Ctrl+Z。保存，以及把
 <details>
 <summary>会改动我的原始贴图吗？</summary>
 
-不会。保存会在原文件旁边生成一张新的 PNG（<code>_ats.png</code>）、一个新的材质和一份保存好的编辑记录。
+不会。保存会在原文件旁边生成一张新的 PNG（<code>_ats.png</code>）、一个新的材质和一份保存好的编辑配方。
 </details>
 
 <details>
@@ -188,7 +249,7 @@ AI 的每个操作都是一步名为“AI: …”的 Ctrl+Z。保存，以及把
 
 ## 参与贡献
 
-欢迎提交 Pull Request。新功能请先在 [Discord](https://discord.gg/PM8uC2UnT) 上和维护者讨论，欢迎加入。如何报告问题、提出功能建议或提交修复，请看[贡献指南](../../.github/CONTRIBUTING.md)。
+欢迎提交 Pull Request。新功能请先在 [Discord](https://discord.gg/sSeWgDJJjY) 上和维护者讨论，欢迎加入。如何报告问题、提出功能建议或提交修复，请看[贡献指南](../../.github/CONTRIBUTING.md)。
 
 | 文件夹 | 里面有什么 |
 |---|---|

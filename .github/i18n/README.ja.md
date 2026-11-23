@@ -21,6 +21,7 @@
   <a href="https://avistry.github.io/avistry/"><img alt="VCCに追加" height="36" src="https://img.shields.io/badge/Add%20to%20VCC-1f6feb?style=for-the-badge"></a>
   <a href="https://github.com/avistry/avistry/releases/latest"><img alt=".unitypackageをダウンロード" height="36" src="https://img.shields.io/badge/Download%20.unitypackage-2ea44f?style=for-the-badge&logo=unity&logoColor=white"></a>
   <a href="https://avistry.github.io/avistry/"><img alt="ウェブサイト" height="36" src="https://img.shields.io/badge/Website-30363d?style=for-the-badge"></a>
+  <a href="https://discord.gg/sSeWgDJJjY"><img alt="Discord" height="36" src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -31,13 +32,111 @@
 </p>
 
 <p align="center">
-  <img alt="Unityでの4ステップ。前腕の袖をクリックして選び、青に変え、選んだピースの中だけにピンクのストロークを描き、元のファイルの隣に新しいPNGとして保存する" src="../../.github/media/flow.webp" width="880">
+  <img alt="元の見た目のアバターが、Avistryで作った3つの新しい見た目(クリムゾン、フロスト、ベノムグリーン)へワイプで切り替わる" src="../../.github/media/looks.webp" width="880">
+  <br><sub>ひとつのアバターで、3つの見た目。すべてAvistryで作りました。元のファイルは変わっていません。</sub>
 </p>
 
-<p align="center">
-  <b>1</b> パーツを選ぶ &nbsp;·&nbsp; <b>2</b> 色を選ぶ &nbsp;·&nbsp; <b>3</b> 細部をペイント &nbsp;·&nbsp; <b>4</b> 新しいコピーとして保存
-  <br><sub>Unityで録画しました。</sub>
-</p>
+## 使い方
+
+4ステップ、ウィンドウはひとつ。**Tools › Avistry › Textures** を開いてアバターを選ぶと、Sceneビューのアバターに、操作した変更がそのまま反映されます。
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="モデル上の前腕の袖をクリックすると選ばれ、テクスチャ上の同じピースが光る" src="../../.github/media/ja/how-1.webp" width="100%">
+      <br><b>1. パーツを選ぶ。</b> モデル上でもテクスチャ上でもクリックできます。同じピースが両方で光ります。
+    </td>
+    <td width="50%" valign="top">
+      <img alt="色のバーをドラッグすると、手袋が黒から青に変わる" src="../../.github/media/ja/how-2.webp" width="100%">
+      <br><b>2. 色を選ぶ。</b> 色を変えても、陰影と模様はそのまま残ります。
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="前腕に沿ってドラッグしたピンクのストロークが、選んだピースの中だけに付く" src="../../.github/media/ja/how-3.webp" width="100%">
+      <br><b>3. 細部をペイント。</b> ブラシとグラデーションは、選んだピースの中だけに適用されます。
+    </td>
+    <td width="50%" valign="top">
+      <img alt="「新しいPNGとして保存」を押すと、変わらない元のファイルの隣に、Glove_ats.png、マテリアルのコピー、編集レシピが追加される" src="../../.github/media/ja/how-4.webp" width="100%">
+      <br><b>4. 新しいコピーとして保存。</b> 元のファイルの隣に、新しいPNGとマテリアルができます。元のファイルはそのままです。
+    </td>
+  </tr>
+</table>
+
+<p align="center"><sub>ウェブサイトの<a href="https://avistry.github.io/avistry/#tour">3分間のツアー</a>を見る(英語・日本語・韓国語・中国語のナレーション付き)。</sub></p>
+
+## 選びたいところを、ぴったり選ぶ
+
+アバターのテクスチャは、袖、ストラップ、翼など、たくさんの小さなピースが並んだ1枚の平らなシートです。Avistryは、各ピースがモデルのどこにあるかを知っています。テクスチャ上でピースを選ぶとアバター上で光り、アバターをクリックするとテクスチャ上で光ります。色、ペイント、レイヤーは、選んだところだけを変えます。選び方は6つあります。
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <img alt="クリック。モデル上でピースをひとつずつ選ぶ" src="../../.github/media/ja/sel-click.webp" width="100%">
+      <br><b>クリック。</b> ピースをひとつずつ選びます。Shiftで追加、Ctrlで除外。
+    </td>
+    <td width="33%" valign="top">
+      <img alt="矩形。腕の上にドラッグした四角が、中にあるピースをすべて選ぶ" src="../../.github/media/ja/sel-box.webp" width="100%">
+      <br><b>矩形。</b> ピースをドラッグで囲みます。テクスチャ上でも、モデル上でも使えます。
+    </td>
+    <td width="33%" valign="top">
+      <img alt="投げ縄。腕のまわりに描いた自由な形が、中にあるピースを選ぶ" src="../../.github/media/ja/sel-lasso.webp" width="100%">
+      <br><b>投げ縄。</b> 選びたいピースのまわりに、好きな形を描きます。
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <img alt="魔法の杖。1回クリックすると、同じ色のピースがすべて選ばれる" src="../../.github/media/ja/sel-wand.webp" width="100%">
+      <br><b>魔法の杖。</b> 色をクリックすると、その色を持つピースがすべて選ばれます。
+    </td>
+    <td width="33%" valign="top">
+      <img alt="パーツ単位。1回クリックすると、パーツのすべてのピースが選ばれる" src="../../.github/media/ja/sel-part.webp" width="100%">
+      <br><b>パーツ単位。</b> ワンクリックで、パーツのすべてのピースを選びます。
+    </td>
+    <td width="33%" valign="top">
+      <img alt="UVタイル単位。1つのタイル内のピースがすべて選ばれる" src="../../.github/media/ja/sel-tile.webp" width="100%">
+      <br><b>UVタイル単位。</b> タイル内のピースをすべて選びます。複数のタイルにまたがるアバター向けです。
+    </td>
+  </tr>
+</table>
+
+## ほかにもできること
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="クイックマテリアル。マテリアルの編集用コピーで、Poiyomiの発光とグリッターの色が変わる" src="../../.github/media/ja/material.webp" width="100%">
+      <br><b>マテリアル全体の色替え。</b> PoiyomiとlilToonでは、影・リム・マットキャップ・アウトライン・発光の色も、
+      シェーダー自身の設定を通して一緒に変わります。
+    </td>
+    <td width="50%" valign="top">
+      <img alt="片側に描いたフェイスペイントが反対側にも左右対称に入り、続いてテクスチャ上にドラッグしたグラデーションで髪が赤から紫に変わる" src="../../.github/media/ja/paint.webp" width="100%">
+      <br><b>ペイント。</b> 筆圧対応の11種類のブラシに加えて、塗りつぶし、グラデーション、ぼかし、指先ツール。
+      テクスチャ上にも3Dモデルに直接も描けて、ミラーもできます。
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img alt="カラーマッチ。角を選ぶと、翼の縁取りが角の色になる" src="../../.github/media/ja/match.webp" width="100%">
+      <br><b>カラーマッチ。</b> 髪に衣装の色を、あるいはその逆を、元の陰影を残したまま移せます。
+    </td>
+    <td width="50%" valign="top">
+      <img alt="一番上のレイヤーの合成モードが切り替わり、それに合わせて翼が変わる" src="../../.github/media/ja/blend.webp" width="100%">
+      <br><b>レイヤーで作業。</b> 28種類の合成モード、マスク、クリッピング、画像レイヤー、色調補正レイヤー。
+      どの操作も、非表示、並べ替え、元に戻すができます。
+    </td>
+  </tr>
+</table>
+
+ほかにもあります。
+
+- **補助マップのベイク。** アンビエントオクルージョン、テクスチャから作る法線マップ、アニメ調の顔向けのフェイスシャドウマップ。
+- **マテリアルのチェック。** ピンク表示のシェーダー、空のスロット、足りないテクスチャ、おかしなインポート設定を、わかりやすい言葉で説明します。
+  安全に直せるものは、ワンクリックで修正できます。
+- **使いながら学ぶ。** SimpleモードとAdvancedモード、情報アイコン、41語の用語集、Unity初心者向けのスキルツリー。
+- **あなたの言語で。** ツール全体が英語、日本語、韓国語、簡体字中国語に対応していて、初期設定ではUnityエディタの言語に合わせて切り替わります。
+
+全機能は[機能ページ](https://avistry.github.io/avistry/features.html)にまとめています。
 
 ## なぜAvistryなのか
 
@@ -47,46 +146,8 @@
 - **量より質。** ほぼ動くツールが10個あるより、きちんと動くツールが1つあるほうがいい。散らかる機能は、お断りしています。
 - **コミュニティと育てる。** アイデアはDiscordで話し合い、コントリビューションはAIエージェントを使って作られることも多く、メンテナーがすべての変更をUnityで確認してテストします。ここでAIは道具であり、作者ではありません。
 
-## できること
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <img alt="クイックマテリアル。マテリアルの編集用コピーで、Poiyomiの発光とグリッターの色が変わる" src="../../.github/media/material.webp" width="100%">
-      <br><b>マテリアル全体の色替え。</b> PoiyomiとlilToonでは、影・リム・マットキャップ・アウトライン・発光の色も、
-      シェーダー自身の設定を通して一緒に変わります。
-    </td>
-    <td width="50%" valign="top">
-      <img alt="テクスチャ上にドラッグしたグラデーションが、アバターの髪にそのまま表示される" src="../../.github/media/paint.webp" width="100%">
-      <br><b>ペイント。</b> 筆圧対応の11種類のブラシに加えて、塗りつぶし、グラデーション、ぼかし、指先ツール。
-      テクスチャ上にも3Dモデルに直接も描けて、ミラーもできます。
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <img alt="Colour Match。角を選ぶと、翼の縁取りが角の色になる" src="../../.github/media/match.webp" width="100%">
-      <br><b>色合わせ。</b> 髪に衣装の色を、あるいはその逆を、元の陰影を残したまま移せます。
-    </td>
-    <td width="50%" valign="top">
-      <img alt="一番上のレイヤーの合成モードが切り替わり、それに合わせて翼が変わる" src="../../.github/media/blend.webp" width="100%">
-      <br><b>レイヤーで作業。</b> 28種類の合成モード、マスク、クリッピング、画像レイヤー、色調補正レイヤー。
-      どの操作も、非表示、並べ替え、元に戻すができます。
-    </td>
-  </tr>
-</table>
-
-ほかにもあります。
-
-- **1つのピースだけ編集。** 袖、リボン、ベルトをクリックすると、そのピースだけが変わります。Sceneビューでも同じです。
-- **補助マップのベイク。** アンビエントオクルージョン、テクスチャから作る法線マップ、アニメ調の顔向けのフェイスシャドウマップ。
-- **マテリアルのチェック。** ピンク表示のシェーダー、空のスロット、足りないテクスチャ、おかしなインポート設定を、わかりやすい言葉で説明します。
-  安全に直せるものは、ワンクリックで修正できます。
-- **使いながら学ぶ。** SimpleモードとAdvancedモード、情報アイコン、41語の用語集、Unity初心者向けのスキルツリー。
-
-全機能は[機能ページ](https://avistry.github.io/avistry/features.html)にまとめています。
-
 <p align="center">
-  <img alt="保存すると、変わらないHair.pngとマテリアルの隣に、Hair_ats.png、マテリアルのコピー、編集レシピが追加される" src="../../.github/media/files.webp" width="640">
+  <img alt="元のHair.matとHair.pngは変わらず、Avistryが新しいPNG、マテリアルのコピー、編集レシピを追加する" src="../../.github/media/ja/files.webp" width="640">
   <br><sub>保存では必ず新しいファイルを作ります。元のテクスチャとマテリアルはそのままです。</sub>
 </p>
 
@@ -105,14 +166,14 @@ Projectウィンドウにドラッグします。ツールは Assets の下で�
 **Git URL。** *Window › Package Manager* で **+** を押し、*Add package from git URL…* を選んで
 `https://github.com/avistry/avistry.git` を貼り付けます。
 
-ほかのパッケージは必要ありません。PoiyomiかlilToonが入っていれば、Colourタブにそれ用の項目が追加されます。
+ほかのパッケージは必要ありません。PoiyomiかlilToonが入っていれば、色替えタブにそれ用の項目が追加されます。
 最初期のテストビルドを使ったことがある人は、先に `Assets/AvatarTextureStudio` を削除してください(VCCなら自動で取り除かれます)。
 
 ## クイックスタート
 
 1. **Tools › Avistry › Textures** を選び、アバターのパーツを選んで、テクスチャを選択します。
-2. 手早く色を変えるなら **Colour** を、ピースを選んで塗るなら **Select** のあとに **Paint** を使います。アバターには操作に合わせてすぐ反映されます。
-3. **Save** タブで **Save as new PNG** を押します。
+2. 手早く色を変えるなら **色替え** を、ピースを選んで塗るなら **範囲** のあとに **ペイント** を使います。アバターには操作に合わせてすぐ反映されます。
+3. **保存** タブで **新しいPNGとして保存** を押します。
 
 保存するまでは何も書き込まれません。Ctrl+Zですべての編集を元に戻せて、未保存のままウィンドウを閉じようとすると確認が出ます。
 
@@ -121,7 +182,7 @@ Projectウィンドウにドラッグします。ツールは Assets の下で�
 - コードはすべてこのリポジトリにあり、[MITライセンス](../../LICENSE)で公開しています。エディタ専用なので、アップロードには何も入らず、VRChat内で動くこともありません。
 - リリースのファイルはVirusTotalでスキャンしていて、SHA-256を `SHA256SUMS.txt` に載せています。ダウンロードしたファイルは、PowerShellで
   `Get-FileHash <file> -Algorithm SHA256` を実行して確認できます。
-- テレメトリーはありません。ネットワーク通信は、任意のアップデート確認(Help › Check for updates automatically)だけです。
+- テレメトリーはありません。ネットワーク通信は、任意のアップデート確認(ヘルプ › 更新を自動的に確認する)だけです。
   オンにするまで動かず、オンにしても1日1回、GitHubの公開APIで最新バージョンを調べるだけで、あなたの情報は何も送りません。
 - 新しいツールを試す前には、プロジェクトのバックアップを取ってください。このツールも例外ではありません。
 
@@ -133,9 +194,9 @@ MCP for Unityは別のチームが作った無料のパッケージです。Avis
 
 1. *Window › Package Manager* で、git URLから `https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity` を追加します。
 2. *Window › MCP for Unity* を開いて、AIアプリをつなぎます。このパソコン上でサーバーが動きます。
-3. Avistryで **Help › Connect an AI helper…** を開き、**Look only** か **Look and edit** を選びます。最初は **Off** です。
+3. Avistryで **ヘルプ › AIヘルパーを接続する…** を開き、**見るだけ** か **見て編集** を選びます。最初は **オフ** です。
 
-AIの操作は1回ごとに「AI: …」という名前のCtrl+Z 1段階になります。保存と、テクスチャの画像の送信は、あなたが **Allow** を押すまで実行されません。
+AIの操作は1回ごとに「AI: …」という名前のCtrl+Z 1段階になります。保存と、テクスチャの画像の送信は、あなたが **許可** を押すまで実行されません。
 私たちのツールが、ファイルを上書きしたり、削除したり、コードを実行したりすることはありません。
 
 注意点: MCP for Unityには独自のツールがあり、その1つはUnity内で任意のコードを実行できます。AIアプリの承認確認はオンのままにしてください。
@@ -194,7 +255,7 @@ AIは意図して使っています。開発を速く進めるためと、セキ
 
 ## 開発に参加する
 
-プルリクエストを歓迎します。新しい機能は、まず[Discord](https://discord.gg/PM8uC2UnT)でメンテナーと話し合います。ぜひ参加してください。バグの報告、機能の提案、修正の送り方は[コントリビューションガイド](../../.github/CONTRIBUTING.md)にあります。
+プルリクエストを歓迎します。新しい機能は、まず[Discord](https://discord.gg/sSeWgDJJjY)でメンテナーと話し合います。ぜひ参加してください。バグの報告、機能の提案、修正の送り方は[コントリビューションガイド](../../.github/CONTRIBUTING.md)にあります。
 
 | フォルダ | 中身 |
 |---|---|
