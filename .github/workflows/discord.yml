@@ -1,0 +1,42 @@
+name: Discord
+
+# Posts to the Avistry Discord through two channel webhooks, stored as repository secrets:
+#   DISCORD_WEBHOOK_COMMITS   every push to the dev branch -> #dev-commits
+#   DISCORD_WEBHOOK_RELEASES  a release -> #announcements (release.yml calls the same script; run this by hand to
+#                             post an earlier release again)
+# A missing secret only skips the post.
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version to announce, for example 0.2.0
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  commits:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Post the commits
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_COMMITS }}
+        run: node .github/scripts/discord.mjs commits
+
+  release:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Announce the release
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
+          VERSION: ${{ inputs.version }}
+        run: node .github/scripts/discord.mjs release "${VERSION}"

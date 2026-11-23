@@ -182,3 +182,10 @@ jobs:
       - name: Rebuild the website and VPM listing
         if: env.PUBLISH == 'true'
         run: gh workflow run pages.yml --ref "${{ github.event.repository.default_branch }}"
+
+      - name: Announce on Discord
+        if: env.PUBLISH == 'true' && env.PRERELEASE == 'false'
+        continue-on-error: true # the release is out; a Discord hiccup must not mark it failed
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
+        run: node .github/scripts/discord.mjs release "${VERSION}"
