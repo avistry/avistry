@@ -1448,8 +1448,97 @@ body.has-marks > main, body.has-marks > footer { position: relative; z-index: 1;
 
 /* the full tour video: native controls, sound on demand */
 .tour-plate { margin-top: 28px; }
+/* the tour grows with the screen: as wide as the window allows while the whole video still fits under the header
+   (tour.js keeps --vw at the width without the scrollbar) */
+.tour .tour-plate {
+  width: min(calc(var(--vw, 100vw) - 2 * var(--gutter)), max(320px, calc((100svh - var(--hdr-h) - 48px) * 16 / 9)));
+  max-width: none; margin-left: 50%; translate: -50% 0;
+}
 .tour-plate .plate-body { background: #000; }
 .tour-plate video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #000; }
+
+/* tour player (tour.js): the language switch sits on the video; the same video moves into a mini player that keeps
+   playing on every page. Colours are fixed: the video is always on black. */
+.tvid { position: relative; container-type: inline-size; background: #000; }
+.tvid video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #000; }
+.tvid.is-back { animation: tvid-back 280ms cubic-bezier(.2, .8, .2, 1); }
+@keyframes tvid-back { from { opacity: 0.4; transform: scale(0.97); } }
+.tv-hold { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: contain; pointer-events: none; transition: opacity 160ms ease-out; }
+.tlang {
+  position: absolute; z-index: 2; top: 12px; right: 12px; display: flex; gap: 2px; padding: 3px; border-radius: var(--r-pill);
+  background: rgb(10 8 15 / 0.74); border: 1px solid rgb(255 255 255 / 0.3); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  transition: opacity 220ms ease-out;
+}
+.tlang button {
+  min-width: 40px; min-height: 32px; margin: 0; padding: 0 11px; border: 0; border-radius: var(--r-pill); background: none; color: #F3F1F6;
+  font-family: var(--font-display); font-weight: 600; font-size: 0.875rem; line-height: 1; cursor: pointer;
+  transition: background-color 140ms ease-out, color 140ms ease-out;
+}
+.tlang button[aria-pressed="true"] { background: #43DCFF; color: #1A1033; }
+.tlang button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+@media (hover: hover) { .tlang button:not([aria-pressed="true"]):hover { background: rgb(255 255 255 / 0.16); } }
+.tlang .l-short { display: none; }
+.tvid.is-idle .tlang:not(:focus-within) { opacity: 0; pointer-events: none; }
+@media (hover: hover) { .tvid.is-idle:hover .tlang { opacity: 1; pointer-events: auto; } }
+@container (max-width: 479px) {
+  .tlang { top: 6px; right: 6px; padding: 2px; }
+  .tlang button { min-width: 30px; min-height: 26px; padding: 0 7px; font-size: 0.75rem; }
+  .tlang .l-long { display: none; }
+  .tlang .l-short { display: inline; }
+}
+
+/* what the tour plate shows while the video plays in the corner */
+.tour-ph { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 9; background: #000 center / cover no-repeat; }
+.tour-ph::before { content: ""; position: absolute; inset: 0; background: rgb(10 8 15 / 0.7); }
+.tour-ph-in { position: relative; display: grid; justify-items: center; gap: 14px; padding: 16px; color: #F3F1F6; text-align: center; font-family: var(--font-display); font-weight: 600; }
+
+.tdock {
+  position: fixed; left: 0; top: 0; z-index: 70; width: var(--w, 360px); transform: translate3d(var(--x, 0), var(--y, 0), 0);
+  border: 1px solid #342E4D; border-radius: var(--r-sm); background: #1D1830; color: #F3F1F6;
+  box-shadow: 3px 3px 0 #FF6F91, 6px 6px 0 #6B4EFF, 0 22px 48px -16px rgb(0 0 0 / 0.75);
+}
+.tdock.is-in { animation: tdock-in 260ms cubic-bezier(.2, .8, .2, 1); }
+@keyframes tdock-in { from { opacity: 0; transform: translate3d(var(--x, 0), calc(var(--y, 0) - 12px), 0) scale(0.94); } }
+.tdock.is-drag { box-shadow: 4px 4px 0 #FF6F91, 8px 8px 0 #6B4EFF, 0 30px 60px -16px rgb(0 0 0 / 0.8); }
+.tdock.is-drag .tdock-media { pointer-events: none; }
+html.sheet-open .tdock { visibility: hidden; }
+.tdock-bar {
+  position: relative; display: flex; align-items: center; gap: 2px; height: 36px; padding: 0 4px; border-radius: var(--r-sm) var(--r-sm) 0 0;
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.tdock.is-drag .tdock-bar, .tdock.is-drag .tdock-grip { cursor: grabbing; }
+.tdock-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display); font-weight: 600; font-size: 0.875rem; color: #BAB3CC; }
+.tdock-grip, .tdock-btn {
+  flex: none; display: grid; place-items: center; width: 32px; height: 32px; margin: 0; padding: 0; border: 0; border-radius: var(--r-xs);
+  background: none; color: inherit; cursor: pointer;
+}
+.tdock-grip { cursor: grab; touch-action: none; color: #BAB3CC; }
+.tdock svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tdock-grip .dots { fill: currentColor; stroke: none; }
+@media (hover: hover) { .tdock-btn:hover, .tdock-grip:hover { background: rgb(255 255 255 / 0.1); color: #fff; } }
+.tdock :focus-visible { outline: 2px solid #43DCFF; outline-offset: -2px; }
+.tdock-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: #43DCFF; transform-origin: 0 50%; transform: scaleX(var(--p, 0)); pointer-events: none; }
+.tdock-media { overflow: hidden; border-radius: 0 0 calc(var(--r-sm) - 1px) calc(var(--r-sm) - 1px); background: #000; }
+.tdock-size {
+  position: absolute; z-index: 3; right: -11px; bottom: -11px; display: grid; place-items: center; width: 22px; height: 22px; margin: 0; padding: 0;
+  border: 2px solid #1D1830; border-radius: 50%; background: #43DCFF; color: #1A1033; cursor: nwse-resize; touch-action: none;
+}
+.tdock-size::after { content: ""; position: absolute; inset: -11px; border-radius: 50%; }
+.tdock-size svg { width: 12px; height: 12px; stroke-width: 2.6; }
+.tdock.is-left .tdock-size { right: auto; left: -11px; cursor: nesw-resize; }
+.tdock.is-left .tdock-size svg { transform: scaleX(-1); }
+.tdock .tdock-size:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.tdock-probe { position: fixed; left: 0; top: 0; visibility: hidden; pointer-events: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+.soft-focus:focus { outline: none; }
+
+/* a page swapped in while the tour plays fades in once its words are in place */
+html.soft-fade body > :not(.tdock) { transition: opacity 140ms ease-out; }
+html.is-soft body > :not(.tdock) { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .tvid.is-back, .tdock.is-in { animation: none; }
+  .tlang, .tlang button, .tv-hold, html.soft-fade body > :not(.tdock) { transition: none; }
+}
 
 /* ---- gallery close-ups: full width, the picture switching sides, text beside it ---- */
 .cu-band { padding-bottom: clamp(48px, 8vh, 96px); }

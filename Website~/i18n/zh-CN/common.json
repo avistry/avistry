@@ -174,5 +174,14 @@
  "alt.orbit.original": "镜头缓缓绕到 Avatar 的背后：水晶角、长发与展开的翅膀。",
  "ui.zoom": "放大查看",
  "ui.close": "关闭",
- "nav.learn": "学习"
+ "nav.learn": "学习",
+ "player.lang": "导览语言",
+ "player.region": "导览视频",
+ "player.title": "导览",
+ "player.move": "移动播放器（方向键）",
+ "player.resize": "调整播放器大小（方向键）",
+ "player.full": "回到大视频",
+ "player.close": "关闭播放器",
+ "player.here": "正在小窗中播放",
+ "player.back": "移回这里"
 }

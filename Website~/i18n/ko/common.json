@@ -174,5 +174,14 @@
  "alt.orbit.original": "카메라가 아바타의 뒤쪽을 천천히 돕니다. 크리스털 뿔, 긴 머리카락, 펼친 날개가 보입니다.",
  "ui.zoom": "크게 열기",
  "ui.close": "닫기",
- "nav.learn": "배우기"
+ "nav.learn": "배우기",
+ "player.lang": "투어 언어",
+ "player.region": "투어 영상",
+ "player.title": "투어",
+ "player.move": "플레이어 옮기기(화살표 키)",
+ "player.resize": "플레이어 크기 바꾸기(화살표 키)",
+ "player.full": "큰 영상으로 돌아가기",
+ "player.close": "플레이어 닫기",
+ "player.here": "미니 플레이어에서 재생 중",
+ "player.back": "여기로 가져오기"
 }

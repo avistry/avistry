@@ -174,5 +174,14 @@
  "alt.orbit.original": "カメラがアバターの背中側をゆっくり回ります。クリスタルの角、長い髪、広げた翼が見えます。",
  "ui.zoom": "大きく開く",
  "ui.close": "閉じる",
- "nav.learn": "学ぶ"
+ "nav.learn": "学ぶ",
+ "player.lang": "ツアーの言語",
+ "player.region": "ツアー動画",
+ "player.title": "ツアー",
+ "player.move": "プレーヤーを移動（矢印キー）",
+ "player.resize": "プレーヤーの大きさを変える（矢印キー）",
+ "player.full": "大きな動画に戻す",
+ "player.close": "プレーヤーを閉じる",
+ "player.here": "ミニプレーヤーで再生中",
+ "player.back": "ここに戻す"
 }

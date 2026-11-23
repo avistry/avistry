@@ -174,5 +174,14 @@
  "alt.orbit.original": "The camera drifts slowly around the avatar's back: a crystal horn, long hair and spread wings.",
  "ui.zoom": "Open larger",
  "ui.close": "Close",
- "nav.learn": "Learn"
+ "nav.learn": "Learn",
+ "player.lang": "Tour language",
+ "player.region": "Tour video",
+ "player.title": "Tour",
+ "player.move": "Move the player (arrow keys)",
+ "player.resize": "Resize the player (arrow keys)",
+ "player.full": "Back to the full-size video",
+ "player.close": "Close the player",
+ "player.here": "Playing in the mini player",
+ "player.back": "Bring it back here"
 }

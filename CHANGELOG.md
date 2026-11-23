@@ -9,6 +9,8 @@ the release notes.
 
 ## [Unreleased]
 
+- Website: the tour video has a language switch (EN, 日本語, 한국어, 中文) that keeps the same second, and keeps playing in a mini player you can move and resize while you visit the other pages.
+
 ## [0.2.0] - 2026-11-22
 
 First public release of Avistry.

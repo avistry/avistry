@@ -1218,6 +1218,8 @@
     if (!mediaReady) return;
     var sel = ['src', 'srcset', 'poster', 'href'].map(function (a) { return '[' + a + '^="' + MEDIA + '"]'; }).join(',');
     $$(sel).forEach(function (el) {
+      /* the tour player (tour.js) picks its own language */
+      if (el.closest('[data-own-lang]')) return;
       ['src', 'srcset', 'poster', 'href'].forEach(function (a) {
         var v = el.getAttribute(a), key = '_en_' + a;
         if (!v || v.indexOf(MEDIA) !== 0) return;
@@ -1285,16 +1287,16 @@
   /* at most one video plays automatically: the one most in view, past 60% */
   function arbitrate() {
     var best = null, top = 0;
-    if (!(external && !external.paused)) {
-      regs.forEach(function (r) {
-        var score = 0;
-        if (r.ready && r.ratio > 0) {
-          if (r.want === 'on') score = 2 + r.ratio;
-          else if (r.want === 'auto' && !noAuto && r.ratio >= 0.6) score = 1 + r.ratio;
-        }
-        if (score > top) { top = score; best = r; }
-      });
-    }
+    /* while a video with sound plays, loops start only when pressed */
+    var ext = external && !external.paused;
+    regs.forEach(function (r) {
+      var score = 0;
+      if (r.ready && r.ratio > 0) {
+        if (r.want === 'on') score = 2 + r.ratio;
+        else if (!ext && r.want === 'auto' && !noAuto && r.ratio >= 0.6) score = 1 + r.ratio;
+      }
+      if (score > top) { top = score; best = r; }
+    });
     regs.forEach(function (r) {
       if (r === best) {
         if (r.el.paused) {
@@ -1385,6 +1387,9 @@
 
   /* a video with native controls (the makeover) wins over the loops while it plays */
   function initOneAtATime() {
+    /* the tour may already be playing in the mini player when this page was swapped in */
+    var tour = $('video[data-own-lang]');
+    if (tour && !tour.paused) external = tour;
     document.addEventListener('play', function (e) {
       if (e.target._r) return;
       external = e.target;
@@ -1584,8 +1589,8 @@
     });
   }
 
-  /* ---------- start ---------- */
-  document.addEventListener('DOMContentLoaded', function () {
+  /* ---------- start (tour.js sets ATS_SOFT when it swaps a page in and runs this file again) ---------- */
+  function start() {
     initCopy();
     initSharePc();
     initTheme();
@@ -1620,5 +1625,6 @@
     openHashTarget();
     window.addEventListener('hashchange', openHashTarget);
     setLang(detectLang(), false);
-  });
+  }
+  if (window.ATS_SOFT) start(); else document.addEventListener('DOMContentLoaded', start);
 })();
