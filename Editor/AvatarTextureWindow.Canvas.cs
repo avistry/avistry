@@ -1,18 +1,20 @@
-using System.Linq;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
 namespace Avistry.Textures
 {
-    // Toolbar, texture canvas, status bar and canvas input.
     public partial class AvatarTextureWindow
     {
         const float StatusHeight = 20f;
 
         Vector2 _pan, _panelScroll, _lastCanvasSize;
         float _zoom;
-        bool _viewFit = true; // true while the view is at "frame texture"; cleared by zoom / pan
+        bool _viewFit = true;
         bool _panning;
+        bool CanvasPainting => _tab == Tab.Paint && _tool == Tool.Paint && !PickingForPaint;
+        bool CanvasSelecting => _tool == Tool.Select || PickingForPaint;
+        bool CanvasImagePlacement => CanvasPainting || _tab == Tab.Select;
         Texture2D _selOverlay, _checker;
         Vector3[] _selSegments = System.Array.Empty<Vector3>();
 
@@ -36,68 +38,161 @@ namespace Avistry.Textures
 
         void DrawToolbar(Rect r)
         {
+            var button = EditorStyles.toolbarButton;
+            var dropdown = EditorStyles.toolbarDropDown;
+            var toolbar = EditorStyles.toolbar;
+            bool showingOriginal = DisplayingOriginal;
+            bool canPaint = CurrentSlot == null || CurrentSlot.role != TextureRole.Normal;
+            var select = StudioGUI.Icon("Grid.BoxTool", Loc.T(" Select"), Loc.T("Select pieces: the separate pieces of the texture sheet (S)"));
+            var paint = StudioGUI.Icon("Grid.PaintTool", Loc.T(" Paint"), PickingForPaint
+                ? Loc.T("Back to paint")
+                : canPaint ? Loc.T("Paint with a brush (B). E = eraser, I = eyedropper.")
+                    : Loc.T("Normal maps can't be painted."));
+            var spotlight = new GUIContent(Loc.T("Spotlight"),
+                Loc.T("While painting, dim everything outside the selected pieces (or the Paint layer's piece mask) " +
+                "and hide the orange selection, so you can see what you're painting."));
+            var mirror = new GUIContent(Loc.T("Mirror"), GradientToolActive
+                ? Loc.T("Gradients aren't mirrored (they're layers across the texture).")
+                : MirrorNeedsClassicAxis ? MirrorClassicHint
+                : Loc.T("Symmetry: also paint the mirror image on the other side of the model (see Symmetry in 4 · Paint)"));
+            var compare = new GUIContent(Loc.T("Original"),
+                Loc.T("Compare: shows the untouched original texture, here and on the avatar. Your edits are hidden while it's on."));
+            var view = new GUIContent(Loc.T("View"), Loc.T("What the texture view and avatar show"));
+            var settings = StudioGUI.Icon("Settings", Loc.T("Settings"), Loc.T("Settings, language and help"));
+            var settingsIcon = StudioGUI.Icon("Settings", "", Loc.T("Settings, language and help"));
+            float settingsLabelWidth = ToolbarItemWidth(button, settings), settingsIconWidth = ToolbarItemWidth(button, settingsIcon);
+
+            float selectWidth = ToolbarItemWidth(button, select), paintWidth = ToolbarItemWidth(button, paint);
+            float spotlightWidth = ToolbarItemWidth(button, spotlight), mirrorWidth = ToolbarItemWidth(button, mirror);
+            float compareWidth = ToolbarItemWidth(button, compare), viewWidth = ToolbarItemWidth(dropdown, view);
+            float withoutCompare = selectWidth + paintWidth + spotlightWidth + mirrorWidth + viewWidth + toolbar.padding.horizontal;
+            const float frameWidth = 28f;
+            float modeWidth = Mathf.Max(64f, Mathf.Max(ToolbarItemWidth(button, new GUIContent(Loc.T("Simple"))),
+                ToolbarItemWidth(button, new GUIContent(Loc.T("Advanced")))));
+            bool showMode = selectWidth + paintWidth + compareWidth + viewWidth + modeWidth + settingsIconWidth + toolbar.padding.horizontal <= r.width;
+            bool inlinePaintViews = withoutCompare + compareWidth + settingsIconWidth + (showMode ? modeWidth : 0f) <= r.width;
+            if (!inlinePaintViews) view.tooltip = Loc.T("Spotlight, Mirror and display options");
+            bool wideActions = false;
+            var mode = new GUIContent(Advanced ? Loc.T("Advanced") : Loc.T("Simple"), ModeSwitchTip);
+            if (r.width >= 480f && inlinePaintViews)
+            {
+                string original = Loc.T("Compare: Original"), originalOn = Loc.T("Compare: Original (on)");
+                float fullCompareWidth = Mathf.Max(ToolbarItemWidth(button, new GUIContent(original)),
+                    ToolbarItemWidth(button, new GUIContent(originalOn)));
+                wideActions = withoutCompare + fullCompareWidth + frameWidth + modeWidth + settingsIconWidth <= r.width;
+                if (wideActions)
+                {
+                    compare.text = showingOriginal ? originalOn : original;
+                    compareWidth = fullCompareWidth;
+                }
+            }
+            float used = selectWidth + paintWidth + compareWidth + viewWidth + toolbar.padding.horizontal +
+                (inlinePaintViews ? spotlightWidth + mirrorWidth : 0f) + (wideActions ? frameWidth : 0f) + (showMode ? modeWidth : 0f);
+            bool settingsLabel = used + settingsLabelWidth <= r.width;
+
             GUILayout.BeginArea(r);
             StudioGUI.Count("tab.toolbar");
-            using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
+            using (new EditorGUILayout.HorizontalScope(toolbar))
             {
-                // Tools (switch the canvas mode and the panel tab).
-                bool canPaint = CurrentSlot == null || CurrentSlot.role != TextureRole.Normal;
-                ToolButton(Tool.Select, StudioGUI.Icon("Grid.BoxTool", Loc.T(" Select"), Loc.T("Select pieces: the separate pieces of the texture sheet (S)")), _comp != null);
-                ToolButton(Tool.Paint, StudioGUI.Icon("Grid.PaintTool", Loc.T(" Paint"), canPaint
-                    ? Loc.T("Paint with a brush (B). E = eraser, I = eyedropper.")
-                    : Loc.T("Normal maps can't be painted.")), _comp != null && canPaint);
-                // Always present (so the buttons to its right never move); only active while painting.
-                using (new EditorGUI.DisabledScope(_tool != Tool.Paint))
-                    _focusWhilePainting = GUILayout.Toggle(_focusWhilePainting, new GUIContent(Loc.T("Spotlight"),
-                        Loc.T("While painting, dim everything outside the selected pieces (or the Paint layer's piece mask) " +
-                        "and hide the orange selection, so you can see what you're painting.")), EditorStyles.toolbarButton);
-                using (new EditorGUI.DisabledScope(_tool != Tool.Paint))
+                ToolButton(Tool.Select, select, selectWidth, _comp != null);
+                ToolButton(Tool.Paint, paint, paintWidth, _comp != null && canPaint);
+                if (inlinePaintViews)
                 {
-                    var oldSymBg = GUI.backgroundColor;
-                    if (_symmetry) GUI.backgroundColor = StudioGUI.Accent;
-                    bool sym = GUILayout.Toggle(_symmetry, new GUIContent(Loc.T("Mirror"), Loc.T("Symmetry: also paint the mirror image on the other side of the model (see Symmetry in 4 · Paint)")), EditorStyles.toolbarButton);
-                    GUI.backgroundColor = oldSymBg;
-                    if (sym != _symmetry)
+                    using (new EditorGUI.DisabledScope(!CanvasPainting))
+                        _focusWhilePainting = GUILayout.Toggle(_focusWhilePainting, spotlight, button, GUILayout.Width(spotlightWidth));
+                    using (new EditorGUI.DisabledScope(!CanvasPainting || GradientToolActive || MirrorNeedsClassicAxis))
                     {
-                        _symmetry = sym;
-                        if (sym) EnsureSymmetry();
-                        SceneView.RepaintAll();
+                        var oldSymBg = GUI.backgroundColor;
+                        if (_symmetry && !GradientToolActive && !MirrorNeedsClassicAxis) GUI.backgroundColor = StudioGUI.Accent;
+                        bool sym = GUILayout.Toggle(_symmetry, mirror, button, GUILayout.Width(mirrorWidth));
+                        GUI.backgroundColor = oldSymBg;
+                        SetSymmetryEnabled(sym);
                     }
                 }
 
                 GUILayout.FlexibleSpace();
 
-                // View: compare is used often, so it gets its own button; the rest live in one menu.
                 var oldBg = GUI.backgroundColor;
-                if (_showOriginal) GUI.backgroundColor = StudioGUI.Accent; // impossible to miss while it hides your edits
-                bool orig = GUILayout.Toggle(_showOriginal, new GUIContent(_showOriginal ? Loc.T("Compare: Original (on)") : Loc.T("Compare: Original"), Loc.T("Compare: shows the untouched original texture, here and on the avatar. Your edits are hidden while it's on.")), EditorStyles.toolbarButton);
+                if (showingOriginal) GUI.backgroundColor = StudioGUI.Accent;
+                bool orig = GUILayout.Toggle(showingOriginal, compare, button, GUILayout.Width(compareWidth));
                 GUI.backgroundColor = oldBg;
-                if (orig != _showOriginal) { _showOriginal = orig; _dirty = true; }
-                if (GUILayout.Button(new GUIContent(Loc.T("View"), Loc.T("What the texture view and avatar show")), EditorStyles.toolbarDropDown))
+                if (orig != showingOriginal)
                 {
-                    var m = new GenericMenu();
-                    m.AddItem(new GUIContent(Loc.T("UV wireframe")), _showWire, () => { _showWire = !_showWire; Repaint(); });
-                    m.AddItem(new GUIContent(Loc.T("Selected pieces (orange)")), _showSelection, () => { _showSelection = !_showSelection; Repaint(); });
-                    m.AddItem(new GUIContent(Loc.T("Transparency checkerboard")), _alphaBlend, () => { _alphaBlend = !_alphaBlend; Repaint(); });
-                    m.AddSeparator("");
-                    m.AddItem(new GUIContent(Loc.T("Live preview on the avatar")), _previewOnAvatar, () => { _previewOnAvatar = !_previewOnAvatar; _dirty = true; Repaint(); });
-                    m.AddItem(new GUIContent(Loc.T("Highlight selection in the Scene view")), _highlightInScene, () => { _highlightInScene = !_highlightInScene; SceneView.RepaintAll(); });
-                    m.AddSeparator("");
-                    m.AddItem(new GUIContent(Loc.T("Frame texture  (F)")), false, () => { _zoom = 0; Repaint(); });
-                    m.DropDown(GUILayoutUtility.GetLastRect());
+                    if (_sceneStrokeDraft != null) EndStroke();
+                    _showOriginal = orig;
+                    _dirty = true;
                 }
-                if (GUILayout.Button(StudioGUI.Icon("ViewToolZoom", "", Loc.T("Frame the texture (F)")), EditorStyles.toolbarButton, GUILayout.Width(28))) _zoom = 0;
-                if (GUILayout.Button(new GUIContent(Advanced ? Loc.T("Advanced") : Loc.T("Simple"), ModeSwitchTip), EditorStyles.toolbarButton, GUILayout.Width(64))) SetAdvanced(!Advanced);
+                if (GUILayout.Button(view, dropdown, GUILayout.Width(viewWidth)))
+                    BuildCanvasViewMenu(!inlinePaintViews).DropDown(GUILayoutUtility.GetLastRect());
+                if (wideActions)
+                {
+                    if (GUILayout.Button(StudioGUI.Icon("ViewToolZoom", "", Loc.T("Frame the texture (F)")),
+                            button, GUILayout.Width(frameWidth))) _zoom = 0;
+                }
+                if (showMode)
+                {
+                    if (GUILayout.Button(mode, button, GUILayout.Width(modeWidth))) SetAdvanced(!Advanced);
+                    StudioGUI.Count("help.simpleMode", GUILayoutUtility.GetLastRect());
+                }
+                DrawSettingsButton(settingsLabel ? settings : settingsIcon, settingsLabel ? settingsLabelWidth : settingsIconWidth, button);
             }
             GUILayout.EndArea();
         }
 
-        void ToolButton(Tool tool, GUIContent content, bool enabled)
+        static float ToolbarItemWidth(GUIStyle style, GUIContent content) =>
+            Mathf.Ceil(style.CalcSize(content).x) + style.margin.horizontal;
+
+        GenericMenu BuildCanvasViewMenu(bool includePaintViews)
         {
+            var menu = new GenericMenu();
+            if (includePaintViews)
+            {
+                var spotlight = new GUIContent(Loc.T("Spotlight"));
+                if (CanvasPainting) menu.AddItem(spotlight, _focusWhilePainting, () =>
+                {
+                    if (!CanvasPainting) return;
+                    _focusWhilePainting = !_focusWhilePainting;
+                    Repaint();
+                });
+                else menu.AddDisabledItem(spotlight, _focusWhilePainting);
+
+                var mirror = new GUIContent(Loc.T("Mirror"));
+                if (CanvasPainting && !GradientToolActive && !MirrorNeedsClassicAxis)
+                    menu.AddItem(mirror, _symmetry, () =>
+                    {
+                        if (CanvasPainting && !GradientToolActive && !MirrorNeedsClassicAxis)
+                            SetSymmetryEnabled(!_symmetry);
+                    });
+                else menu.AddDisabledItem(mirror, _symmetry);
+                menu.AddSeparator("");
+            }
+            menu.AddItem(new GUIContent(Loc.T("UV wireframe on the texture")), _showWire, () =>
+            {
+                Undo.RecordObject(this, "Toggle texture UV wireframe");
+                _showWire = !_showWire;
+                Repaint();
+            });
+            menu.AddItem(new GUIContent(Loc.T("UV wireframe on the model")), SceneUvWireEnabled, () => SetSceneUvWire(!SceneUvWireEnabled));
+            menu.AddItem(new GUIContent(Loc.T("Selected pieces (orange)")), _showSelection, () => { _showSelection = !_showSelection; Repaint(); });
+            menu.AddItem(new GUIContent(Loc.T("Transparency checkerboard")), _alphaBlend, () => { _alphaBlend = !_alphaBlend; Repaint(); });
+            menu.AddSeparator("");
+            menu.AddItem(new GUIContent(Loc.T("Live preview on the avatar")), _previewOnAvatar, () => { _previewOnAvatar = !_previewOnAvatar; _dirty = true; Repaint(); });
+            menu.AddItem(new GUIContent(Loc.T("Highlight selection in the Scene view")), _highlightInScene, () => { _highlightInScene = !_highlightInScene; SceneView.RepaintAll(); });
+            menu.AddSeparator("");
+            menu.AddItem(new GUIContent(Loc.T("Frame texture  (F)")), false, () => { _zoom = 0; Repaint(); });
+            return menu;
+        }
+
+        void ToolButton(Tool tool, GUIContent content, float width, bool enabled)
+        {
+            Tab tab = tool == Tool.Paint ? Tab.Paint : Tab.Select;
+            bool returnToPaint = tool == Tool.Paint && PickingForPaint;
+            bool active = _tab == tab && !returnToPaint;
             using (new EditorGUI.DisabledScope(!enabled))
             {
-                bool on = GUILayout.Toggle(_tool == tool, content, EditorStyles.toolbarButton);
-                if (on && _tool != tool) SetTab(tool == Tool.Paint ? Tab.Paint : Tab.Select);
+                if (!GUILayout.Toggle(active, content, EditorStyles.toolbarButton, GUILayout.Width(width)) || active) return;
+                if (returnToPaint) SetPickForPaint(false);
+                else SetTab(tab);
             }
         }
 
@@ -119,26 +214,38 @@ namespace Avistry.Textures
             var r = new Rect(area.x, area.y, area.width, area.height - StatusHeight);
             var status = new Rect(area.x, r.yMax, area.width, StatusHeight);
             EditorGUI.DrawRect(r, StudioGUI.CanvasBg);
-            bool dragging = HandleMeshDrop(r);
+            HandleCanvasDrop(r);
 
             if (_comp == null)
             {
-                // Empty state: one clear instruction and a big drop target.
+                if (_canvasDrop != CanvasDrop.None)
+                {
+                    DrawCanvasDropHint(r);
+                    DrawStatusBar(status, "", "");
+                    return;
+                }
                 var box = new Rect(r.center.x - Mathf.Min(170, r.width / 2 - 12), r.center.y - 60, Mathf.Min(340, r.width - 24), 120);
                 if (Event.current.type == EventType.Repaint)
                 {
-                    EditorGUI.DrawRect(box, dragging ? new Color(1f, 0.6f, 0.15f, 0.18f) : new Color(1, 1, 1, 0.03f));
-                    StudioGUI.DrawBorder(box, dragging ? StudioGUI.Accent : new Color(1, 1, 1, 0.15f), 1);
+                    EditorGUI.DrawRect(box, new Color(1, 1, 1, 0.03f));
+                    StudioGUI.DrawBorder(box, new Color(1, 1, 1, 0.15f), 1);
                 }
                 GUI.Label(box, _renderer == null
-                        ? Loc.T("Drag a part here from the Hierarchy\n\nor select it and press Use Selection\nin 1 · Pick")
+                        ? Loc.T("Drop a part, mesh, material or saved edit here, or choose a part in 1 · Pick.")
+                        : WaitingForPreview ? PreviewWaitText
+                        : CanStartUnityTexture ? Loc.T("Choose Create a texture and paint in 1 · Pick.")
                         : _statusFix == StatusFix.PickAnotherMesh ? SlotStatusText()
                         : (string.IsNullOrEmpty(_status) ? Loc.T("This part has no editable texture.") : _status),
                     new GUIStyle(EditorStyles.centeredGreyMiniLabel) { wordWrap = true, fontSize = 12 });
-                if (_renderer != null && _statusFix == StatusFix.PickAnotherMesh)
+                if (!WaitingForPreview && _renderer != null && _statusFix == StatusFix.PickAnotherMesh)
                 {
                     StudioGUI.Count("canvas.pickAnotherMesh");
                     if (GUI.Button(new Rect(box.center.x - 70, box.yMax + 6, 140, 22), Msg.BtnPickMesh)) DrawPartListMenu();
+                }
+                else if (!WaitingForPreview && _renderer != null && _statusFix == StatusFix.RetryPreview)
+                {
+                    float width = Mathf.Min(140f, box.width);
+                    if (GUI.Button(new Rect(box.center.x - width * 0.5f, box.yMax + 6, width, 22), Loc.T("Retry preview"))) RetryTexturePreview();
                 }
                 DrawToast(r);
                 DrawStatusBar(status, "", "");
@@ -147,7 +254,6 @@ namespace Avistry.Textures
 
             if (r.size != _lastCanvasSize)
             {
-                // re-frame on resize only if the view was framed; otherwise keep the centre stable
                 if (_viewFit || _lastCanvasSize == Vector2.zero) _zoom = 0;
                 else _pan += (r.size - _lastCanvasSize) * 0.5f;
                 _lastCanvasSize = r.size;
@@ -160,18 +266,17 @@ namespace Avistry.Textures
             if (Event.current.type == EventType.Repaint)
             {
                 GUI.DrawTextureWithTexCoords(texRect, Checker, new Rect(0, 0, texRect.width / 16f, texRect.height / 16f));
-                GUI.DrawTexture(texRect, _showOriginal ? _comp.SourcePreview : _comp.Preview, ScaleMode.StretchToFill, _alphaBlend);
-                if (MaskEditing && _showMaskOverlay && !_showOriginal)
+                GUI.DrawTexture(texRect, DisplayingOriginal ? _comp.SourcePreview : _comp.Preview, ScaleMode.StretchToFill, _alphaBlend);
+                if (CanvasPainting && MaskEditing && _showMaskOverlay && !DisplayingOriginal)
                 {
-                    var overlay = _comp.MaskOverlay(ActiveLayer, _uv); // hidden parts of the layer in red
+                    var overlay = _comp.MaskOverlay(ActiveLayer, _uv);
                     if (overlay != null) GUI.DrawTexture(texRect, overlay, ScaleMode.StretchToFill, true);
                 }
-                var focus = FocusIslands();
+                var focusFaces = FocusFaces();
+                var focus = focusFaces ?? FocusIslands();
                 if (focus != null)
                 {
-                    // Focus while painting: everything outside the islands almost disappears, no orange overlay,
-                    // and only the focused islands keep a faint wireframe as a guide.
-                    GUI.DrawTexture(texRect, FocusOverlay(focus), ScaleMode.StretchToFill, true);
+                    GUI.DrawTexture(texRect, FocusOverlay(focus, faces: focusFaces != null), ScaleMode.StretchToFill, true);
                     if (_showWire && _focusSegments.Length > 0)
                     {
                         var old = Handles.matrix;
@@ -181,9 +286,12 @@ namespace Avistry.Textures
                         Handles.matrix = old;
                     }
                 }
-                else if (_showSelection && _selOverlay != null && _selection.Count > 0) GUI.DrawTexture(texRect, _selOverlay, ScaleMode.StretchToFill, true);
-                // While painting, show where the model actually is: texture areas no mesh uses are dimmed (painting there shows nowhere).
-                if (focus == null && _tool == Tool.Paint && _uv != null && _uv.islandCount > 0)
+                else if (_showSelection && _uv != null && HighlightElements.Count > 0)
+                {
+                    PrepareCanvasSelection(_showWire);
+                    GUI.DrawTexture(texRect, _selOverlay, ScaleMode.StretchToFill, true);
+                }
+                if (focus == null && CanvasPainting && _uv != null && _uv.islandCount > 0)
                     GUI.DrawTexture(texRect, FocusOverlay(null, 170), ScaleMode.StretchToFill, true);
                 if (focus == null && _showWire && _uv != null)
                 {
@@ -198,55 +306,56 @@ namespace Avistry.Textures
                     }
                     Handles.matrix = old;
                 }
-                if (GradientToolActive) DrawGradientOverlay();
-                DrawImageHandlesOverlay();
-                if (_tool == Tool.Paint && !_panning) DrawCanvasBrushCursor(new Rect(0, 0, r.width, r.height));
+                if (CanvasPainting && GradientToolActive) DrawGradientOverlay();
+                else if (CanvasPainting) DrawPaintUvLimitGuide(texRect);
+                if (CanvasImagePlacement) DrawImageHandlesOverlay();
+                if (CanvasPainting && !_panning) DrawCanvasBrushCursor(new Rect(0, 0, r.width, r.height));
             }
             GUI.EndClip();
 
             if (_panning) EditorGUIUtility.AddCursorRect(r, MouseCursor.Pan);
-            if (dragging && Event.current.type == EventType.Repaint) StudioGUI.DrawBorder(r, StudioGUI.Accent, 2);
             DrawBeforeBanner(r);
             DrawMarqueeCanvas(r);
             DrawTileGrid(r);
             DrawToast(r);
+            DrawCanvasDropHint(r);
 
-            var focused = FocusIslands();
-            string left = $"{_comp.Width}×{_comp.Height}" + (_comp.SourceWidth != _comp.Width ? " " + Loc.F("(saves at {0})", _comp.SourceWidth) : "") + $"  ·  {_zoom * 100f:0}%" +
-                          (focused != null ? "  ·  " + Loc.F("focus: {0} piece{1}", focused.Count, focused.Count == 1 ? "" : "s") : "") +
-                          (_tool == Tool.Select ? "  ·  " + Loc.F("{0}: {1} selected", SelectModeNames[(int)_selectMode], _selection.Count) : "");
-            string right = _tool == Tool.Paint
-                ? (_matchPick != MatchPick.None ? Loc.T("Colour Match: click the colour here or in the Scene view  ·  Esc cancels")
-                   : _eyedropperArmed ? Loc.T("Eyedropper: click to pick a colour  ·  I cancel")
+            var focusedFaces = FocusFaces();
+            var focused = focusedFaces ?? FocusIslands();
+            string dimensions = $"{_comp.Width}×{_comp.Height}  ·  {_zoom * 100f:0}%";
+            string context = PartPicking ? SceneSelectionSummary(HighlightElements.Count, HighlightUsesFaces) :
+                CanvasSelecting ? CanvasSelectionStatus() : focused != null
+                ? Loc.F(focusedFaces != null ? "focus: {0} face{1}" : "focus: {0} piece{1}", focused.Count, focused.Count == 1 ? "" : "s")
+                : null;
+            string left = dimensions + (_comp.SourceWidth != _comp.Width ? " " + Loc.F("(saves at {0})", _comp.SourceWidth) : "") +
+                          (context != null ? "  ·  " + context : "");
+            string navigation = Loc.T("Wheel zoom  ·  Right-drag pan");
+            string right = _matchPick != MatchPick.None ? Loc.T("Colour Match: click the colour here or in the Scene view  ·  Esc cancels")
+                : CanvasPainting
+                ? (_eyedropperArmed ? Loc.T("Eyedropper: click to pick a colour  ·  I cancel")
                    : MaskEditing ? Loc.F("Mask of “{0}”: B reveal  ·  E hide  ·  G fill  ·  red = hidden", ActiveLayer.name)
                    : BlendToolActive ? (_brush.blendKind == StrokeTool.Smudge ? Loc.T("Drag to smudge colour along the stroke  ·  [ ] size  ·  B back to the brush") : Loc.T("Drag to blur  ·  [ ] size  ·  B back to the brush"))
-                   : GradientToolActive ? Loc.T("Drag to draw a gradient  ·  Shift snaps 45°  ·  drag the dots to adjust  ·  Ctrl+click pick colour")
+                   : GradientToolActive ? (TextureGradientForHandles != null
+                       ? Loc.T("Drag to draw a gradient  ·  Shift snaps 45°  ·  drag the dots to adjust  ·  Ctrl+click pick colour")
+                       : Loc.T("Drag to draw a gradient  ·  Shift snaps 45°  ·  Ctrl+click pick colour"))
+                   : _brush.fillTool ? Loc.T("Click to fill  ·  I or Ctrl+click picks a colour")
                                     : Loc.T("Drag paint  ·  I or Ctrl+click pick colour  ·  [ ] size  ·  E erase"))
-                : SelectModeHint().Replace(". ", "  ·  ").TrimEnd('.') + "  ·  " + Loc.T("Wheel zoom  ·  Right-drag pan");
-            if (SelectedImage != null && _matchPick == MatchPick.None && !_eyedropperArmed) right = ImageHandlesHint();
-            if (PartPicking) right = StudioGUI.Label("colour.onePiece", "One piece at a time") + Loc.T(": click a piece to add or remove it  ·  Shift add  ·  Ctrl remove  ·  Right-drag pan");
-            DrawStatusBar(status, left, right);
-        }
-
-        /// <summary>Drag a GameObject / renderer from the Hierarchy onto the canvas to edit it. Returns true while dragging over.</summary>
-        bool HandleMeshDrop(Rect r)
-        {
-            var e = Event.current;
-            if ((e.type != EventType.DragUpdated && e.type != EventType.DragPerform) || !r.Contains(e.mousePosition)) return false;
-            var target = DragAndDrop.objectReferences.Select(ResolveRenderer).FirstOrDefault(x => x != null);
-            if (target == null) { DragAndDrop.visualMode = DragAndDropVisualMode.Rejected; return false; }
-            DragAndDrop.visualMode = DragAndDropVisualMode.Link;
-            if (e.type == EventType.DragPerform)
+                : PartPicking ? Loc.T("Click a piece to choose where the colour goes.")
+                : CanvasSelecting ? CanvasSelectHint() : navigation;
+            string selectNavigation = CanvasSelecting && _matchPick == MatchPick.None ? navigation : null;
+            if (CanvasImagePlacement && SelectedImage != null && _matchPick == MatchPick.None && !_eyedropperArmed)
             {
-                DragAndDrop.AcceptDrag();
-                SetRendererChecked(target);
-                _tab = Tab.Target;
+                right = ImageHandlesHint();
+                selectNavigation = null;
             }
-            e.Use();
-            return true;
+            if (PartPicking)
+            {
+                right = StudioGUI.Label("colour.onePiece", "Pieces") + Loc.T(": click a piece to add or remove it  ·  Shift add  ·  Ctrl remove  ·  Right-drag pan");
+                selectNavigation = null;
+            }
+            DrawStatusBar(status, left, right, context ?? dimensions, selectNavigation);
         }
 
-        // Toasts show feedback right where the user is looking
 
         string _toastText, _toastAction, _toastAction2, _lastToastAction, _lastToastAction2;
         System.Action _toastCallback, _toastCallback2;
@@ -255,12 +364,12 @@ namespace Avistry.Textures
         Rect _toastRect;
         bool ToastHit(Vector2 p) => !string.IsNullOrEmpty(_toastText) && EditorApplication.timeSinceStartup <= _toastUntil && _toastRect.Contains(p);
 
-        /// <summary>Short message over the canvas, optionally with a one-click fix button.</summary>
         void Toast(string text, MessageType type = MessageType.Info, float seconds = 5f, string actionLabel = null, System.Action action = null)
             => Toast(text, type, seconds, actionLabel, action, null, null);
 
         void Toast(string text, MessageType type, float seconds, string actionLabel, System.Action action, string actionLabel2, System.Action action2)
         {
+            ClearSceneTopologyFeedback();
             _toastText = text;
             _toastType = type;
             _toastAction = actionLabel;
@@ -281,6 +390,8 @@ namespace Avistry.Textures
             {
                 EditorApplication.update -= ToastTick;
                 _toastText = null;
+                _toastCallback = _toastCallback2 = null;
+                ClearSceneTopologyFeedback();
                 Repaint();
             }
         }
@@ -329,56 +440,48 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>
-        /// Islands to focus on while painting: the island selection, or else the active Paint layer's island mask.
-        /// Null when focus doesn't apply (Select tool, Focus off, or nothing to focus on).
-        /// </summary>
         System.Collections.Generic.List<int> FocusIslands()
         {
-            if (_tool != Tool.Paint || !_focusWhilePainting || _uv == null || _comp == null) return null;
+            if (!CanvasPainting || !_focusWhilePainting || _uv == null || _comp == null) return null;
             if (_selection.Count > 0) return _selection;
-            if (ActiveLayer is PaintLayer pl && pl.maskMode == MaskMode.SelectedIslands && pl.islands.Count > 0) return pl.islands;
+            if (ActiveLayer is PaintLayer pl && pl.maskMode == MaskMode.SelectedIslands && !pl.invertMask && pl.islands.Count > 0)
+                return pl.islands;
             return null;
         }
 
-        /// <summary>Canvas-coloured, nearly opaque everywhere except the given islands (cached per island set).</summary>
-        Texture2D FocusOverlay(System.Collections.Generic.List<int> islands, byte dimAlpha = 236)
+        Texture2D FocusOverlay(System.Collections.Generic.List<int> islands, byte dimAlpha = 236, bool faces = false)
         {
-            // null = every island (no list built per repaint). Otherwise an order-independent hash avoids sorting and joining each repaint.
             string key;
             if (islands == null) key = $"{_comp.Width}x{_comp.Height}:{dimAlpha}:all{_uv.islandCount}";
             else
             {
                 uint sum = 0, mix = 0;
                 for (int i = 0; i < islands.Count; i++) { uint h = (uint)islands[i] * 2654435761u; sum += h; mix ^= (h << 13) | (h >> 19); }
-                key = $"{_comp.Width}x{_comp.Height}:{dimAlpha}:{islands.Count}:{sum}:{mix}";
+                key = $"{_comp.Width}x{_comp.Height}:{dimAlpha}:{faces}:{islands.Count}:{sum}:{mix}";
             }
             if (_focusOverlay != null && key == _focusKey) return _focusOverlay;
             _focusKey = key;
-            var sorted = islands != null ? new System.Collections.Generic.List<int>(islands) : Enumerable.Range(0, _uv.islandCount).ToList();
-            sorted.Sort();
-
             int ow = Mathf.Min(1024, _comp.Width);
             int oh = Mathf.Max(1, Mathf.RoundToInt(_comp.Height * (ow / (float)_comp.Width)));
-            var set = new System.Collections.Generic.HashSet<int>(sorted);
-            var px = _uv.SelectionOverlay(ow, oh, set, new Color32(255, 255, 255, 255));
+            var set = islands == null ? null : new HashSet<int>(islands);
             var bg = StudioGUI.CanvasBg;
             var dim = new Color32((byte)(bg.r * 255), (byte)(bg.g * 255), (byte)(bg.b * 255), dimAlpha);
-            for (int i = 0; i < px.Length; i++) px[i] = px[i].a > 0 ? new Color32(0, 0, 0, 0) : dim;
+            var px = new Color32[ow * oh];
+            System.Array.Fill(px, dim);
+            System.Func<int, bool> selected = set == null ? null : faces ? set.Contains : t => set.Contains(_uv.triIsland[t]);
+            _uv.Rasterize(ow, oh, selected, (pixel, t, a, b, c) => px[pixel] = default);
 
             if (_focusOverlay == null || _focusOverlay.width != ow || _focusOverlay.height != oh)
             {
                 if (_focusOverlay != null) DestroyImmediate(_focusOverlay);
-                // sRGB (linear: false) so the dim colour matches the canvas background exactly in Linear projects.
                 _focusOverlay = new Texture2D(ow, oh, TextureFormat.RGBA32, false, false) { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
             }
             _focusOverlay.SetPixels32(px);
             _focusOverlay.Apply(false);
-            _focusSegments = _uv.SegmentsForIslands(set);
+            _focusSegments = selected == null ? System.Array.Empty<Vector3>() : _uv.SegmentsForTriangles(selected);
             return _focusOverlay;
         }
 
-        /// <summary>"Before" hides every edit (canvas and avatar). Editing while it's on looks like nothing works, so turn it off.</summary>
         void ShowEditsIfBeforeOn()
         {
             if (!_showOriginal) return;
@@ -387,19 +490,26 @@ namespace Avistry.Textures
             Toast(Loc.T("“Compare: Original” was on, so you were seeing the original texture. Showing your edits again."), MessageType.Info, 4f);
         }
 
-        /// <summary>While "Before" is on, say so on the canvas itself, with a one-click way back.</summary>
+        static Rect BeforeBannerRect(Rect canvas) =>
+            new Rect(canvas.x + 10, canvas.yMax - 40, Mathf.Min(canvas.width - 20, 330), 30);
+
         void DrawBeforeBanner(Rect canvas)
         {
-            if (!_showOriginal) return;
-            var r = new Rect(canvas.x + 10, canvas.yMax - 40, Mathf.Min(canvas.width - 20, 330), 30);
+            if (!DisplayingOriginal) return;
+            var r = BeforeBannerRect(canvas);
             if (Event.current.type == EventType.Repaint)
             {
                 EditorGUI.DrawRect(r, new Color(0.09f, 0.09f, 0.09f, 0.95f));
                 EditorGUI.DrawRect(new Rect(r.x, r.y, 4, r.height), StudioGUI.Accent);
                 StudioGUI.DrawBorder(canvas, new Color(StudioGUI.Accent.r, StudioGUI.Accent.g, StudioGUI.Accent.b, 0.5f), 2);
             }
-            GUI.Label(new Rect(r.x + 12, r.y, r.width - 130, r.height), Loc.T("Showing the ORIGINAL (Compare: Original is on)"), new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = StudioGUI.Accent } });
-            if (GUI.Button(new Rect(r.xMax - 112, r.y + 5, 104, 20), Loc.T("Show my edits")))
+            var showEdits = new GUIContent(Loc.T("Show my edits"));
+            float buttonWidth = GUI.skin.button.CalcSize(showEdits).x + 8f;
+            var button = new Rect(r.xMax - buttonWidth - 8f, r.y + 5f, buttonWidth, 20f);
+            var label = new Rect(r.x + 12f, r.y + 5f, button.x - r.x - 18f, 20f);
+            GUI.Label(label, new GUIContent(Loc.T("Original"), Loc.T("Showing the ORIGINAL (Compare: Original is on)")),
+                new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = StudioGUI.Accent } });
+            if (GUI.Button(button, showEdits))
             {
                 _showOriginal = false;
                 _dirty = true;
@@ -407,17 +517,57 @@ namespace Avistry.Textures
             }
         }
 
-        void DrawStatusBar(Rect r, string left, string right)
+        static GUIStyle _statusHint;
+
+        void DrawStatusBar(Rect r, string left, string right, string compactStatus = null, string navigation = null)
         {
             if (Event.current.type == EventType.Repaint)
             {
                 EditorGUI.DrawRect(r, StudioGUI.StatusBg);
                 EditorGUI.DrawRect(new Rect(r.x, r.y, r.width, 1), StudioGUI.HeaderLine);
             }
-            var leftW = Mathf.Min(r.width * 0.45f, StudioGUI.Status.CalcSize(new GUIContent(left)).x + 4);
-            GUI.Label(new Rect(r.x, r.y, leftW, r.height), left, StudioGUI.Status);
-            var hint = new GUIStyle(StudioGUI.Status) { alignment = TextAnchor.MiddleRight };
-            GUI.Label(new Rect(r.x + leftW, r.y, r.width - leftW, r.height), right, hint);
+            if (DrawEditorActivity(r) || (left.Length == 0 && right.Length == 0)) return;
+
+            var (readout, hint, split) = CanvasStatusLayout(r.width, left, right, compactStatus, navigation);
+            GUI.Label(new Rect(r.x, r.y, split, r.height), readout, StudioGUI.Status);
+            _statusHint ??= new GUIStyle(StudioGUI.Status) { alignment = TextAnchor.MiddleRight };
+            GUI.Label(new Rect(r.x + split, r.y, r.width - split, r.height), hint, _statusHint);
+        }
+
+        static (GUIContent readout, GUIContent hint, float split) CanvasStatusLayout(float width, string left, string right,
+            string compactStatus, string navigation)
+        {
+            var style = StudioGUI.Status;
+            var readout = new GUIContent(left, left);
+            string fullHint = navigation == null ? right : right + "  ·  " + navigation;
+            var hint = new GUIContent(fullHint, fullHint);
+            float split = style.CalcSize(readout).x;
+            float hintWidth = style.CalcSize(hint).x;
+            if (split + hintWidth <= width) return (readout, hint, split);
+
+            if (navigation != null)
+            {
+                hint.text = right;
+                hintWidth = style.CalcSize(hint).x;
+            }
+            if (compactStatus != null && split + hintWidth > width)
+            {
+                readout.text = compactStatus;
+                split = style.CalcSize(readout).x;
+            }
+            if (split + hintWidth > width)
+            {
+                split = Mathf.Min(split, width * 0.45f);
+                readout.text = StudioGUI.Ellipsize(readout.text, style, split);
+                string fitted = StudioGUI.Ellipsize(hint.text, style, width - split);
+                if (fitted != hint.text)
+                {
+                    int boundary = Mathf.Max(fitted.LastIndexOf("  ·  ", System.StringComparison.Ordinal), fitted.LastIndexOf('。') + 1);
+                    if (boundary > 0) fitted = fitted.Substring(0, boundary) + "…";
+                }
+                hint.text = fitted;
+            }
+            return (readout, hint, split);
         }
 
         void DrawCanvasBrushCursor(Rect clip)
@@ -426,27 +576,32 @@ namespace Avistry.Textures
             if (!clip.Contains(mp)) return;
             if (_eyedropperArmed || Event.current.control || Event.current.command) { DrawPickerCircle(mp); return; }
             bool gradient = GradientToolActive;
-            float rPx = _brush.fillTool || gradient ? 6f : _brush.size * 0.5f / Mathf.Max(1, _comp.SourceWidth) * _comp.Width * _zoom; // fill / gradient: a small target marker
+            float rPx = _brush.fillTool || gradient ? 6f : _brush.size * 0.5f / Mathf.Max(1, _comp.SourceWidth) * _comp.Width * _zoom;
             var c = new Vector3(mp.x, mp.y, 0);
             if (gradient && GradientHandleAt(mp) != GradHandle.None) EditorGUIUtility.AddCursorRect(new Rect(mp.x - 10, mp.y - 10, 20, 20), MouseCursor.MoveArrow);
 
-            // Over texture space no mesh uses, a stroke can't show on the model (and with "stay inside" it paints nothing):
-            // say so right at the cursor, before the user drags. (A gradient may start or end anywhere.)
-            bool offModel = !gradient && _uv != null && _uv.IslandsAtUV(CanvasToUV(mp)).Count == 0;
+            var uv = CanvasToUV(mp);
+            string fillProblem = _brush.fillTool ? CanvasFillCursorProblem(uv) : null;
+            bool offModel = !_brush.fillTool && !gradient && _uv != null && !_uv.HasIslandAtUV(uv);
+            bool blocked = offModel || fillProblem != null;
             bool maskHides = MaskEditing && (_brush.fillTool ? _maskFillHides : _brush.mode == BrushMode.Erase);
-            var ring = offModel ? StudioGUI.Danger : _brush.mode == BrushMode.Erase || maskHides ? new Color(1f, 0.55f, 0.55f)
+            var ring = blocked ? StudioGUI.Danger : _brush.mode == BrushMode.Erase || maskHides ? new Color(1f, 0.55f, 0.55f)
                      : BlendToolActive ? new Color(0.55f, 0.85f, 1f) : Color.white;
 
             Handles.color = new Color(0, 0, 0, 0.7f);
             Handles.DrawWireDisc(c, Vector3.forward, rPx + 1f);
             Handles.color = ring;
             Handles.DrawWireDisc(c, Vector3.forward, rPx);
-            if (offModel)
+            if (blocked)
             {
                 var style = new GUIStyle(EditorStyles.miniBoldLabel) { normal = { textColor = StudioGUI.Danger } };
-                string text = _brush.fillTool ? Loc.T("not part of the model: nothing to fill here") : _brush.stayInsideIslands ? Loc.T("not part of the model: nothing will paint here") : Loc.T("not part of the model: won't show on the avatar");
+                string text = fillProblem ?? (_brush.stayInsideIslands ? Loc.T("not part of the model: nothing will paint here")
+                    : Loc.T("not part of the model: won't show on the avatar"));
                 var size = style.CalcSize(new GUIContent(text));
-                var lr = new Rect(mp.x + rPx + 6, mp.y - 8, size.x + 6, 16);
+                float x = mp.x + rPx + 6f;
+                if (fillProblem != null && x + size.x + 6f > clip.xMax)
+                    x = Mathf.Max(clip.xMin, mp.x - rPx - size.x - 12f);
+                var lr = new Rect(x, mp.y - 8, size.x + 6, 16);
                 EditorGUI.DrawRect(lr, new Color(0.08f, 0.08f, 0.08f, 0.9f));
                 GUI.Label(new Rect(lr.x + 3, lr.y, size.x, 16), text, style);
             }
@@ -458,7 +613,7 @@ namespace Avistry.Textures
             Handles.color = Color.white;
             Handles.DrawLine(c + Vector3.left * 3, c + Vector3.right * 3);
             Handles.DrawLine(c + Vector3.up * 3, c + Vector3.down * 3);
-            if (!gradient && !offModel) DrawCanvasMirrorCursor(mp, rPx); // where the mirrored paint will land
+            if (!gradient && !blocked) DrawCanvasMirrorCursor(mp, rPx);
         }
 
         void Frame(Rect r)
@@ -480,6 +635,15 @@ namespace Avistry.Textures
             Vector2 local = e.mousePosition - r.position;
             bool inside = r.Contains(e.mousePosition);
 
+            if ((_gradDrag != null || _imgDrag != null) && e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape)
+            {
+                CancelGradientDrag();
+                CancelImageDrag();
+                ReleaseGradientDragControl();
+                ReleaseImageDragControl();
+                e.Use();
+            }
+
             switch (e.GetTypeForControl(id))
             {
                 case EventType.ScrollWheel when inside:
@@ -492,8 +656,9 @@ namespace Avistry.Textures
                     Repaint();
                     break;
                 }
-                case EventType.MouseDown when inside && !ToastHit(e.mousePosition):
-                    if (_marqueeActive) { e.Use(); break; } // another button during a Box or Lasso drag must not take the mouse
+                case EventType.MouseDown when inside && !ToastHit(e.mousePosition) &&
+                    !(DisplayingOriginal && BeforeBannerRect(r).Contains(e.mousePosition)):
+                    if (_marqueeActive || _gradDrag != null || _imgDrag != null) { e.Use(); break; }
                     if (e.button == 2 || e.button == 1 || (e.button == 0 && e.alt))
                     {
                         _panning = true;
@@ -503,32 +668,33 @@ namespace Avistry.Textures
                     else if (e.button == 0)
                     {
                         var uv = CanvasToUV(local);
-                        if (HandleCanvasMatchPick(uv)) { e.Use(); break; } // a Colour Match pick is waiting for a click
-                        if (PartPicking) { PartPick(_uv.IslandsAtUV(uv), e.shift, e.control || e.command, null); e.Use(); break; } // 2 · Colour › By part
-                        if (!_eyedropperArmed && !((_tool == Tool.Paint) && (e.control || e.command)) && BeginImageDrag(local, e))
+                        if (HandleCanvasMatchPick(uv)) { e.Use(); break; }
+                        if (PartPicking) { PartPick(_uv.IslandsAtUV(uv), e.shift, e.control || e.command, null); e.Use(); break; }
+                        bool pickColour = CanvasPainting && (e.control || e.command || _eyedropperArmed);
+                        if (CanvasImagePlacement && !pickColour && BeginImageDrag(local, e))
                         {
-                            GUIUtility.hotControl = id; // grabbed a handle of the selected Image layer
+                            GUIUtility.hotControl = _imgDragControl = id;
                             e.Use();
-                            break;
                         }
-                        if (_tool == Tool.Paint)
+                        else if (CanvasPainting)
                         {
-                            if (e.control || e.command || _eyedropperArmed) PickColour(uv);
+                            if (pickColour) PickColour(uv);
                             else if (GradientToolActive)
                             {
-                                if (BeginGradientDrag(local)) GUIUtility.hotControl = id;
+                                if (BeginGradientDrag(local)) GUIUtility.hotControl = _gradDragControl = id;
                             }
                             else if (CanPaint(out var why))
                             {
-                                BeginStroke(uv, Pressure(e), -1);
-                                GUIUtility.hotControl = id;
+                                var pointer = BrushPointer(e, start: true);
+                                BeginStroke(CanvasToUV(pointer.position - r.position), pointer.pressure, -1);
+                                if (_liveStroke != null) GUIUtility.hotControl = id;
                             }
                             else Toast(why, MessageType.Warning);
                             e.Use();
                         }
-                        else if (_uv != null)
+                        else if (CanvasSelecting && _uv != null)
                         {
-                            if (TileGridClick(r, e)) { e.Use(); break; } // a click on a cell of the tile grid selects that tile
+                            if (TileGridClick(r, e)) { e.Use(); break; }
                             if (CanvasSelectDown(uv, e)) GUIUtility.hotControl = id;
                             e.Use();
                         }
@@ -539,23 +705,37 @@ namespace Avistry.Textures
                     else if (_gradDrag != null) UpdateGradientDrag(local, e.shift);
                     else if (_imgDrag != null) UpdateImageDrag(local, e.shift);
                     else if (_marqueeActive && !_marqueeInScene) UpdateMarquee(CanvasToUV(local), e.mousePosition);
-                    else if (_liveStroke != null) AddStrokePoint(CanvasToUV(local), Pressure(e), true, -1);
+                    else if (_liveStroke != null)
+                    {
+                        var pointer = BrushPointer(e, start: false);
+                        AddStrokePoint(CanvasToUV(pointer.position - r.position), pointer.pressure, true, -1);
+                    }
                     e.Use();
                     Repaint();
                     break;
                 case EventType.MouseUp when GUIUtility.hotControl == id:
-                    if (_marqueeActive && e.button != 0) { e.Use(); break; } // only the left button ends the drag
+                    if ((_marqueeActive || _gradDrag != null || _imgDrag != null) && e.button != 0) { e.Use(); break; }
                     if (_panning) _panning = false;
-                    else if (_gradDrag != null) EndGradientDrag();
-                    else if (_imgDrag != null) EndImageDrag();
+                    else if (_gradDrag != null)
+                    {
+                        UpdateGradientDrag(local, e.shift);
+                        EndGradientDrag();
+                        _gradDragControl = 0;
+                    }
+                    else if (_imgDrag != null)
+                    {
+                        UpdateImageDrag(local, e.shift);
+                        EndImageDrag();
+                        _imgDragControl = 0;
+                    }
                     else if (_marqueeActive && !_marqueeInScene) EndMarqueeCanvas();
                     else EndStroke();
                     GUIUtility.hotControl = 0;
                     e.Use();
                     break;
-                case EventType.MouseMove when _tool == Tool.Paint:
+                case EventType.MouseMove when CanvasPainting:
                 case EventType.MouseLeaveWindow:
-                    Repaint(); // brush cursor follows the mouse
+                    Repaint();
                     break;
                 case EventType.KeyDown when e.keyCode == KeyCode.Escape && _marqueeActive && !_marqueeInScene:
                     CancelMarquee();

@@ -5,11 +5,10 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    // "Check materials": finds broken or wrong-looking materials on the current avatar and offers safe fixes.
     partial class AvatarTextureWindow
     {
-        List<MaterialAudit.Finding> _auditFindings;   // null = not checked yet
-        Transform _auditRoot;                         // the avatar the findings belong to
+        List<MaterialAudit.Finding> _auditFindings;
+        Transform _auditRoot;
         int _auditMaterialCount;
         bool _auditShowInfo;
         bool _auditBusy;
@@ -17,7 +16,7 @@ namespace Avistry.Textures
         void DrawAuditGroup()
         {
             var root = MaterialAudit.FindAvatarRoot(_renderer);
-            if (root != _auditRoot) { _auditRoot = root; _auditFindings = null; } // switched avatar: old results don't apply
+            if (root != _auditRoot) { _auditRoot = root; _auditFindings = null; }
 
             string badge = null;
             if (_auditFindings != null)
@@ -25,7 +24,9 @@ namespace Avistry.Textures
                 int toLook = _auditFindings.Count(f => f.severity != MaterialAudit.Severity.Info);
                 badge = toLook > 0 ? Loc.F("{0} to look at", toLook) : Loc.T("all good");
             }
-            StudioGUI.BeginGroup(Loc.T("Check materials"), badge, infoId: "shader");
+            bool open = StudioGUI.BeginFoldGroup(ref _foldAudit, Loc.T("Check materials"), badge, badge,
+                Loc.T("Finds pink or broken materials, missing textures and wrong texture settings, with safe fixes"), "shader");
+            if (!open) { StudioGUI.EndGroup(); return; }
 
             if (root == null)
             {
@@ -58,7 +59,6 @@ namespace Avistry.Textures
             if (problems.Count == 0 && warnings.Count == 0)
                 StudioGUI.CheckRow(StudioGUI.Check.Ok, Loc.F("Nothing broken on {0} material{1}.", _auditMaterialCount, (_auditMaterialCount == 1 ? "" : "s")));
 
-            // Fixes run after this frame's GUI (delayCall): they may re-import textures or change the list we're drawing.
             DrawAuditSection(Loc.T("Broken: needs fixing"), problems, StudioGUI.Check.Problem);
             DrawAuditSection(Loc.T("Worth a look"), warnings, StudioGUI.Check.Note);
 
@@ -66,7 +66,7 @@ namespace Avistry.Textures
             {
                 GUILayout.Space(4);
                 StudioGUI.Count("audit.goodToKnow");
-                _auditShowInfo = EditorGUILayout.Foldout(_auditShowInfo, Loc.F("Good to know ({0})", infos.Count), true);
+                _auditShowInfo = StudioGUI.Foldout(_auditShowInfo, new GUIContent(Loc.F("Good to know ({0})", infos.Count)));
                 if (_auditShowInfo) DrawAuditSection(null, infos, StudioGUI.Check.Note);
             }
             StudioGUI.EndGroup();
@@ -86,7 +86,7 @@ namespace Avistry.Textures
                 StudioGUI.CheckRow(mark, $"<b>{f.title}</b>{who}");
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    GUILayout.Space(20); // line up under the text, not the mark
+                    GUILayout.Space(20);
                     using (new EditorGUILayout.VerticalScope())
                     {
                         GUILayout.Label(f.detail, StudioGUI.Hint);
@@ -164,8 +164,8 @@ namespace Avistry.Textures
                 Toast(Loc.F("Couldn't {0}: {1}", f.fixLabel.ToLowerInvariant(), e.Message), MessageType.Error, 6f);
             }
             finally { _auditBusy = false; }
-            _needsRebuild = true;  // the material or its textures may have changed
-            RunAudit(false);       // refresh the list so fixed items disappear
+            _needsRebuild = true;
+            RunAudit(false);
         }
     }
 }

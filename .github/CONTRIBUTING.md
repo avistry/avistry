@@ -8,7 +8,7 @@ Open a [bug report](https://github.com/avistry/avistry/issues/new?template=bug_r
 - the tool's version (shown under the **?** button in the window) and your Unity version
 - the shader (Poiyomi, lilToon or other)
 - the exact steps, and the Console error if there is one
-- the **Copy diagnostics** text, once your version has it. It contains no file paths or user names.
+- the report from **Settings → Review support report…**. Read it before choosing **Copy report**.
 
 Please do not paste file paths, your Windows user name, or avatar files you are not allowed to share.
 

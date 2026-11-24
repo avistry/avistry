@@ -11,11 +11,9 @@ namespace Avistry.Textures
             "New to Unity? The Hierarchy is the list of everything in your scene: click a part of your avatar there to start. " +
             "Nothing changes your files until you press Save, and Ctrl+Z undoes your edits."));
 
-        /// <summary>The strip grows with the text, so a narrow panel wraps the sentence instead of cutting it off.</summary>
         static float NewToUnityStripHeight(float width) => Mathf.Max(78f, 33f + StudioGUI.Hint.CalcHeight(NewToUnityText, width - 16f));
         static bool? s_newToUnityDismissed;
 
-        // EditorPrefs is a registry read on Windows; the cache is refreshed by the hooks and on dismiss.
         static bool NewToUnityDismissed => s_newToUnityDismissed ??= EditorPrefs.GetBool(StudioMode.NewToUnityKey, false);
 
         void DismissNewToUnity()
@@ -34,7 +32,6 @@ namespace Avistry.Textures
             }
             StudioGUI.Count("onboarding.newToUnity");
             GUI.Label(new Rect(r.x + 8, r.y + 4, r.width - 16, r.height - 29), NewToUnityText, StudioGUI.Hint);
-            // Buttons are sized from their labels; when the three do not fit side by side the longest gets its short name.
             var treeC = new GUIContent(Loc.T("Start the skill tree"), Loc.T("Opens the skill tree on the first thing to try"));
             var glossaryC = new GUIContent(Loc.T("Glossary…"), Loc.T("Plain-language explanations of the words used here"));
             var gotItC = new GUIContent(Loc.T("Got it"), Loc.T("Hide this for good"));
@@ -57,7 +54,6 @@ namespace Avistry.Textures
             GlossaryWindow.Open(s_nextUp.Count > 0 ? s_nextUp[0] : null);
         }
 
-        // Renderers under the selected object's avatar root, or in the open scenes when nothing is selected.
         List<Renderer> PartChoices()
         {
             IEnumerable<Renderer> all;

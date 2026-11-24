@@ -7,13 +7,6 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Finds materials on an avatar that are broken or will look wrong: empty slots, missing or failing shaders,
-    /// Poiyomi materials locked to a shader version that isn't installed, links to deleted textures, placeholder
-    /// materials from the model file, and texture import settings that don't match how the shader reads them.
-    /// Healthy materials produce no findings. Every fix is undoable (material/renderer changes) or only changes
-    /// import settings; nothing is deleted and no texture pixels are touched.
-    /// </summary>
     public static class MaterialAudit
     {
         public enum Severity { Problem, Warning, Info }
@@ -21,15 +14,15 @@ namespace Avistry.Textures
         public class Finding
         {
             public Severity severity;
-            public Material material;                                   // null for avatar-wide findings
+            public Material material;
             public List<TargetResolver.SlotRef> users = new List<TargetResolver.SlotRef>();
-            public string title;                                        // short, plain language
-            public string detail;                                       // what is wrong and what to do
-            public string fixLabel;                                     // null when there's no safe one-click fix
-            public string fixTooltip;                                   // what the fix button will do
-            public string confirm;                                      // optional "are you sure" text shown before fixing
+            public string title;
+            public string detail;
+            public string fixLabel;
+            public string fixTooltip;
+            public string confirm;
             public Action fix;
-            public UnityEngine.Object ping;                             // what "Select" shows (material, renderer, texture…)
+            public UnityEngine.Object ping;
 
             public string UsedBy
             {
@@ -48,10 +41,6 @@ namespace Avistry.Textures
         static readonly string[] ModelExtensions = { ".fbx", ".obj", ".blend", ".dae", ".3ds", ".max", ".ma", ".mb" };
 
 
-        /// <summary>
-        /// The avatar a renderer belongs to: the nearest parent with a VRChat avatar descriptor, else the topmost
-        /// parent with an Animator (outfits often carry their own Animator below the avatar), else the scene root.
-        /// </summary>
         public static Transform FindAvatarRoot(Renderer r)
         {
             if (r == null) return null;
@@ -78,7 +67,6 @@ namespace Avistry.Textures
 
         static Type s_descriptorType;
         static bool s_descriptorResolved;
-        /// <summary>VRCAvatarDescriptor, resolved once (null when the VRChat SDK isn't installed).</summary>
         static Type DescriptorType
         {
             get
@@ -103,7 +91,6 @@ namespace Avistry.Textures
             var findings = new List<Finding>();
             if (avatarRoot == null) return findings;
 
-            // Who uses what (inactive objects included: they get switched on by toggles in game).
             var users = new Dictionary<Material, List<TargetResolver.SlotRef>>();
             var renderers = avatarRoot.GetComponentsInChildren<Renderer>(true);
             foreach (var r in renderers)
@@ -114,7 +101,6 @@ namespace Avistry.Textures
                     var slot = new TargetResolver.SlotRef { renderer = r, materialIndex = i };
                     if (mats[i] == null)
                     {
-                        // Slot 1+ on a particle renderer is the trail material; it is legitimately empty when trails are off.
                         if (i >= 1 && r is ParticleSystemRenderer)
                         {
                             var ps = r.GetComponent<ParticleSystem>();
@@ -197,7 +183,6 @@ namespace Avistry.Textures
             string originalName = m.GetTag("OriginalShader", false, "");
             bool hasLockTag = !string.IsNullOrEmpty(originalName);
 
-            // 1. Shader missing entirely (deleted, not imported, or a locked copy that was cleaned up).
             if (s == null || s.name == ErrorShaderName)
             {
                 if (hasLockTag && original != null)
@@ -233,7 +218,6 @@ namespace Avistry.Textures
                 return;
             }
 
-            // 2. Shader exists but fails to compile, or can't run here.
             bool hasError = ShaderUtil.ShaderHasError(s);
             if (hasError || !s.isSupported)
             {
@@ -268,7 +252,6 @@ namespace Avistry.Textures
                 return;
             }
 
-            // 3. Temporary in-memory shader saved onto the material (Poiyomi's section lock).
             if (MaterialWriter.IsSectionLocked(m))
             {
                 findings.Add(new Finding
@@ -291,7 +274,6 @@ namespace Avistry.Textures
 
             if (locked == null) return;
 
-            // 4. Locked to a Poiyomi version that isn't installed any more: fine now, but stuck.
             string version = OldVersion(originalName) ?? OldVersion(locked);
             if (hasLockTag && original == null)
             {
@@ -309,7 +291,6 @@ namespace Avistry.Textures
                 return;
             }
 
-            // 5. Locked from an old Poiyomi version that is installed: works, just old.
             if (version != null)
             {
                 findings.Add(new Finding
@@ -322,7 +303,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>The shader a locked Poiyomi material was made from (Thry stores it in material tags), if installed.</summary>
         static Shader OriginalShader(Material m)
         {
             string guid = m.GetTag("OriginalShaderGUID", false, "");
@@ -343,7 +323,6 @@ namespace Avistry.Textures
             return match.Success ? match.Groups[1].Value : null;
         }
 
-        /// <summary>Which shader made a material whose shader is gone, from the values it saved.</summary>
         static ShaderFamily GuessFamily(Material m)
         {
             var so = new SerializedObject(m);
@@ -362,7 +341,6 @@ namespace Avistry.Textures
         static void Unlock(Material m, Shader original)
         {
             Undo.RecordObject(m, "Unlock material");
-            // Thry restores renamed (animated) properties too; fall back to assigning the shader ourselves.
             if (MaterialWriter.CanUnlockPoiyomi) MaterialWriter.UnlockPoiyomi(new[] { m });
             if (m.shader == null || m.shader.name == ErrorShaderName || m.shader.name.StartsWith(LockedPrefix))
                 if (original != null) m.shader = original;
@@ -377,7 +355,6 @@ namespace Avistry.Textures
         }
 
 
-        /// <summary>Texture slots that point at a file that no longer exists (deleted or moved outside Unity).</summary>
         static void CheckMissingTextures(Material m, List<Finding> findings)
         {
             var missing = new List<string>();
@@ -409,7 +386,6 @@ namespace Avistry.Textures
                 {
                     Undo.RecordObject(m, "Clear missing textures");
                     foreach (var p in missing) if (m.HasProperty(p)) m.SetTexture(p, null);
-                    // Locked shaders may not expose the property any more: clear the saved link directly.
                     var so2 = new SerializedObject(m);
                     var envs2 = so2.FindProperty("m_SavedProperties.m_TexEnvs");
                     for (int i = 0; envs2 != null && i < envs2.arraySize; i++)
@@ -423,16 +399,15 @@ namespace Avistry.Textures
             });
         }
 
-        /// <summary>A Poiyomi/lilToon material with no main texture and a near-white colour: likely lost its texture.</summary>
         static void CheckMainTexture(Material m, List<TargetResolver.SlotRef> users, List<Finding> findings)
         {
             if (users.All(u => u.renderer is ParticleSystemRenderer || u.renderer is TrailRenderer || u.renderer is LineRenderer)) return;
             var family = ShaderProfiles.Detect(m.shader);
             if (family == ShaderFamily.Other || !m.HasProperty("_MainTex") || m.GetTexture("_MainTex") != null) return;
-            if (findings.Any(f => f.material == null && f.title == Loc.T("Its main image file is missing"))) return; // already reported as a broken link
+            if (findings.Any(f => f.material == null && f.title == Loc.T("Its main image file is missing"))) return;
             if (!m.HasProperty("_Color")) return;
             var c = m.GetColor("_Color");
-            if (c.r < 0.9f || c.g < 0.9f || c.b < 0.9f) return; // a deliberate solid colour (e.g. eye shadow)
+            if (c.r < 0.9f || c.g < 0.9f || c.b < 0.9f) return;
             findings.Add(new Finding
             {
                 severity = Severity.Info,
@@ -443,7 +418,6 @@ namespace Avistry.Textures
 
         static Dictionary<Mesh, List<Renderer>> s_meshCache;
         static double s_meshCacheTime = -10;
-        /// <summary>All scene renderers grouped by shared mesh; cached 1s, dropped on hierarchy change.</summary>
         static Dictionary<Mesh, List<Renderer>> SceneRenderersByMesh()
         {
             if (s_meshCache != null && EditorApplication.timeSinceStartup - s_meshCacheTime < 1.0 && s_hierarchyVersion == s_meshCacheVersion) return s_meshCache;
@@ -460,7 +434,6 @@ namespace Avistry.Textures
         }
         static int s_meshCacheVersion;
 
-        /// <summary>The grey placeholder material that comes inside the model file (Standard shader, can't be edited).</summary>
         static void CheckPlaceholder(Material m, List<TargetResolver.SlotRef> users, Renderer[] avatarRenderers, List<Finding> findings)
         {
             if (users.All(u => u.renderer is ParticleSystemRenderer || u.renderer is TrailRenderer || u.renderer is LineRenderer)) return;
@@ -477,7 +450,6 @@ namespace Avistry.Textures
                          Loc.T("It can't be edited and won't match your toon look. Drag in a Poiyomi or lilToon material."),
             };
 
-            // Same mesh with a real material elsewhere in the open scenes (e.g. another copy of this avatar): offer it.
             var avatarSet = new HashSet<Renderer>(avatarRenderers);
             var byMesh = SceneRenderersByMesh();
             var plan = new List<KeyValuePair<TargetResolver.SlotRef, Material>>();
@@ -523,17 +495,13 @@ namespace Avistry.Textures
         }
 
 
-        /// <summary>
-        /// One finding per texture whose import setting doesn't match how the shader reads it (from MaterialWriter.ImportProblem),
-        /// plus one summary for Crunch compression. Textures used only by switched-off features are skipped.
-        /// </summary>
         static void CheckTextureImports(Dictionary<Material, List<TargetResolver.SlotRef>> users, List<Finding> findings)
         {
             var seen = new HashSet<string>();
             var crunched = new Dictionary<string, Texture2D>();
             var slotsOf = new Dictionary<Material, List<TextureSlot>>();
-            var materialsOf = new Dictionary<string, List<string>>(); // texture path -> material names
-            var rolesOf = new Dictionary<string, HashSet<TextureRole>>();  // texture path -> every way the avatar uses it
+            var materialsOf = new Dictionary<string, List<string>>();
+            var rolesOf = new Dictionary<string, HashSet<TextureRole>>();
             foreach (var m in users.Keys)
             {
                 if (m.shader == null || m.shader.name == ErrorShaderName) continue;
@@ -559,7 +527,6 @@ namespace Avistry.Textures
                     if (importer == null) continue;
                     if (importer.crunchedCompression) crunched[slot.assetPath] = slot.texture;
                     if (slot.featureOff || seen.Contains(slot.assetPath)) continue;
-                    // Used as colour in one place and as a mask in another: no single import setting is right, so leave it alone.
                     if (rolesOf.TryGetValue(slot.assetPath, out var allRoles) && allRoles.Count > 1) continue;
 
                     var problem = MaterialWriter.ImportProblem(slot, out var fix);

@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Avistry skill tree: learn Unity as you go</title>
-<meta name="description" content="A free course inside Avistry: 40 short skills in 6 tiers, from finding the Hierarchy to baking maps. Nothing is locked." data-i18n-attr="content:sk.meta.description">
+<meta name="description" content="Hands-on lessons for editing textures, working with shaders and testing VRChat avatars in Unity." data-i18n-attr="content:sk.meta.description">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#141218">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Avistry skill tree: learn Unity as you go">
 <meta property="og:url" content="https://avistry.github.io/avistry/skills.html">
-<meta property="og:image" content="https://avistry.github.io/avistry/media/og-skills.jpg">
+<meta property="og:image" content="https://avistry.github.io/avistry/media/og-skills.jpg?v=030-learning-1">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:type" content="image/jpeg">
-<meta property="og:image:alt" content="The Avistry skill tree: six tiers of skills you learn by using the tool.">
+<meta property="og:image:alt" content="Practice painting, materials and avatar setup in the Avistry skill tree.">
 <meta property="og:site_name" content="Avistry">
-<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-skills.jpg">
+<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-skills.jpg?v=030-learning-1">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://avistry.github.io/avistry/skills.html">
 <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
@@ -32,8 +32,6 @@
   try {
     var theme = localStorage.getItem('ats-theme');
     root.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
-    /* Performance mode by itself: on weak devices, with data saver, or after this tab crashed or ran short of memory
-       (app.js keeps ats-alive set while the page is on screen); never just for being a phone on strong hardware */
     var perf = localStorage.getItem('ats-perf'), nav = navigator, mem = nav.deviceMemory, cores = nav.hardwareConcurrency, con = nav.connection || {};
     var ss = sessionStorage, sick = ss.getItem('ats-sick') === '1' || ss.getItem('ats-alive') === '1';
     if (sick) ss.setItem('ats-sick', '1');
@@ -62,7 +60,8 @@
 })();
 </script>
 <style>html{background:#141218}html[data-theme="light"]{background:#F3F1F6}html.i18n-wait body{visibility:hidden}</style>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=030-paper-3">
+<link rel="stylesheet" href="learn.css?v=030-workshop-1">
 </head>
 <body class="v4 sub-page page-learn">
 
@@ -149,41 +148,52 @@
 
 <main id="main">
   <section class="stage surface-dark pg-hero" id="top">
-    <span class="stk stk-corner" data-stk="lgtm" aria-hidden="true"></span>
     <div class="wrap pg-hero-in">
-      <h1 class="h-display" data-i18n="sk.title" data-emo="e_avistry_cool">Learn Unity as you go.</h1>
-      <p class="sub" data-i18n="sk.lead">Forty skills in six tiers, from finding the Hierarchy to baking maps. Each is marked done when you do it in the tool. Nothing is locked.</p>
+      <div class="sticker-heading">
+        <h1 class="h-display" data-i18n="sk.title" data-emo="e_avistry_cool">The skill tree</h1>
+        <span class="stk stk-placed" data-stk="lgtm" aria-hidden="true"></span>
+      </div>
+      <p class="sub" data-i18n="sk.lead">Choose a chapter or search for the next thing you want to try. Open the same lesson in Unity to track your progress.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary btn-lg" href="#in-unity" data-i18n="sk.cta.how">How to start it in Unity</a>
+        <a class="btn btn-primary btn-lg" href="#lessons" data-i18n="sk.browse">Browse lessons</a>
         <a class="btn btn-outline btn-lg" href="glossary.html" data-i18n="lb.glossary">Open the glossary</a>
       </div>
     </div>
   </section>
 
-  <section class="sec" id="in-unity" aria-labelledby="in-unity-title">
+  <section class="sec lesson-library" id="lessons" aria-label="Skill tree" data-i18n-attr="aria-label:sk.list">
+    <div class="wrap">
+      <label class="learning-search"><span data-i18n="sk.search">Find a skill</span>
+        <input type="search" id="sk-search" autocomplete="off" spellcheck="false" placeholder="Search skills" data-i18n-attr="placeholder:sk.search.ph">
+      </label>
+      <p id="gl-note" class="pg-note" hidden data-i18n="gl.note.en">The English edition is shown while this language is unavailable.</p>
+      <div class="skill-index">
+        <nav class="chapter-rail" id="sk-nav" aria-label="Chapters" data-i18n-attr="aria-label:sk.chapters"></nav>
+        <div id="sk-root"><noscript><p data-i18n="sk.nojs">Open the skill tree in Unity to browse these lessons offline.</p></noscript></div>
+      </div>
+      <p role="status" class="sr-only" id="sk-status"></p>
+    </div>
+  </section>
+  <section class="sec lr-unity" id="in-unity" aria-labelledby="in-unity-title">
     <div class="wrap sk-how">
-      <h2 class="h-display" id="in-unity-title" data-i18n="sk.how.title">Start it in Unity.</h2>
-      <ol class="steps-list sk-steps">
-        <li data-i18n-html="sk.how.1">Open <span class="path">Tools &gt; Avistry &gt; Textures</span>.</li>
-        <li data-i18n-html="sk.how.2">Press <strong>Start the skill tree</strong> in the New to Unity? note at the top of the window. It opens the first thing to try.</li>
-        <li data-i18n-html="sk.how.3">Or open the <strong>?</strong> Help menu and choose <strong>Glossary and skill tree</strong>. Pick a skill, read the card and press <strong>Show me</strong> to try it.</li>
-      </ol>
-      <p class="small sk-fine" data-i18n="sk.how.note">Progress is kept on your computer only, with medals for each tier. Reset skill progress clears it.</p>
+      <div class="sticker-heading">
+        <h2 class="h-display" id="in-unity-title" data-i18n="sk.how.title">Start it in Unity.</h2>
+        <span class="stk stk-placed" data-stk="ship_it" data-stk-pool="ship_it lgtm" aria-hidden="true"></span>
+      </div>
+      <div class="workshop-unity">
+        <div>
+          <ol class="steps-list sk-steps">
+            <li data-i18n-html="sk.how.1">In Unity, open <span class="path">Tools → Avistry → Skill tree</span>.</li>
+            <li data-i18n-html="sk.how.2">Choose a chapter and a skill. Follow <strong>Try it</strong> on your own avatar.</li>
+            <li data-i18n-html="sk.how.3">Avistry records supported actions as you work. For a manual lesson, check the result in Unity and choose <strong>I've got it</strong>.</li>
+          </ol>
+          <p class="small sk-fine" data-i18n="sk.how.note">Progress is kept on your computer only, with medals for each tier. Reset skill progress clears it.</p>
+        </div>
+        <a class="workshop-unity-shot" href="media/v4/ui-skill-tree-030.webp?v=030-learning-1" target="_blank" rel="noopener"><img src="media/v4/ui-skill-tree-030.webp?v=030-learning-1" width="940" height="542" loading="lazy" decoding="async" alt="Browse chapters and open a lesson in the Unity skill tree." data-i18n-attr="alt:lr.unity.alt"></a>
+      </div>
     </div>
   </section>
 
-  <section class="sec">
-    <div class="wrap">
-      <p class="pg-note" id="gl-note" hidden data-i18n="gl.note.en">The glossary text is only written in English so far. The page around it is translated.</p>
-      <div class="sk-tiers" id="sk-root" aria-label="Skill tree" data-i18n-attr="aria-label:sk.list">
-        <noscript><p data-i18n="sk.nojs">This page needs JavaScript to show the skills. The same course is in the tool under Help.</p></noscript>
-      </div>
-      <div class="pg-cta">
-        <a class="btn btn-primary btn-lg" href="glossary.html" data-i18n="lb.glossary">Open the glossary</a>
-        <a class="btn btn-outline btn-lg" href="index.html" data-i18n="pg.home">Back to the front page</a>
-      </div>
-    </div>
-  </section>
 </main>
 
 <section class="sec next-up" data-next="glossary,download" aria-labelledby="next-title">
@@ -236,9 +246,10 @@
 
 <p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
 
-<script src="tour.js" defer></script>
-<script src="paint.js" defer></script>
-<script src="app.js" defer></script>
-<script src="learn.js" defer></script>
+<script src="tour.js?v=030-paper-3" defer></script>
+<script src="ink-effects.js?v=030-paper-3" defer></script>
+<script src="paint.js?v=030-paper-3" defer></script>
+<script src="app.js?v=030-learning-1" defer></script>
+<script src="learn.js?v=030-workshop-1" defer></script>
 </body>
 </html>

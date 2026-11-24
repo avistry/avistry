@@ -5,21 +5,6 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Face shadow map ("SDF" face shading) made from the face mesh. Toon shaders read it instead of the mesh normals,
-    /// so the shadow on a face sweeps across it cleanly as the light turns from the front to the side.
-    ///
-    /// Each texel gets the light angle (0° = light from the front, 180° = from behind) up to which it stays lit. It is
-    /// taken from where the point sits around the head: a point at azimuth φ (0 = the middle of the face, + = toward the
-    /// side the light comes from) stays lit until 90° + φ, as on a round head.
-    ///
-    /// Formats (both read from the shader code):
-    ///   lilToon (Shadow › Mask type SDF, map in _ShadowStrengthMask): R = light from the object's -X side, G = from +X,
-    ///     B = 0 (use the map, not the normals), A = 1. Lit while 0.5·cos θ + 0.5·value + 0.25 > border (0.5), so the edge only moves for light 60°..120° from the front: the map is an even sweep over that range.
-    ///   Poiyomi (Lighting type SDF, _SDFShadingTexture): R only, for light from the "Left Direction" side, mirrored in U
-    ///     for the other side. Lit while value > (1 − cos θ) / 2.
-    /// The same file works for both channel layouts; the values follow the material's shader.
-    /// </summary>
     public static class FaceShadow
     {
         public const string Tag = "ATS face shadow";
@@ -27,26 +12,28 @@ namespace Avistry.Textures
         [Serializable]
         public class Settings
         {
-            public int size = 1024;       // 0 = same as the texture
-            public bool swapSides;        // the shadow comes from the wrong side: swap left and right
+            public int size = 1024;
+            public bool swapSides;
         }
 
         public struct Result
         {
             public Color32[] pixels;
             public int width, height;
-            public bool headBone;         // the avatar's head bone was used as the centre
-            public string note;           // something the user should know (or null)
+            public bool headBone;
+            public string note;
         }
 
         public static Result Make(MeshUV uv, HashSet<int> onlyIslands, Material mat, int w, int h, Settings s,
-            Func<float, bool> progress = null)
+            Func<float, bool> progress = null) => Prepare(uv, onlyIslands, mat, w, h, s, false)(progress, default);
+
+        internal static Func<Func<float, bool>, System.Threading.CancellationToken, Result> Prepare(MeshUV uv,
+            HashSet<int> onlyIslands, Material mat, int w, int h, Settings s, bool snapshot)
         {
             var res = new Result { width = w, height = h };
             var pos = uv.PosedCombinedCached();
             var family = mat != null ? ShaderProfiles.Detect(mat.shader) : ShaderFamily.Other;
 
-            // Head frame: the avatar faces its root's forward (VRChat avatars face +Z); the head bone is the centre.
             var root = uv.AvatarRoot();
             var anim = root != null ? root.GetComponent<Animator>() : null;
             var head = anim != null && anim.isHuman ? anim.GetBoneTransform(HumanBodyBones.Head) : null;
@@ -76,7 +63,6 @@ namespace Avistry.Textures
                 centre = b.center;
             }
 
-            // Which side the shader's R channel is for: its object -X (lilToon) or its Left Direction (Poiyomi).
             var part = uv.parts.Count > 0 ? uv.parts[0] : null;
             var space = part?.renderer is SkinnedMeshRenderer smr && smr.rootBone != null ? smr.rootBone : part?.renderer?.transform;
             var leftLocal = family == ShaderFamily.Poiyomi && mat.HasProperty("_SDFLeft") ? (Vector3)mat.GetVector("_SDFLeft") : Vector3.left;
@@ -100,7 +86,23 @@ namespace Avistry.Textures
             }
             if (s.swapSides) sideSign = -sideSign;
 
-            // Per vertex: the angle up to which it stays lit, for light from the R side and from the G side.
+            string overlapHint = Loc.T("Both halves of the face share the same part of the texture (mirrored UVs), so one map can't hold both sides; " +
+                                 "the shadow may look patchy there.");
+            if (snapshot)
+            {
+                uv = uv.CopyIslandRasterInput();
+                pos = (Vector3[])pos.Clone();
+                if (onlyIslands != null) onlyIslands = new HashSet<int>(onlyIslands);
+            }
+            return (progress, cancel) => RenderPixels(uv, onlyIslands, pos, family, centre, right, forward, sideSign,
+                res, overlapHint, progress, cancel);
+        }
+
+        static Result RenderPixels(MeshUV uv, HashSet<int> onlyIslands, Vector3[] pos, ShaderFamily family,
+            Vector3 centre, Vector3 right, Vector3 forward, float sideSign, Result res, string overlapHint,
+            Func<float, bool> progress, System.Threading.CancellationToken cancel)
+        {
+            int w = res.width, h = res.height;
             int vCount = uv.uv.Length;
             var litR = new float[vCount];
             var litG = new float[vCount];
@@ -109,7 +111,7 @@ namespace Avistry.Textures
                 var p = pos[i];
                 if (float.IsNaN(p.x)) continue;
                 var d = p - centre;
-                float phi = Mathf.Atan2(Vector3.Dot(d, right), Vector3.Dot(d, forward)) * Mathf.Rad2Deg; // + = toward the right
+                float phi = Mathf.Atan2(Vector3.Dot(d, right), Vector3.Dot(d, forward)) * Mathf.Rad2Deg;
                 litR[i] = Mathf.Clamp(90f + sideSign * phi, 0f, 180f);
                 litG[i] = Mathf.Clamp(90f - sideSign * phi, 0f, 180f);
             }
@@ -117,21 +119,18 @@ namespace Avistry.Textures
             float Encode(float litAngle)
             {
                 float c = Mathf.Cos(litAngle * Mathf.Deg2Rad);
-                // lilToon can only move the shadow edge while the light is 60°..120° from the front (border 0.5), so it gets the
-                // whole face as an even 0..1 sweep (the edge crosses the face in that range). Poiyomi compares with (1 - cos θ) / 2: exact.
                 return family == ShaderFamily.LilToon ? Mathf.Clamp01(litAngle / 180f) : Mathf.Clamp01((1f - c) * 0.5f);
             }
 
-            var r = new ushort[w * h];
-            var g = new ushort[w * h];
-            var bl = new ushort[w * h];
-            var covered = new bool[w * h];
+            bool lil = family == ShaderFamily.LilToon;
+            var pixels = new Color32[w * h];
+            Array.Fill(pixels, new Color32(255, 255, lil ? (byte)255 : (byte)0, 255));
+            var covered = new ushort[pixels.Length];
             var angle = new float[w * h];
             int conflicts = 0, coveredCount = 0;
             int polled = 0;
             bool cancelled = false;
-            // Rasterize has no cancel hook: poll in the per-triangle filter and skip the rest once cancelled.
-            uv.Rasterize(w, h, t =>
+            uv.RasterizeTriangles(w, h, t =>
             {
                 if (cancelled) return false;
                 if (progress != null && (++polled & 255) == 0 && progress(0.8f * t / Mathf.Max(1, uv.TriangleCount))) { cancelled = true; return false; }
@@ -142,46 +141,31 @@ namespace Avistry.Textures
                 if (float.IsNaN(pos[i0].x) || float.IsNaN(pos[i1].x) || float.IsNaN(pos[i2].x)) return;
                 float lr = litR[i0] * a + litR[i1] * b + litR[i2] * c;
                 float lg = litG[i0] * a + litG[i1] * b + litG[i2] * c;
-                if (covered[px]) { if (Mathf.Abs(angle[px] - lr) > 40f) conflicts++; }
+                if (covered[px] != 0) { if (Mathf.Abs(angle[px] - lr) > 40f) conflicts++; }
                 else coveredCount++;
-                covered[px] = true;
+                covered[px] = 1;
                 angle[px] = lr;
-                r[px] = (ushort)Mathf.RoundToInt(Encode(lr) * 65535f);
-                g[px] = (ushort)Mathf.RoundToInt(Encode(lg) * 65535f);
-                bl[px] = Use(t) ? (ushort)0 : (ushort)65535; // lilToon: islands left out keep their normal shading
-            });
+                byte r = (byte)(Mathf.RoundToInt(Encode(lr) * 65535f) >> 8);
+                byte g = (byte)(Mathf.RoundToInt(Encode(lg) * 65535f) >> 8);
+                bool face = onlyIslands == null || onlyIslands.Count == 0 || onlyIslands.Contains(uv.triIsland[t]);
+                pixels[px] = new Color32(r, g, lil && !face ? (byte)255 : (byte)0, 255);
+            }, cancel);
 
-            if (cancelled || (progress != null && progress(0.9f))) { res.pixels = null; return res; } // cancelled: nothing made
-            var c1 = (bool[])covered.Clone();
-            var c2 = (bool[])covered.Clone();
-            MeshUV.Dilate(r, covered, w, h, 8);
-            MeshUV.Dilate(g, c1, w, h, 8);
-            MeshUV.Dilate(bl, c2, w, h, 8);
-
-            var o = new Color32[w * h];
-            bool lil = family == ShaderFamily.LilToon;
-            for (int i = 0; i < o.Length; i++)
-            {
-                byte vr = (byte)(r[i] >> 8), vg = (byte)(g[i] >> 8);
-                if (!covered[i]) { vr = 255; vg = 255; }
-                o[i] = lil ? new Color32(vr, vg, c2[i] ? (byte)(bl[i] >> 8) : (byte)255, 255) : new Color32(vr, vg, 0, 255);
-            }
-            res.pixels = o;
-
+            if (cancelled || (progress != null && progress(0.9f))) return res;
+            MapPixels.PadEdges(pixels, covered, w, h, 8, false, cancel);
+            res.pixels = pixels;
             if (coveredCount > 0 && conflicts > coveredCount * 0.05f)
                 res.note = (res.note != null ? res.note + " " : "") +
-                           Loc.T("Both halves of the face share the same part of the texture (mirrored UVs), so one map can't hold both sides; " +
-                                 "the shadow may look patchy there.");
+                           overlapHint;
             return res;
         }
 
-        public static Texture2D Save(Texture mainTex, Result r, out string path)
-        {
-            path = MapBaker.MapPath(mainTex, "FaceShadow", Tag);
-            return MapBaker.SavePng(path, r.pixels, r.width, r.height, Tag, false);
-        }
+        public static Texture2D Save(Texture mainTex, Result r, out string path) =>
+            MapBaker.SaveMap(mainTex, "FaceShadow", Tag, r.pixels, r.width, r.height, out path);
 
-        /// <summary>The property the material's shader reads a face shadow map from, or null.</summary>
+        internal static Texture2D SaveForTarget(Texture mainTex, Result r, string targetKey) =>
+            MapBaker.SaveMap(mainTex, "FaceShadow", Tag, r.pixels, r.width, r.height, out _, targetKey: targetKey);
+
         public static string Property(Material m)
         {
             if (m == null || m.shader == null) return null;
@@ -191,7 +175,6 @@ namespace Avistry.Textures
             return null;
         }
 
-        /// <summary>Puts the map on the material and switches its face shading to SDF (undoable).</summary>
         public static void Assign(Material m, Texture2D map)
         {
             string prop = Property(m);
@@ -200,14 +183,14 @@ namespace Avistry.Textures
             m.SetTexture(prop, map);
             if (prop == "_ShadowStrengthMask")
             {
-                m.SetFloat("_ShadowMaskType", 2f); // SDF
+                m.SetFloat("_ShadowMaskType", 2f);
                 if (m.HasProperty("_UseShadow")) m.SetFloat("_UseShadow", 1f);
                 EditorUtility.SetDirty(m);
                 MaterialWriter.AfterLilToonEdit(new[] { m });
             }
             else
             {
-                m.SetFloat("_LightingMode", 8f); // SDF
+                m.SetFloat("_LightingMode", 8f);
                 foreach (var k in m.shaderKeywords)
                     if (k.StartsWith("_LIGHTINGMODE_")) m.DisableKeyword(k);
                 m.EnableKeyword("_LIGHTINGMODE_SDF");
@@ -216,7 +199,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>True when this tool made the texture.</summary>
         public static bool IsMade(Texture tex) =>
             tex != null && AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(tex)) is TextureImporter imp && (imp.userData ?? "").StartsWith(Tag);
     }

@@ -25,14 +25,13 @@ namespace Avistry.Textures
 
         public static void Count(string controlId)
         {
-            // Controls counted without a rect get their Show me outline from the window's layout probe.
             AvatarTextureWindow.LearnPulse.Probe(controlId);
             Tally(controlId);
         }
 
-        /// <summary>Counts a control and remembers where it was drawn, so "Show me" can outline it.</summary>
         public static void Count(string controlId, Rect rect)
         {
+            AvatarTextureWindow.LearnPulse.PanelControlDrawn?.Invoke(controlId, rect);
             Tally(controlId);
             Track(controlId, rect);
         }
@@ -50,7 +49,6 @@ namespace Avistry.Textures
         static double s_pulseStart;
         const double PulseSeconds = 1.6, PulseFade = 0.4;
 
-        /// <summary>The control that is being outlined, or null once the outline has run its 1.6 seconds.</summary>
         internal static string Pulse
         {
             get => s_pulse != null && EditorApplication.timeSinceStartup - s_pulseStart < PulseSeconds ? s_pulse : null;
@@ -64,7 +62,6 @@ namespace Avistry.Textures
             }
         }
 
-        // Runs only while an outline is showing, so the window keeps redrawing without a permanent update loop.
         static void PulseTick()
         {
             UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
@@ -72,7 +69,6 @@ namespace Avistry.Textures
             EditorApplication.update -= PulseTick;
         }
 
-        /// <summary>Remembers the rect a counted control was drawn at in the last repaint, and draws its outline while it is the pulse.</summary>
         internal static void Track(string controlId, Rect rect)
         {
             if (Event.current == null || Event.current.type != EventType.Repaint) return;
@@ -85,7 +81,6 @@ namespace Avistry.Textures
             DrawRoundedBorder(new Rect(rect.x - 3f, rect.y - 3f, rect.width + 6f, rect.height + 6f), c, 4f, 2f);
         }
 
-        /// <summary>True when the control was drawn within the last second. The rect is in the window's GUI space.</summary>
         internal static bool TryGetRect(string controlId, out Rect rect)
         {
             if (s_seen.TryGetValue(controlId, out var s) && EditorApplication.timeSinceStartup - s.Time < 1.0)
@@ -125,7 +120,6 @@ namespace Avistry.Textures
         static Color InfoHover => Pro ? Hex(0x6AA2FF) : Hex(0x2F6FDE);
         static Color InfoActive => Pro ? Hex(0x8DBBFF) : Hex(0x1D4FB0);
 
-        // White on purpose: the state colour comes from GUI.color. 28 px so it stays sharp at 14 px on high-DPI screens.
         static Texture2D InfoIcon(bool filled)
         {
             if (filled ? s_infoFilled == null : s_infoRing == null)
@@ -158,7 +152,6 @@ namespace Avistry.Textures
         static int s_topTier = -1;
         static bool s_learnHooked;
 
-        /// <summary>Whether unseen info icons carry a small dot (Simple mode only). Per machine; on by default.</summary>
         internal static bool ShowDots
         {
             get
@@ -175,7 +168,6 @@ namespace Avistry.Textures
 
         static void LearnChanged() => s_topTier = -1;
 
-        // New concepts, up to one tier past where the person has got to, so a beginner is not flooded with dots.
         static bool ShowsUnseenDot(Glossary.Entry entry)
         {
             if (StudioMode.Advanced || !ShowDots || Learn.StateOf(entry.id) != Learn.State.New) return false;
@@ -186,7 +178,6 @@ namespace Avistry.Textures
 
         static bool HasInfo(string conceptId) => !string.IsNullOrEmpty(conceptId) && Glossary.Get(conceptId) != null;
 
-        /// <summary>Info icon in layout: an 18 px hit area after the control. Drawn in Simple mode only.</summary>
         public static void Info(string conceptId)
         {
             if (StudioMode.Advanced || !HasInfo(conceptId)) return;
@@ -200,7 +191,6 @@ namespace Avistry.Textures
             DrawInfo(r, conceptId);
         }
 
-        // Per concept: the control name and the empty-text tooltip content are built once, not on every redraw.
         static readonly Dictionary<string, string> s_infoNames = new Dictionary<string, string>();
         static readonly Dictionary<string, GUIContent> s_infoTips = new Dictionary<string, GUIContent>();
 
@@ -217,13 +207,11 @@ namespace Avistry.Textures
             return c;
         }
 
-        // Section headers call this directly so they show the icon in both modes.
         static void DrawInfo(Rect r, string conceptId)
         {
             var entry = Glossary.Get(conceptId);
             if (entry == null) return;
             var e = Event.current;
-            // A keyboard control instead of a button: Tab reaches it in layout order without a per-frame name counter.
             GUI.SetNextControlName(InfoName(conceptId));
             int id = GUIUtility.GetControlID(InfoHint, FocusType.Keyboard, r);
             bool focused = GUIUtility.keyboardControl == id;
@@ -292,17 +280,11 @@ namespace Avistry.Textures
 
         public static bool FoldoutWithInfo(ref bool open, string controlId, string simpleFallback = null)
         {
-            var row = EditorGUILayout.GetControlRect();
+            var row = EditorGUILayout.GetControlRect(false, 22f);
             Count(controlId, row);
             var content = Content(controlId, simpleFallback);
             var concept = Glossary.Control(controlId)?.concept;
-            // The icon goes first so its click is used before the full-width foldout can toggle.
-            if (StudioMode.Simple && HasInfo(concept))
-            {
-                float x = Mathf.Min(row.x + EditorStyles.foldout.CalcSize(content).x + 2f, row.xMax - InfoHit);
-                DrawInfo(new Rect(x, row.y + (row.height - InfoHit) * 0.5f, InfoHit, InfoHit), concept);
-            }
-            open = EditorGUI.Foldout(row, open, content, true);
+            open = FoldoutWithDetail(row, open, content.text, null, content.tooltip, StudioMode.Simple ? concept : null);
             return open;
         }
     }

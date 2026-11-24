@@ -5,10 +5,6 @@ using UnityEngine.Scripting.APIUpdating;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Blend modes, named and grouped like CLIP STUDIO PAINT's list (the "/" makes submenus in the popup).
-    /// Values are saved in recipes, so new modes are only ever appended.
-    /// </summary>
     public enum BlendMode
     {
         [InspectorName("Normal")] Normal = 0,
@@ -24,7 +20,6 @@ namespace Avistry.Textures
         [InspectorName("Colour/Luminosity")] Luminosity = 10,
         [InspectorName("Darken/Darken")] Darken = 11,
         [InspectorName("Lighten/Lighten")] Lighten = 12,
-        // CLIP STUDIO PAINT additions
         [InspectorName("Darken/Colour burn")] ColorBurn = 13,
         [InspectorName("Darken/Linear burn")] LinearBurn = 14,
         [InspectorName("Lighten/Colour dodge")] ColorDodge = 15,
@@ -42,7 +37,15 @@ namespace Avistry.Textures
         [InspectorName("Lighten/Lighter colour")] LighterColor = 27,
     }
 
-    public enum MaskMode { WholeTexture = 0, SelectedIslands = 1 }
+    public enum MaskMode { WholeTexture = 0, SelectedIslands = 1, SelectedFaces = 2 }
+
+    [Serializable]
+    internal struct LayerBlendPass
+    {
+        public bool enabled;
+        public BlendMode mode;
+        [Range(0, 1)] public float strength;
+    }
 
     [Serializable]
     public abstract class Layer
@@ -51,13 +54,17 @@ namespace Avistry.Textures
         public string name;
         public bool enabled = true;
         public bool expanded = true;
+        [SerializeField, HideInInspector] internal string groupId;
+        [SerializeField, HideInInspector] internal string groupName;
         [Range(0, 1)] public float opacity = 1f;
         public BlendMode blend = BlendMode.Normal;
+        [SerializeField, HideInInspector] internal List<LayerBlendPass> additionalBlends = new List<LayerBlendPass>();
         public MaskMode maskMode = MaskMode.WholeTexture;
         public List<int> islands = new List<int>();
         public bool invertMask;
+        [HideInInspector] public List<int> faces = new List<int>();
+        [HideInInspector] public string faceLayout;
 
-        // CLIP STUDIO PAINT / Photoshop-style clipping and layer masks
         [Tooltip("Clip to layer below: this layer only shows where the nearest unclipped layer below it shows")]
         public bool clipToBelow;
         [Tooltip("Which channels of the texture this layer writes (for masks that pack several things into R, G, B and A)")]
@@ -68,25 +75,44 @@ namespace Avistry.Textures
         public bool hasPaintMask;
         [Tooltip("The mask started as 'hide everything' (paint to reveal). Flipping this inverts the mask.")]
         public bool paintMaskStartsHidden;
-        /// <summary>
-        /// Mask strokes, replayed like paint. Their coverage is the difference from the starting state: with
-        /// paintMaskStartsHidden off, painted coverage hides; with it on, painted coverage reveals.
-        /// </summary>
         public List<PaintStroke> maskStrokes = new List<PaintStroke>();
 
-        /// <summary>Shader pass in Hidden/Avistry/Layer.</summary>
         public abstract int Pass { get; }
         public abstract string TypeName { get; }
         public virtual bool NeedsGradientTexture => false;
         public virtual GradientMode GradientModeUsed => GradientMode.PerStrandUV;
 
-        /// <summary>Set shader parameters. Colours are passed as vectors (gamma values, no linear conversion).</summary>
+        internal const int MaxAdditionalBlends = 4;
+
+        internal Vector4 AdditionalBlendStrengths(out Vector4 modes)
+        {
+            modes = Vector4.zero;
+            var strengths = Vector4.zero;
+            int count = Mathf.Min(additionalBlends?.Count ?? 0, MaxAdditionalBlends);
+            for (int index = 0; index < count; index++)
+            {
+                var step = additionalBlends[index];
+                if (!step.enabled || !float.IsFinite(step.strength) || step.strength <= 0f) continue;
+                modes[index] = (int)step.mode;
+                strengths[index] = Mathf.Clamp01(step.strength);
+            }
+            return strengths;
+        }
+
+        internal bool HasActiveAdditionalBlends
+        {
+            get
+            {
+                var strength = AdditionalBlendStrengths(out _);
+                return strength.x + strength.y + strength.z + strength.w > 0f;
+            }
+        }
+
         public abstract void Apply(Material mat, Func<Gradient, Texture2D> lut);
 
         protected static Vector4 Gamma(Color c) => new Vector4(c.r, c.g, c.b, c.a);
     }
 
-    /// <summary>How the Hue / Saturation / Lightness layer treats colour strength.</summary>
     public enum ChromaMode { Scale = 0, Add = 1, Set = 2 }
 
     [Serializable, MovedFrom(false, sourceNamespace: "AvatarTextureStudio", sourceAssembly: "AvatarTextureStudio.Editor")]
@@ -192,7 +218,6 @@ namespace Avistry.Textures
 
         static Gradient DefaultGradient()
         {
-            // Transparent at the start (top), colour toward the end: a classic ombré.
             var g = new Gradient();
             g.SetKeys(
                 new[] { new GradientColorKey(new Color(1f, 0.45f, 0.7f), 0f), new GradientColorKey(new Color(0.55f, 0.35f, 1f), 1f) },
@@ -271,7 +296,6 @@ namespace Avistry.Textures
             m.SetVector("_Params0", new Vector4(threshold, 0, 0, 0));
     }
 
-    /// <summary>Tone Curve: an editable curve for all channels plus optional per-channel curves (baked to a lookup table).</summary>
     [Serializable, MovedFrom(false, sourceNamespace: "AvatarTextureStudio", sourceAssembly: "AvatarTextureStudio.Editor")]
     public class ToneCurveLayer : Layer
     {
@@ -284,9 +308,8 @@ namespace Avistry.Textures
         public ToneCurveLayer() { name = "Tone Curve"; }
         public override int Pass => 11;
         public override string TypeName => "Tone Curve";
-        public override void Apply(Material m, Func<Gradient, Texture2D> lut) { } // the compositor binds the curve lookup table
+        public override void Apply(Material m, Func<Gradient, Texture2D> lut) { }
 
-        /// <summary>256-entry lookup: channel curve applied after the RGB curve, like CSP's Tone Curve.</summary>
         public Color32[] BuildLut()
         {
             var px = new Color32[256];
@@ -306,7 +329,6 @@ namespace Avistry.Textures
 
     public enum GradientShape { Linear = 0, Circle = 1, Ellipse = 2 }
 
-    /// <summary>What happens past the ends of the gradient (CSP: Edge process).</summary>
     public enum GradientEdge
     {
         [InspectorName("Not repeat (extend the end colours)")] NotRepeat = 0,
@@ -315,10 +337,6 @@ namespace Avistry.Textures
         [InspectorName("Don't draw past the ends")] DontDraw = 3,
     }
 
-    /// <summary>
-    /// A gradient drawn by dragging on the texture (CLIP STUDIO PAINT's Gradient tool, kept as an editable gradient layer):
-    /// start and end points in UV space, linear / circle / ellipse, edge process and dithering.
-    /// </summary>
     [Serializable, MovedFrom(false, sourceNamespace: "AvatarTextureStudio", sourceAssembly: "AvatarTextureStudio.Editor")]
     public class DrawnGradientLayer : Layer
     {
@@ -336,9 +354,14 @@ namespace Avistry.Textures
         [Tooltip("End point (texture position, 0..1)")]
         public Vector2 end = new Vector2(0.5f, 0f);
 
+        [HideInInspector] public bool sceneProjection;
+        [HideInInspector] public Vector3 sceneStart, sceneEnd, sceneNormal;
+        [HideInInspector] public Vector3 sceneAxis, sceneAcross;
+
         public DrawnGradientLayer() { name = "Gradient"; }
         public override int Pass => 12;
         public override string TypeName => "Gradient";
+        internal DrawnGradientLayer CopyPlacement() => (DrawnGradientLayer)MemberwiseClone();
         public override void Apply(Material m, Func<Gradient, Texture2D> lut)
         {
             m.SetTexture("_LUT", lut(gradient));
@@ -356,10 +379,6 @@ namespace Avistry.Textures
         [InspectorName("Mirror onto the other half (flipped picture)")] MirrorFlipped = 3,
     }
 
-    /// <summary>
-    /// A picture placed on the texture: position, size and rotation in texture space, with an optional mask. Uses the
-    /// same placement maths as Poiyomi's decals, so a shader decal can be flattened into the texture exactly.
-    /// </summary>
     [Serializable, MovedFrom(false, sourceNamespace: "AvatarTextureStudio", sourceAssembly: "AvatarTextureStudio.Editor")]
     public class ImageLayer : Layer
     {
@@ -382,14 +401,18 @@ namespace Avistry.Textures
         [Tooltip("Which channel of the mask to use (0 = R, 1 = G, 2 = B, 3 = A)")]
         [Range(0, 3)] public int maskChannel;
 
-        // Set when this layer was made by flattening a shader decal: what to switch off on the saved material.
+        [SerializeField, HideInInspector] internal string missingPackImage;
+        [SerializeField, HideInInspector] internal string missingPackMask;
+        internal bool NeedsPackMask => mask == null && !string.IsNullOrEmpty(missingPackMask);
+
         [HideInInspector] public List<string> offFloats = new List<string>();
         [HideInInspector] public List<string> offKeywords = new List<string>();
         [HideInInspector] public string flattenedFrom;
-        [HideInInspector] public Vector4 imageST = new Vector4(1, 1, 0, 0); // the picture.s own tiling / offset (from a decal)
-        [HideInInspector] public string generated; // set when the picture is a map this tool baked ("ao" = ambient occlusion)
+        [HideInInspector] public Vector4 imageST = new Vector4(1, 1, 0, 0);
+        [HideInInspector] public string generated;
 
         public ImageLayer() { name = "Image"; }
+        internal ImageLayer CopyPlacement() => (ImageLayer)MemberwiseClone();
         public override int Pass => 13;
         public override string TypeName => "Image";
         public override void Apply(Material m, Func<Gradient, Texture2D> lut)
@@ -402,11 +425,6 @@ namespace Avistry.Textures
     }
 
 
-    /// <summary>
-    /// Matches this texture's colours to another material's: each of this texture's main colours is paired with one of
-    /// the other material's, and every pixel moves by the shift of the pairs near it (in OKLab). Shading, texture and
-    /// detail stay; only the colours change. Pairs are found by "Find colours" in the layer settings and can be edited.
-    /// </summary>
     [Serializable, MovedFrom(false, sourceNamespace: "AvatarTextureStudio", sourceAssembly: "AvatarTextureStudio.Editor")]
     public class ColourMatchLayer : Layer
     {
@@ -417,7 +435,6 @@ namespace Avistry.Textures
         [Tooltip("Match to the texture above instead of the material")]
         public bool useTexture;
 
-        /// <summary>The material or texture the colours come from (whichever is in use), or null.</summary>
         public UnityEngine.Object SourceObject => useTexture ? (UnityEngine.Object)sourceTexture : source;
         public bool HasSource => SourceObject != null;
         public string SourceName => HasSource ? SourceObject.name : "";
@@ -427,6 +444,7 @@ namespace Avistry.Textures
         public List<Color> to = new List<Color>();
         [Tooltip("How many main colours to look for on each texture")]
         [Range(2, 8)] public int colourCount = 4;
+        [SerializeField, HideInInspector] internal ColourMatch.Pairing pairing;
         [Tooltip("How far each match reaches into similar colours. Higher = smoother, lower = more separate")]
         [Range(0.02f, 0.4f)] public float softness = 0.12f;
         [Tooltip("How much of the other material's brightness to take (0 = keep this texture's light and dark)")]
@@ -459,11 +477,6 @@ namespace Avistry.Textures
     }
 
 
-    /// <summary>
-    /// One part of the model recoloured from 2 · Colour › By part: hue / saturation / brightness, limited to its UV islands.
-    /// Same colour maths as the Colour tab's shader recolour (Recolour.Shift: HSV, or OKLab for Poiyomi), so a part looks
-    /// like the sliders' preview. Several parts each keep their own colour; saving bakes them into the texture.
-    /// </summary>
     [Serializable, MovedFrom(false, sourceNamespace: "AvatarTextureStudio", sourceAssembly: "AvatarTextureStudio.Editor")]
     public class RecolourPartLayer : Layer
     {
@@ -475,9 +488,8 @@ namespace Avistry.Textures
         [Range(-1, 1)] public float brightness;
         [Tooltip("Turn the hue in OKLab (colours stay evenly bright, like Poiyomi) instead of HSV (like lilToon)")]
         public bool oklab;
-        [HideInInspector] public Color swatch = new Color(0.6f, 0.6f, 0.6f, 1f); // the part's average colour after the change (lists)
+        [HideInInspector] public Color swatch = new Color(0.6f, 0.6f, 0.6f, 1f);
 
-        /// <summary>Shift = turn the colours around the wheel (can't colour grey). Tint = give the part one colour and keep its shading.</summary>
         public enum PartMode { Shift, Tint }
         [Tooltip("Rotate colours: turn every colour around the colour wheel. Tint: give the part one colour, keeping its light and shadow (works on white and grey).")]
         public PartMode partMode;
@@ -485,8 +497,8 @@ namespace Avistry.Textures
         public Color tintColour = new Color(1f, 0.19f, 0.38f, 1f);
         [Tooltip("How strongly the tint colours the part (Tint mode)")]
         [Range(0, 1)] public float tintStrength = 1f;
-        [HideInInspector] public bool modeChosen;   // the user picked Shift or Tint themselves: don't switch it automatically
-        [HideInInspector] public bool autoTinted;   // started in Tint because the part is white / grey (shows a one-line note)
+        [HideInInspector] public bool modeChosen;
+        [HideInInspector] public bool autoTinted;
 
         public RecolourPartLayer() { name = "Part"; }
         public override int Pass => 15;
@@ -502,12 +514,10 @@ namespace Avistry.Textures
             else m.SetVector("_Params1", Vector4.zero);
         }
 
-        /// <summary>These values as Colour tab settings (main texture only), for Recolour.Shift / Match.</summary>
         public RecolourSettings Settings => new RecolourSettings { hue = hue, saturation = saturation, brightness = brightness, main = true };
         public bool IsTint => partMode == PartMode.Tint;
         public bool IsIdentity => IsTint ? (tintStrength < 0.001f && Mathf.Abs(brightness) < 0.001f) : Settings.IsIdentity;
 
-        /// <summary>This part's change applied to one colour (for previews and swatches).</summary>
         public Color Preview(Color c) => IsTint ? Recolour.Tint(c, tintColour, tintStrength, brightness) : Recolour.Shift(c, Settings, oklab);
     }
 }

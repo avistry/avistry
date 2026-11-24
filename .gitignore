@@ -1,10 +1,8 @@
-# Build output
 /dist/
 /_site/
 *.unitypackage
 *.zip
 
-# Unity (when the package is opened inside a project)
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
@@ -12,7 +10,6 @@
 [Ll]ogs/
 UserSettings/
 
-# IDE and OS
 .vs/
 .idea/
 .vscode/
@@ -24,11 +21,9 @@ UserSettings/
 Thumbs.db
 desktop.ini
 
-# Tooling
 node_modules/
 
 
-# Maintainers' local files and links: never part of this public repository
 /DevKit~
 /Documentation~
 /.claude

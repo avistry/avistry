@@ -1,6 +1,3 @@
-// Usage: node changelog-release.mjs <version> [CHANGELOG.md]
-// Turns "## [Unreleased]" into "## [<version>] - <today>", puts a fresh empty "## [Unreleased]" above it and
-// updates the compare links at the bottom. Exits 1 (and changes nothing) if Unreleased is empty or the version exists.
 import fs from 'node:fs';
 
 const REPO = process.env.GITHUB_REPOSITORY ? `https://github.com/${process.env.GITHUB_REPOSITORY}` : 'https://github.com/avistry/avistry';
@@ -34,7 +31,6 @@ if (lines.some((l) => new RegExp(`^##\\s+\\[?v?${esc(version)}\\]?(\\s|$)`).test
 let end = lines.findIndex((l, i) => i > start && /^##\s/.test(l) && !/^###/.test(l));
 if (end < 0) end = lines.length;
 
-// Real content = any line that is not blank, a "###" heading or a link definition.
 const hasContent = lines.slice(start + 1, end).some((l) => l.trim() && !/^###/.test(l) && !isLink(l));
 if (!hasContent) {
   console.error(`"## [Unreleased]" in ${file} is empty. Add what changed for users before releasing.`);
@@ -44,7 +40,6 @@ if (!hasContent) {
 const prevMatch = lines.slice(end).map((l) => /^##\s+\[v?(\d[^\]\s]*)\]/.exec(l)).find(Boolean);
 const today = new Date().toISOString().slice(0, 10);
 const ownLink = new RegExp(`^\\[(unreleased|v?${esc(version)})\\]:`, 'i');
-// Only the trailing block of link definitions is rewritten; a link definition used inside an entry stays put.
 let tail = lines.length;
 while (tail > 0 && (lines[tail - 1].trim() === '' || isLink(lines[tail - 1]))) tail--;
 const oldLinks = lines.slice(tail).filter((l) => isLink(l) && !ownLink.test(l));

@@ -5,14 +5,13 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Every link from the tool to the Avistry website, in one table, so a page can move without touching UI code. The
-    /// words live in en.json as <c>web.*</c> controls. A page opens in the browser only on a click: the tool never
-    /// fetches, checks or counts these links.
-    /// </summary>
     internal static class OnlineGuide
     {
         internal const string Site = "https://avistry.github.io/avistry/";
+        internal const string DiscordSupport = "https://discord.gg/sSeWgDJJjY";
+        internal const string GitHubBugReport = "https://github.com/avistry/avistry/issues/new?template=bug_report.yml";
+
+        internal static void OpenSupport(bool gitHub) => Application.OpenURL(gitHub ? GitHubBugReport : DiscordSupport);
 
         internal sealed class Page
         {
@@ -21,22 +20,21 @@ namespace Avistry.Textures
             public Page(string key, string path, bool video) { Key = key; Path = path; Video = video; }
         }
 
-        // Video: the anchored section plays a loop recorded in Unity. A maintainers' test checks paths, anchors and videos.
         static readonly Page[] s_pages =
         {
             new Page("home", "index.html", false),
             new Page("steps", "index.html#how", true),
             new Page("tour", "features.html", false),
-            new Page("select", "features.html#select", true),
+            new Page("select", "features.html#select", false),
             new Page("paint", "features.html#paint", true),
             new Page("layers", "features.html#layers", false),
-            new Page("modes", "features.html#modes", true),
-            new Page("colour", "features.html#colour", true),
-            new Page("material", "features.html#material", true),
+            new Page("modes", "features.html#modes", false),
+            new Page("colour", "features.html#colour", false),
+            new Page("material", "features.html#quick-material", false),
             new Page("maps", "features.html#maps", false),
-            new Page("undo", "features.html#undo", false),
-            new Page("files", "features.html#files", true),
-            new Page("report", "features.html#report", false),
+            new Page("undo", "features.html#history-example", false),
+            new Page("files", "features.html#safety", false),
+            new Page("report", "features.html#audit-example", false),
             new Page("learn", "features.html#learn", false),
             new Page("gallery", "gallery.html", false),
             new Page("glossary", "glossary.html", false),
@@ -47,7 +45,6 @@ namespace Avistry.Textures
             new Page("ai", "about.html#q-ai", false),
         };
 
-        /// <summary>The website section that shows a concept at work. Concepts not listed get only their glossary link.</summary>
         static readonly Dictionary<string, string> s_conceptPage = new Dictionary<string, string>
         {
             { "hierarchy", "steps" }, { "scene-view", "select" }, { "project-window", "files" }, { "asset", "files" },
@@ -60,13 +57,11 @@ namespace Avistry.Textures
             { "normal-map", "maps" }, { "sdf-face-shadow", "maps" }, { "ai-helper", "ai" },
         };
 
-        /// <summary>The feature tour section for each tab (the Tab enum names).</summary>
         static readonly Dictionary<string, string> s_tabPage = new Dictionary<string, string>
         {
             { "Target", "steps" }, { "Colour", "colour" }, { "Select", "select" }, { "Paint", "paint" }, { "Layers", "layers" }, { "Save", "files" },
         };
 
-        /// <summary>The pages the Online guide menus list, in order. Null is a separator.</summary>
         static readonly string[] s_menu = { "tour", "gallery", null, "skills", "glossary", null, "faq", "home" };
 
         static Dictionary<string, Page> s_byKey;
@@ -89,7 +84,6 @@ namespace Avistry.Textures
         internal static Page ForConcept(string conceptId) => conceptId != null && s_conceptPage.TryGetValue(conceptId, out var k) ? Get(k) : null;
         internal static Page ForTab(string tabName) => tabName != null && s_tabPage.TryGetValue(tabName, out var k) ? Get(k) : null;
 
-        /// <summary>The address of a page, with the tool's language when the site has it. <paramref name="anchor"/> replaces the page's own.</summary>
         internal static string Url(Page page, string anchor = null)
         {
             if (page == null) return null;
@@ -105,14 +99,10 @@ namespace Avistry.Textures
         internal static string TermUrl(string conceptId) => Url(Get("glossary"), conceptId);
         internal static string SkillUrl(string conceptId) => Url(Get("skills"), string.IsNullOrEmpty(conceptId) ? null : "sk-" + conceptId);
 
-        // English leaves the site to its own choice (a saved pick or the browser language), so only a translated tool overrides it.
-        // Loc.Codes are the site's own language codes.
         static string SiteLanguage() => Loc.English ? null : Loc.Current;
 
-        /// <summary>The address without "https://", for showing under a link.</summary>
         internal static string Shown(string url) => url != null && url.StartsWith("https://", StringComparison.Ordinal) ? url.Substring(8) : url;
 
-        /// <summary>Opens one of our pages in the browser. Anything that is not under <see cref="Site"/> is refused.</summary>
         internal static bool Open(string url)
         {
             if (string.IsNullOrEmpty(url) || !url.StartsWith(Site, StringComparison.Ordinal)) return false;
@@ -120,7 +110,6 @@ namespace Avistry.Textures
             return true;
         }
 
-        /// <summary>The label of a web.* control, or the fallback when the copy is missing.</summary>
         internal static string Label(string id, string fallback)
         {
             var c = Glossary.Control(id);
@@ -135,14 +124,12 @@ namespace Avistry.Textures
 
         internal static string PageLabel(Page p) => Label("web." + p.Key, p.Key);
 
-        /// <summary>The tooltip of a link: what the page shows, then the full address.</summary>
         internal static string Hover(Page p, string url)
         {
             string tip = p == null ? null : Tip("web." + p.Key);
             return string.IsNullOrEmpty(tip) ? url : tip + "\n" + url;
         }
 
-        /// <summary>Adds the Online guide submenu: "This tab, explained" when a tab is given, then the main pages.</summary>
         internal static void AddMenu(GenericMenu menu, string tabName)
         {
             string root = Label("web.menu", "Online guide") + "/";

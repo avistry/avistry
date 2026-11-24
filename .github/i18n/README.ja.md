@@ -133,7 +133,7 @@
 - **補助マップのベイク。** アンビエントオクルージョン、テクスチャから作る法線マップ、アニメ調の顔向けのフェイスシャドウマップ。
 - **マテリアルのチェック。** ピンク表示のシェーダー、空のスロット、足りないテクスチャ、おかしなインポート設定を、わかりやすい言葉で説明します。
   安全に直せるものは、ワンクリックで修正できます。
-- **使いながら学ぶ。** SimpleモードとAdvancedモード、情報アイコン、41語の用語集、Unity初心者向けのスキルツリー。
+- **使いながら学ぶ。** SimpleモードとAdvancedモード、情報アイコン、65語の用語集、Unity初心者向けのスキルツリー。
 - **あなたの言語で。** ツール全体が英語、日本語、韓国語、簡体字中国語に対応していて、初期設定ではUnityエディタの言語に合わせて切り替わります。
 
 全機能は[機能ページ](https://avistry.github.io/avistry/features.html)にまとめています。
@@ -156,18 +156,18 @@
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/learn.html?lang=ja"><img alt="学ぶ: ツール内の短いコース、全用語の用語集、各ツールの動き。" src="../../Website~/media/og-learn-ja.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/learn.html?lang=ja"><b>学ぶ</b></a> · <sub>ツール内の短いコース、全用語の用語集、各ツールの動き。</sub>
+      <a href="https://avistry.github.io/avistry/learn.html?lang=ja"><img alt="学ぶ: Unity でのペイントからアバターの動作確認まで。スキルツリーから手順を開き、作業中に用語を調べられます。" src="../../Website~/media/og-learn-ja.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/learn.html?lang=ja"><b>学ぶ</b></a> · <sub>Unity でのペイントからアバターの動作確認まで。スキルツリーから手順を開き、作業中に用語を調べられます。</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/skills.html?lang=ja"><img alt="スキルツリー: Hierarchy の見つけ方からマップのベイクまで、6 ステージ・40 の短いスキル。" src="../../Website~/media/og-skills-ja.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/skills.html?lang=ja"><b>スキルツリー</b></a> · <sub>Hierarchy の見つけ方からマップのベイクまで、6 ステージ・40 の短いスキル。</sub>
+      <a href="https://avistry.github.io/avistry/skills.html?lang=ja"><img alt="スキルツリー: 初めての一筆からアバターのトグルの動作確認まで、64 のスキルを実践。" src="../../Website~/media/og-skills-ja.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/skills.html?lang=ja"><b>スキルツリー</b></a> · <sub>初めての一筆からアバターのトグルの動作確認まで、64 のスキルを実践。</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/glossary.html?lang=ja"><img alt="用語集: Unity、テクスチャ、VRChat アバターの 41 語を、Unity での場所つきで。" src="../../Website~/media/og-glossary-ja.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/glossary.html?lang=ja"><b>用語集</b></a> · <sub>Unity、テクスチャ、VRChat アバターの 41 語を、Unity での場所つきで。</sub>
+      <a href="https://avistry.github.io/avistry/glossary.html?lang=ja"><img alt="用語集: Unity、シェーダー、VRChat の用語を、実際の操作と結び付けて解説。" src="../../Website~/media/og-glossary-ja.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/glossary.html?lang=ja"><b>用語集</b></a> · <sub>Unity、シェーダー、VRChat の用語を、実際の操作と結び付けて解説。</sub>
     </td>
     <td width="50%" valign="top">
       <a href="https://avistry.github.io/avistry/about.html?lang=ja"><img alt="概要: できること・できないこと、ダウンロードの確かめ方、そして協力する方法。" src="../../Website~/media/og-about-ja.jpg" width="100%"></a>
@@ -180,8 +180,8 @@
       <br><a href="https://avistry.github.io/avistry/download.html?lang=ja"><b>ダウンロード</b></a> · <sub>VCC がいちばん簡単で、Avistry を最新に保ってくれます。</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/?lang=ja"><img alt="ホーム: パーツを色替えし、レイヤーに描いて、新しい PNG に保存。元のファイルは変わりません。" src="../../Website~/media/og-ja.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/?lang=ja"><b>ホーム</b></a> · <sub>パーツを色替えし、レイヤーに描いて、新しい PNG に保存。元のファイルは変わりません。</sub>
+      <a href="https://avistry.github.io/avistry/?lang=ja"><img alt="ホーム: パーツの色を変え、レイヤーに描いて、新しい PNG として保存。元のテクスチャはそのまま残ります。" src="../../Website~/media/og-ja.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/?lang=ja"><b>ホーム</b></a> · <sub>パーツの色を変え、レイヤーに描いて、新しい PNG として保存。元のテクスチャはそのまま残ります。</sub>
     </td>
   </tr>
 </table>
@@ -202,8 +202,8 @@
 
 <!-- release-banner:start -->
 <p align="center">
-  <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0"><img alt="Avistry 0.2.0" src="../../Website~/media/release/0.2.0/banner-ja.jpg" width="880"></a>
-  <br><sub>最新版 0.2.0 · <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0">リリースノートを読む</a></sub>
+  <a href="https://github.com/avistry/avistry/releases/tag/v0.3.0"><img alt="Avistry 0.3.0「Surface Studio」。イヤーカップに桜の花を描いた茶色のヘッドホン。" src="../../Website~/media/release/0.3.0/banner-ja.jpg" width="880"></a>
+  <br><sub>最新版 0.3.0 · Surface Studio · <a href="https://github.com/avistry/avistry/releases/tag/v0.3.0">リリースノートを読む</a></sub>
 </p>
 <!-- release-banner:end -->
 
@@ -236,8 +236,8 @@ Projectウィンドウにドラッグします。ツールは Assets の下で�
 ## 安全性と信頼性
 
 - コードはすべてこのリポジトリにあり、[MITライセンス](../../LICENSE)で公開しています。エディタ専用なので、アップロードには何も入らず、VRChat内で動くこともありません。
-- リリースのファイルはVirusTotalでスキャンしていて、SHA-256を `SHA256SUMS.txt` に載せています。ダウンロードしたファイルは、PowerShellで
-  `Get-FileHash <file> -Algorithm SHA256` を実行して確認できます。
+- 各ファイルの SHA-256 は `SHA256SUMS.txt` に記載されています。PowerShell で
+  `Get-FileHash <file> -Algorithm SHA256` を実行し、値を照合してください。VirusTotal の検査結果がある場合は、リリースノートから確認できます。
 - テレメトリーはありません。ネットワーク通信は、任意のアップデート確認(ヘルプ › 更新を自動的に確認する)だけです。
   オンにするまで動かず、オンにしても1日1回、GitHubの公開APIで最新バージョンを調べるだけで、あなたの情報は何も送りません。
 - 新しいツールを試す前には、プロジェクトのバックアップを取ってください。このツールも例外ではありません。

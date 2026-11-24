@@ -4,14 +4,6 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Symmetry painting: mirrors texture points through the 3D model rather than the texture (avatar UVs are rarely laid
-    /// out symmetrically). A UV point is found on the posed mesh, reflected across the avatar's mirror plane, snapped to
-    /// the nearest surface on the other side, and that surface point's UV is where the mirrored paint goes.
-    ///
-    /// Line-up: the plane starts at the avatar's own left/right axis and is refined so it sits exactly on the model's
-    /// centre. The score is the share of the mesh whose mirror image lands on the mesh again (within 0.5% of its size).
-    /// </summary>
     public sealed class SymmetryMap
     {
         public enum Axis
@@ -20,26 +12,47 @@ namespace Avistry.Textures
             [InspectorName("Left ↔ right")] LeftRight = 1,
             [InspectorName("Up ↔ down")] UpDown = 2,
             [InspectorName("Front ↔ back")] FrontBack = 3,
+            Both = 4,
+            Custom = 5,
         }
 
         public enum Result { None, Same, Mirrored }
 
-        public Vector3 normal;          // plane: dot(normal, p) = offset (world space)
+        public Vector3 normal;
         public float offset;
-        public Axis axis;               // the axis actually used
-        public float score;             // 0..1 share of the mesh that lines up with its mirror
-        public float meanError;         // average distance (world units) from a mirrored vertex to the surface
-        public float tolerance;         // world units counted as "lines up"
-        public float size;              // bounds diagonal (world units)
-        public Vector3 centre;          // a point on the plane (for drawing it)
-        public Vector3 planeU, planeV;  // half extents of the plane rectangle (for drawing it)
+        public Axis axis;
+        public float score;
+        public float meanError;
+        public float tolerance;
+        public float size;
+        public Vector3 centre;
+        public Vector3 planeU, planeV;
+        internal Vector3 secondNormal, secondCentre, secondU, secondV;
+        internal float secondOffset;
+
+        internal readonly struct MirrorDestination
+        {
+            public readonly int branch, piece, triangle;
+            public readonly Vector2 uv;
+            public readonly Vector3 bary;
+            public readonly float scale;
+
+            public MirrorDestination(int branch, int piece, int triangle, Vector2 uv, Vector3 bary, float scale)
+            {
+                this.branch = branch;
+                this.piece = piece;
+                this.triangle = triangle;
+                this.uv = uv;
+                this.bary = bary;
+                this.scale = scale;
+            }
+        }
 
         readonly MeshUV _mesh;
         readonly Vector3[] _pos;
         readonly bool[] _triOk;
         readonly Vector3[] _triNormal;
 
-        // world-space grid of triangles (compressed rows)
         Vector3 _gMin;
         float _cell;
         int _nx, _ny, _nz;
@@ -47,7 +60,6 @@ namespace Avistry.Textures
         int[] _stamp;
         int _stampId;
 
-        // UV-space grid of triangles
         const int UvGrid = 128;
         int[] _uvStart, _uvItems;
 
@@ -64,7 +76,6 @@ namespace Avistry.Textures
                 bool ok = !float.IsNaN(a.x) && !float.IsNaN(b.x) && !float.IsNaN(c.x);
                 var n = ok ? Vector3.Cross(b - a, c - a) : Vector3.zero;
                 _triOk[t] = ok && n.sqrMagnitude > 1e-24f;
-                // Not n.normalized: Unity returns zero below a length of 1e-5, which small triangles (in metres) are.
                 _triNormal[t] = _triOk[t] ? n * (1f / Mathf.Sqrt(n.sqrMagnitude)) : Vector3.zero;
             }
             _stamp = new int[tc];
@@ -72,21 +83,53 @@ namespace Avistry.Textures
             BuildUvGrid();
         }
 
-        /// <summary>Builds the map and finds the mirror plane. Returns null if the mesh has no usable posed geometry.</summary>
-        public static SymmetryMap Build(MeshUV mesh, Axis axis)
+        public static SymmetryMap Build(MeshUV mesh, Axis axis) => BuildWithPlane(mesh, axis, Vector3.zero, 0f);
+
+        internal static SymmetryMap BuildWithPlane(MeshUV mesh, Axis axis, Vector3 angles, float shift)
         {
             if (mesh == null || mesh.TriangleCount == 0) return null;
             var map = new SymmetryMap(mesh);
             if (map._cellStart == null) return null;
-            map.DetectPlane(axis);
+            map.DetectPlane(axis, angles, shift);
             return map;
         }
 
 
-        void DetectPlane(Axis wanted)
+        void DetectPlane(Axis wanted, Vector3 angles, float shift)
         {
             var root = _mesh.AvatarRoot();
             Vector3 right = root != null ? root.right : Vector3.right, up = root != null ? root.up : Vector3.up, fwd = root != null ? root.forward : Vector3.forward;
+            if (wanted == Axis.Both)
+            {
+                axis = wanted;
+                normal = right.normalized;
+                secondNormal = up.normalized;
+                Evaluate(normal, out offset, out var acrossScore, out var acrossError);
+                Evaluate(secondNormal, out secondOffset, out var verticalScore, out var verticalError);
+                score = Mathf.Min(acrossScore, verticalScore);
+                meanError = Mathf.Max(acrossError, verticalError);
+                DrawPlaneBounds(secondNormal, secondOffset, up, fwd, out secondCentre, out secondU, out secondV);
+            }
+            else if (wanted == Axis.Custom)
+            {
+                axis = wanted;
+                var local = Quaternion.Euler(angles) * Vector3.right;
+                var bounds = Bounds(root);
+                var pivot = root != null ? root.TransformPoint(bounds.center) : bounds.center;
+                float diagonal = root != null ? Vector3.Scale(bounds.size, root.lossyScale).magnitude : size;
+                var world = root != null ? root.worldToLocalMatrix.transpose.MultiplyVector(local) : local;
+                if (root != null && (!float.IsFinite(world.sqrMagnitude) || world.sqrMagnitude < 1e-10f))
+                    world = root.TransformDirection(local);
+                normal = world.normalized;
+                offset = Vector3.Dot(normal, pivot) + shift * diagonal;
+                ScorePlane(normal, offset, SampleVertices(1500), size * 0.03f, out score, out meanError);
+            }
+            else FindClassicPlane(wanted, right, up, fwd);
+            DrawPlaneBounds(normal, offset, up, fwd, out centre, out planeU, out planeV);
+        }
+
+        void FindClassicPlane(Axis wanted, Vector3 right, Vector3 up, Vector3 fwd)
+        {
             var candidates = new List<(Axis axis, Vector3 n)>();
             if (wanted == Axis.Auto || wanted == Axis.LeftRight) candidates.Add((Axis.LeftRight, right));
             if (wanted == Axis.Auto || wanted == Axis.UpDown) candidates.Add((Axis.UpDown, up));
@@ -96,17 +139,18 @@ namespace Avistry.Textures
             foreach (var (ax, n) in candidates)
             {
                 Evaluate(n.normalized, out float off, out float sc, out float err);
-                // Avatars are almost always left/right symmetric: only pick another axis if it is clearly better.
                 float bias = ax == Axis.LeftRight ? 0.1f : 0f;
                 if (sc + bias > bestScore)
                 {
                     bestScore = sc + bias;
                     axis = ax; normal = n.normalized; offset = off; score = sc; meanError = err;
                 }
-                if (wanted == Axis.Auto && ax == Axis.LeftRight && sc >= 0.85f) break; // clearly left/right: done
+                if (wanted == Axis.Auto && ax == Axis.LeftRight && sc >= 0.85f) break;
             }
+        }
 
-            // Rectangle for drawing the plane: the mesh bounds projected onto it.
+        void DrawPlaneBounds(Vector3 normal, float offset, Vector3 up, Vector3 fwd, out Vector3 centre, out Vector3 planeU, out Vector3 planeV)
+        {
             var b = Bounds();
             centre = b.center - (Vector3.Dot(normal, b.center) - offset) * normal;
             var u = Vector3.Cross(normal, Mathf.Abs(Vector3.Dot(normal, up)) < 0.9f ? up : fwd).normalized;
@@ -121,7 +165,6 @@ namespace Avistry.Textures
             planeV = v * hv * 1.05f;
         }
 
-        /// <summary>Finds the plane offset along n that best maps the mesh onto itself, and how well it does.</summary>
         void Evaluate(Vector3 n, out float off, out float sc, out float err)
         {
             var b = Bounds();
@@ -135,7 +178,6 @@ namespace Avistry.Textures
                 {
                     var m = p - 2f * (Vector3.Dot(n, p) - off) * n;
                     if (!Closest(m, reach, out int t, out var s, out _)) continue;
-                    // Only surfaces facing along the axis tell us where the centre is (others just slide along it).
                     if (Mathf.Abs(Vector3.Dot(_triNormal[t], n)) < 0.5f) continue;
                     est.Add((Vector3.Dot(n, p) + Vector3.Dot(n, s)) * 0.5f);
                 }
@@ -147,18 +189,22 @@ namespace Avistry.Textures
                 if (settled) break;
             }
 
-            int good = 0, found = 0;
+            ScorePlane(n, off, samples, reach, out sc, out err);
+        }
+
+        void ScorePlane(Vector3 n, float offset, List<Vector3> samples, float reach, out float score, out float error)
+        {
+            int good = 0;
             double sum = 0;
             foreach (var p in samples)
             {
-                var m = p - 2f * (Vector3.Dot(n, p) - off) * n;
+                var m = Reflect(p, n, offset);
                 if (!Closest(m, reach, out _, out _, out float d)) d = reach;
-                else found++;
                 sum += Mathf.Min(d, reach);
                 if (d <= tolerance) good++;
             }
-            sc = samples.Count > 0 ? good / (float)samples.Count : 0f;
-            err = samples.Count > 0 ? (float)(sum / samples.Count) : reach;
+            score = samples.Count > 0 ? good / (float)samples.Count : 0f;
+            error = samples.Count > 0 ? (float)(sum / samples.Count) : reach;
         }
 
         List<Vector3> SampleVertices(int max)
@@ -180,7 +226,7 @@ namespace Avistry.Textures
             return list;
         }
 
-        Bounds Bounds()
+        Bounds Bounds(Transform relativeTo = null)
         {
             var b = new Bounds();
             bool any = false;
@@ -190,6 +236,7 @@ namespace Avistry.Textures
                 for (int k = 0; k < 3; k++)
                 {
                     var p = _pos[_mesh.tris[t * 3 + k]];
+                    if (relativeTo != null) p = relativeTo.InverseTransformPoint(p);
                     if (!any) { b = new Bounds(p, Vector3.zero); any = true; }
                     else b.Encapsulate(p);
                 }
@@ -204,18 +251,54 @@ namespace Avistry.Textures
         }
 
 
-        public Vector3 Mirror(Vector3 p) => p - 2f * (Vector3.Dot(normal, p) - offset) * normal;
+        public Vector3 Mirror(Vector3 p) => Reflect(p, normal, offset);
 
-        /// <summary>
-        /// The mirrored texture point. Same = the point is already its own mirror in the texture (on the centre line, or the
-        /// two sides share UV space), so painting it once covers both sides. None = nothing found on the other side.
-        /// </summary>
-        /// <param name="preferIsland">When several parts overlap in the texture, use this island's surface (from a Scene view hit).</param>
-        /// <param name="scale">How much bigger a brush must be on the other side to cover the same surface area.</param>
+        static Vector3 Reflect(Vector3 point, Vector3 normal, float offset) =>
+            point - 2f * (Vector3.Dot(normal, point) - offset) * normal;
+
+        internal void MirrorDestinations(Vector2 uvPoint, int preferIsland, MeshUV.SurfaceHit? hit, List<MirrorDestination> output)
+        {
+            output.Clear();
+            int source;
+            Vector3 bary;
+            if (hit.HasValue && hit.Value.triangle >= 0 && hit.Value.triangle < _triOk.Length && _triOk[hit.Value.triangle])
+            {
+                source = hit.Value.triangle;
+                bary = hit.Value.bary;
+            }
+            else
+            {
+                var candidates = TrianglesAtUV(uvPoint, out var weights);
+                if (candidates.Count == 0) return;
+                int pick = candidates.FindIndex(triangle => _mesh.triIsland[triangle] == preferIsland);
+                if (pick < 0) pick = 0;
+                source = candidates[pick];
+                bary = weights[pick];
+            }
+
+            var point = Interp(_pos, source, bary);
+            var facing = _triNormal[source];
+            float density = UvPerWorld(source);
+            int count = axis == Axis.Both ? 3 : 1;
+            const float sharedUvDistanceSq = 1e-10f;
+            for (int reflection = 1; reflection <= count; reflection++)
+            {
+                Vector3 p = point, n = facing;
+                if ((reflection & 1) != 0) { p = Reflect(p, normal, offset); n = Reflect(n, normal, 0f); }
+                if ((reflection & 2) != 0) { p = Reflect(p, secondNormal, secondOffset); n = Reflect(n, secondNormal, 0f); }
+                if (!Closest(p, tolerance * 2f, out int triangle, out _, out _, out var matched, n)) continue;
+                var uv = InterpUV(triangle, matched);
+                if ((uv - uvPoint).sqrMagnitude < sharedUvDistanceSq ||
+                    output.Exists(destination => (destination.uv - uv).sqrMagnitude < sharedUvDistanceSq)) continue;
+                float pairedDensity = UvPerWorld(triangle);
+                float scale = density > 1e-9f && pairedDensity > 1e-9f ? Mathf.Clamp(pairedDensity / density, 0.25f, 4f) : 1f;
+                output.Add(new MirrorDestination(reflection - 1, _mesh.triIsland[triangle], triangle, uv, matched, scale));
+            }
+        }
+
         public Result MirrorUV(Vector2 uvPoint, int preferIsland, out Vector2 mirroredUv, out int mirroredIsland, out float scale) =>
             MirrorUV(uvPoint, preferIsland, out mirroredUv, out mirroredIsland, out scale, out _, out _);
 
-        /// <summary>As above, and also where on the mesh the mirrored point is (triangle + barycentric weights), for 3D-brush strokes.</summary>
         public Result MirrorUV(Vector2 uvPoint, int preferIsland, out Vector2 mirroredUv, out int mirroredIsland, out float scale, out int mirroredTri, out Vector3 mirroredBary)
         {
             mirroredUv = uvPoint; mirroredIsland = -1; scale = 1f; mirroredTri = -1; mirroredBary = default;
@@ -228,10 +311,6 @@ namespace Avistry.Textures
             int t0 = cands[pick];
             var p = Interp(_pos, t0, bary[pick]);
             var m = Mirror(p);
-            // Only where the other side really matches: close to the mirrored point (1% of the mesh size) and facing the
-            // mirrored way, so asymmetric parts (hair, buckles) are left out instead of landing on a different strand.
-            // Facing filter: an inner layer or back face at the same spot faces the other way, so it's skipped and the
-            // paint lands on the matching outer surface.
             var n0 = _triNormal[t0];
             var mirroredNormal = n0 - 2f * Vector3.Dot(n0, normal) * normal;
             if (!Closest(m, tolerance * 2f, out int t1, out _, out _, out var b1, mirroredNormal)) return Result.None;
@@ -239,14 +318,12 @@ namespace Avistry.Textures
             mirroredIsland = _mesh.triIsland[t1];
             mirroredTri = t1;
             mirroredBary = b1;
-            // Already its own mirror: on the centre line, or both halves use the same texture area.
             if ((mirroredUv - uvPoint).sqrMagnitude < 1e-6f || cands.Contains(t1)) return Result.Same;
             float d0 = UvPerWorld(t0), d1 = UvPerWorld(t1);
             scale = d0 > 1e-9f && d1 > 1e-9f ? Mathf.Clamp(d1 / d0, 0.25f, 4f) : 1f;
             return Result.Mirrored;
         }
 
-        /// <summary>World position of a texture point (first part covering it), for drawing the mirrored brush.</summary>
         public bool SurfacePoint(Vector2 uvPoint, int preferIsland, out Vector3 world)
         {
             world = default;
@@ -302,8 +379,6 @@ namespace Avistry.Textures
             }
         }
 
-        // Tiled UVs wrap back into 0..1, but a positive whole value (1.0, 2.0...) maps to the last cell, not cell 0,
-        // so triangles/points that touch the far edge stay in the last cell for both the grid build and lookups.
         static int Cell(float v)
         {
             float r = Mathf.Repeat(v, 1f);
@@ -379,10 +454,6 @@ namespace Avistry.Textures
         bool Closest(Vector3 p, float maxDist, out int tri, out Vector3 point, out float dist) =>
             Closest(p, maxDist, out tri, out point, out dist, out _);
 
-        /// <summary>
-        /// Nearest surface point within maxDist (grid search in growing shells of cells). With facing set, only triangles
-        /// facing roughly that way count (dot > 0.3).
-        /// </summary>
         bool Closest(Vector3 p, float maxDist, out int tri, out Vector3 point, out float dist, out Vector3 bary, Vector3 facing = default)
         {
             bool filter = facing.sqrMagnitude > 0.25f;
@@ -403,7 +474,7 @@ namespace Avistry.Textures
                         for (int x = cx - r; x <= cx + r; x++)
                         {
                             if (x < 0 || x >= _nx) continue;
-                            if (Mathf.Max(Mathf.Abs(x - cx), Mathf.Max(Mathf.Abs(y - cy), Mathf.Abs(z - cz))) != r) continue; // shell only
+                            if (Mathf.Max(Mathf.Abs(x - cx), Mathf.Max(Mathf.Abs(y - cy), Mathf.Abs(z - cz))) != r) continue;
                             int cell = (z * _ny + y) * _nx + x;
                             for (int i = _cellStart[cell]; i < _cellStart[cell + 1]; i++)
                             {
@@ -419,14 +490,13 @@ namespace Avistry.Textures
                         }
                     }
                 }
-                if (tri >= 0 && Mathf.Sqrt(best2) <= r * _cell) break; // nothing in farther shells can be closer
+                if (tri >= 0 && Mathf.Sqrt(best2) <= r * _cell) break;
             }
             if (tri < 0) return false;
             dist = Mathf.Sqrt(best2);
             return true;
         }
 
-        /// <summary>Closest point on triangle abc to p, with barycentric weights (Ericson, Real-Time Collision Detection 5.1.5).</summary>
         static Vector3 ClosestOnTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c, out Vector3 bary)
         {
             Vector3 ab = b - a, ac = c - a, ap = p - a;

@@ -3,24 +3,19 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Handles for the selected Image layer, drawn on the texture view: drag inside the picture to move it (Select tool),
-    /// the centre dot to move it with any tool, the corner squares to scale (Shift keeps the shape) and the circle above
-    /// the picture to rotate (Shift snaps to 15 degrees). One undo step per drag.
-    /// </summary>
     partial class AvatarTextureWindow
     {
         enum ImgGrab { None, Move, Rotate, Corner }
 
-        ImageLayer _imgDrag;
+        ImageLayer _imgDrag, _imgOriginal;
         ImgGrab _imgGrab = ImgGrab.None;
-        int _imgCorner;
+        int _imgCorner, _imgDragControl;
+        bool _imgPreviewActive, _imgOriginalView;
         Vector2 _imgStartPos, _imgStartSize, _imgGrabUV;
         float _imgStartRot;
 
         static readonly Vector2[] ImgCorners = { new Vector2(-1, -1), new Vector2(1, -1), new Vector2(1, 1), new Vector2(-1, 1) };
 
-        /// <summary>The Image layer whose handles are shown, or null (hidden, tiled, empty, or while painting a mask).</summary>
         ImageLayer SelectedImage
         {
             get
@@ -30,14 +25,12 @@ namespace Avistry.Textures
             }
         }
 
-        // The shader rotates the texture position around the picture's centre by +rotation, then divides by size.
         static void ImgSinCos(ImageLayer l, out float cs, out float sn)
         {
             float a = l.rotation * Mathf.Deg2Rad;
             cs = Mathf.Cos(a); sn = Mathf.Sin(a);
         }
 
-        /// <summary>A point in the picture's own frame (centre = 0, in texture UV units) to texture UV.</summary>
         static Vector2 ImgLocalToUV(ImageLayer l, Vector2 d)
         {
             ImgSinCos(l, out float cs, out float sn);
@@ -81,19 +74,18 @@ namespace Avistry.Textures
             return ImgGrab.None;
         }
 
-        /// <summary>Mouse down on the texture view: grab a handle of the selected Image layer. False when nothing was hit.</summary>
         bool BeginImageDrag(Vector2 local, Event e)
         {
             var l = SelectedImage;
             if (l == null) return false;
-            // Inside the picture moves it only with the Select tool, so Paint can still paint over it; modifiers keep their meaning.
             bool body = _tool != Tool.Paint && !e.shift && !e.control && !e.command;
             var grab = ImageHitTest(l, local, body, out int corner);
             if (grab == ImgGrab.None) return false;
             EndStroke();
-            ShowEditsIfBeforeOn();
-            Undo.IncrementCurrentGroup(); // the drag is its own undo step
-            _imgDrag = l;
+            CancelSceneGradient();
+            _imgOriginalView = _showOriginal;
+            _imgOriginal = l;
+            _imgDrag = l.CopyPlacement();
             _imgGrab = grab;
             _imgCorner = corner;
             _imgStartPos = l.position;
@@ -108,32 +100,43 @@ namespace Avistry.Textures
             var l = _imgDrag;
             if (l == null || _comp == null) return;
             var uv = CanvasToUV(local);
+            var travel = uv - _imgGrabUV;
             switch (_imgGrab)
             {
                 case ImgGrab.Move:
-                    l.position = _imgStartPos + (uv - _imgGrabUV);
+                    l.position = _imgStartPos + travel;
                     break;
                 case ImgGrab.Rotate:
                 {
-                    var v = uv - l.position;
+                    var v = uv - _imgStartPos;
                     if (v.sqrMagnitude < 1e-10f) break;
-                    float deg = Mathf.Atan2(v.x, v.y) * Mathf.Rad2Deg; // the picture's "up" points at (sin, cos)
-                    if (shift) deg = Mathf.Round(deg / 15f) * 15f;
-                    l.rotation = Mathf.Clamp(deg, -180f, 180f);
+                    var start = _imgGrabUV - _imgStartPos;
+                    float from = Mathf.Atan2(start.x, start.y) * Mathf.Rad2Deg;
+                    float to = Mathf.Atan2(v.x, v.y) * Mathf.Rad2Deg;
+                    float turn = Mathf.DeltaAngle(from, to);
+                    if (Mathf.Abs(turn) < 1e-4f) { l.rotation = _imgStartRot; break; }
+                    float angle = _imgStartRot + turn;
+                    if (shift) angle = Mathf.Round(angle / 15f) * 15f;
+                    l.rotation = Mathf.Repeat(angle + 180f, 360f) - 180f;
                     break;
                 }
                 case ImgGrab.Corner:
                 {
-                    // The corner opposite the one you drag stays where it is; work in the picture's own (unrotated) frame.
+                    if (travel == Vector2.zero) { l.position = _imgStartPos; l.size = _imgStartSize; break; }
+                    const float MinSize = 0.005f;
                     var c = ImgCorners[_imgCorner];
                     float w0 = Mathf.Max(1e-4f, Mathf.Abs(_imgStartSize.x)), h0 = Mathf.Max(1e-4f, Mathf.Abs(_imgStartSize.y));
                     var startLayer = new ImageLayer { position = _imgStartPos, rotation = _imgStartRot };
                     var opp = new Vector2(-c.x * w0 * 0.5f, -c.y * h0 * 0.5f);
-                    var d = ImgUVToLocal(startLayer, uv);
-                    float W = Mathf.Max(0.005f, (d.x - opp.x) * c.x), H = Mathf.Max(0.005f, (d.y - opp.y) * c.y);
+                    var delta = ImgUVToLocal(startLayer, uv) - ImgUVToLocal(startLayer, _imgGrabUV);
+                    float W = Mathf.Max(MinSize, w0 + delta.x * c.x), H = Mathf.Max(MinSize, h0 + delta.y * c.y);
                     if (shift)
                     {
-                        float f = Mathf.Max(W / w0, H / h0);
+                        var pixelSize = new Vector2(_comp.Width, _comp.Height);
+                        var diagonal = Vector2.Scale(ImgLocalToUV(startLayer, -2f * opp) - _imgStartPos, pixelSize);
+                        var drag = Vector2.Scale(travel, pixelSize);
+                        float minScale = Mathf.Max(MinSize / w0, MinSize / h0);
+                        float f = Mathf.Max(minScale, 1f + Vector2.Dot(drag, diagonal) / diagonal.sqrMagnitude);
                         W = w0 * f; H = h0 * f;
                     }
                     var centre = opp + new Vector2(c.x * W * 0.5f, c.y * H * 0.5f);
@@ -142,35 +145,70 @@ namespace Avistry.Textures
                     break;
                 }
             }
+            if (!_imgPreviewActive)
+            {
+                if (!ImagePlacementChanged(l)) return;
+                _imgPreviewActive = true;
+                _showOriginal = false;
+            }
             ComposeNow();
             Repaint();
         }
 
+        bool ImagePlacementChanged(ImageLayer layer) =>
+            (layer.position - _imgStartPos).sqrMagnitude >= 1e-12f ||
+            (layer.size - _imgStartSize).sqrMagnitude >= 1e-12f ||
+            Mathf.Abs(Mathf.DeltaAngle(_imgStartRot, layer.rotation)) >= 1e-4f;
+
         void EndImageDrag()
         {
-            var l = _imgDrag;
-            if (l == null) return;
-            _imgDrag = null;
-            Vector2 fp = l.position, fs = l.size;
-            float fr = l.rotation;
-            if ((fp - _imgStartPos).sqrMagnitude < 1e-12f && (fs - _imgStartSize).sqrMagnitude < 1e-12f && Mathf.Approximately(fr, _imgStartRot))
-            {
-                Repaint();
-                return;
-            }
-            // The layer was edited live while dragging: record the whole drag as one undo step.
-            l.position = _imgStartPos; l.size = _imgStartSize; l.rotation = _imgStartRot;
-            Undo.RecordObject(_recipe, _imgGrab == ImgGrab.Move ? "Move image" : _imgGrab == ImgGrab.Rotate ? "Rotate image" : "Scale image");
-            l.position = fp; l.size = fs; l.rotation = fr;
+            var draft = _imgDrag;
+            if (draft == null) return;
+            var original = _imgOriginal;
+            var grab = _imgGrab;
+            bool commit = !_needsRebuild && original == SelectedImage && ImagePlacementChanged(draft);
+            CancelImageDrag();
+            if (!commit) return;
+
+            Undo.FlushUndoRecordObjects();
+            Undo.IncrementCurrentGroup();
+            string undoName = grab == ImgGrab.Move ? "Move image" : grab == ImgGrab.Rotate ? "Rotate image" : "Scale image";
+            Undo.SetCurrentGroupName(undoName);
+            Undo.RecordObject(_recipe, undoName);
+            if (grab == ImgGrab.Rotate) original.rotation = draft.rotation;
+            else original.position = draft.position;
+            if (grab == ImgGrab.Corner) original.size = draft.size;
             MarkEdited();
+            Undo.FlushUndoRecordObjects();
             Undo.IncrementCurrentGroup();
             ComposeNow();
         }
 
-        /// <summary>The selected Image layer's outline, corner squares, rotate circle and centre dot (canvas-local coordinates).</summary>
+        void CancelImageDrag()
+        {
+            if (_imgDrag == null) return;
+            _imgDrag = _imgOriginal = null;
+            _placementPreview.Clear();
+            if (_imgPreviewActive)
+            {
+                _showOriginal = _imgOriginalView;
+                _dirty = true;
+                SceneView.RepaintAll();
+            }
+            _imgPreviewActive = false;
+            Repaint();
+        }
+
+        void ReleaseImageDragControl()
+        {
+            if (_imgDrag != null || _imgDragControl == 0) return;
+            if (GUIUtility.hotControl == _imgDragControl) GUIUtility.hotControl = 0;
+            _imgDragControl = 0;
+        }
+
         void DrawImageHandlesOverlay()
         {
-            var l = SelectedImage;
+            var l = _imgDrag ?? SelectedImage;
             if (l == null || Event.current.type != EventType.Repaint) return;
             var pts = new Vector3[5];
             for (int i = 0; i < 4; i++) pts[i] = ImgCornerCanvas(l, i);

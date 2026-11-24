@@ -1,7 +1,5 @@
 name: Changelog check
 
-# Every pull request that changes the tool (Editor/ or package.json) must add a line under
-# "## [Unreleased]" in CHANGELOG.md, so the release notes stay complete. Add the label "no-changelog" to skip.
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
@@ -35,14 +33,12 @@ jobs:
             exit 0
           fi
 
-          # A release PR (changelog-release.mjs) moves [Unreleased] into a new "## [x.y.z]" section: that counts.
           NEW_SECTION=$(git diff -U0 "${BASE_SHA}...${HEAD_SHA}" -- CHANGELOG.md | grep -cE '^\+## \[[0-9]+\.[0-9]+\.[0-9]+' || true)
           if [ "${NEW_SECTION:-0}" -gt 0 ]; then
             echo "CHANGELOG.md has a new release section: nothing more to add."
             exit 0
           fi
 
-          # Added lines inside the "## [Unreleased]" section only (stops at the next "## " heading).
           ADDED=$(git diff -U0 "${BASE_SHA}...${HEAD_SHA}" -- CHANGELOG.md | node -e '
             const lines = require("fs").readFileSync(0, "utf8").split(/\r?\n/);
             const head = require("child_process").execSync(`git show ${process.env.HEAD_SHA}:CHANGELOG.md`, { encoding: "utf8", maxBuffer: 1 << 26 }).split(/\r?\n/);

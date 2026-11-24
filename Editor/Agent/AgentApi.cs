@@ -1,22 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// What an AI helper may do in the open Avistry Textures window. Three entry points split by risk: <see cref="Read"/>
-    /// looks, <see cref="Edit"/> makes undoable edits, <see cref="Request"/> waits for the person to click Allow before it
-    /// writes files or shares a picture. Every edit goes through the same window code as the UI and is one Undo step named
-    /// "AI: ...". Nothing here opens a socket; the optional bridge (Editor/McpBridge) only translates tool calls to these.
-    /// </summary>
     internal static partial class AgentApi
     {
         enum Kind { Read, Edit, Request }
 
         static readonly Queue<double> s_writes = new Queue<double>();
+        static int s_undoSerial;
 
         internal static AgentResult Read(string action, AgentArgs a = null) => Run(Kind.Read, action, a);
         internal static AgentResult Edit(string action, AgentArgs a = null) => Run(Kind.Edit, action, a);
@@ -65,7 +61,6 @@ namespace Avistry.Textures
 
         static readonly Regex s_path = new Regex(@"(?:[A-Za-z]:[\\/]|\\\\|/(?:Users|home)/)[^\s""'’”]*", RegexOptions.Compiled);
 
-        /// <summary>Messages may name assets, never a drive or home folder.</summary>
         static string Scrub(string s) => string.IsNullOrEmpty(s) ? s : s_path.Replace(s, "<path>");
 
         static AgentResult Clean(AgentResult r)
@@ -78,7 +73,6 @@ namespace Avistry.Textures
             return r;
         }
 
-        /// <summary>Null when an edit may go ahead. A person who is dragging or saving, or a test that set its own dialog answer, is never interrupted.</summary>
         static AgentResult BusyCheck(string action, AvatarTextureWindow w)
         {
             string why = null;
@@ -91,7 +85,6 @@ namespace Avistry.Textures
             return null;
         }
 
-        /// <summary>Counts one write. False once more than 20 came in the last 10 seconds.</summary>
         static bool TakeWriteSlot()
         {
             double now = EditorApplication.timeSinceStartup;
@@ -101,18 +94,13 @@ namespace Avistry.Textures
             return true;
         }
 
-        /// <summary>Forgets the write counter and the open request's details. For tests.</summary>
         internal static void Reset()
         {
             s_writes.Clear();
             s_pending = null;
+            ClearHelperUndo();
         }
 
-        /// <summary>
-        /// Runs <paramref name="body"/> the way the person's own click would: skill progress stays untouched, the tool's
-        /// dialogs are answered by <paramref name="answer"/>, and (when <paramref name="label"/> is given) every Undo step
-        /// it makes becomes one step named "AI: label".
-        /// </summary>
         static AgentResult InScope(AvatarTextureWindow w, string label, Func<StudioDialog.Question, int> answer, Func<AgentResult> body)
         {
             using (Learn.Suppress())
@@ -122,27 +110,38 @@ namespace Avistry.Textures
                 try
                 {
                     if (label == null) return body();
-                    string name = "AI: " + label;
+                    string name = "AI: " + label + " #" + ++s_undoSerial;
+                    Undo.FlushUndoRecordObjects();
+                    var undoBefore = ReadUndoTimeline() ? s_appliedUndo.ToArray() : null;
                     Undo.IncrementCurrentGroup();
                     int group = Undo.GetCurrentGroup();
-                    Undo.SetCurrentGroupName(name);
                     double toast = w.AutoToastStamp;
                     AgentResult res;
-                    // A throwing hook must not leave a half-open group that swallows the person's next steps.
-                    try { res = body(); }
+                    try
+                    {
+                        res = body();
+                        w.AutoSettle();
+                    }
                     finally
                     {
-                        Undo.SetCurrentGroupName(name);
-                        Undo.CollapseUndoOperations(group);
-                        Undo.SetCurrentGroupName(name);
+                        Undo.FlushUndoRecordObjects();
+                        if (undoBefore == null || !ReadUndoTimeline() || !s_appliedUndo.SequenceEqual(undoBefore))
+                        {
+                            Undo.SetCurrentGroupName(name);
+                            Undo.CollapseUndoOperations(group);
+                        }
+                        Undo.IncrementCurrentGroup();
                     }
-                    w.AutoSettle();
-                    Undo.IncrementCurrentGroup();
                     if (w.AutoToastStamp != toast) res.toast = w.AutoLastToast();
                     if ((res.ok || res.partial) && !res.pending)
                     {
-                        res.undo = name;
-                        AgentAccess.Log(LogText(res, label), name, group);
+                        if (undoBefore != null && ReadUndoTimeline() && s_appliedUndo.Count > 0 &&
+                            s_appliedUndo[s_appliedUndo.Count - 1] == name && !s_appliedUndo.SequenceEqual(undoBefore))
+                        {
+                            TrackHelperUndo(w, name);
+                            res.undo = name;
+                        }
+                        AgentAccess.Log(LogText(res, label));
                     }
                     return res;
                 }
@@ -153,12 +152,9 @@ namespace Avistry.Textures
         static string LogText(AgentResult r, string label) =>
             r.changed != null && r.changed.Length > 0 ? r.changed[0] : label;
 
-        /// <summary>Questions during a helper edit: a target change follows on_layers, anything else is answered Cancel.</summary>
-        // Matched on its "Move layers" button: the title is translated and has no fixed English prefix.
         static Func<StudioDialog.Question, int> EditAnswers(string onLayers) =>
             q => q.ok == Msg.BtnMoveLayers && onLayers == "keep" ? 0 : 1;
 
-        /// <summary>The same question the person would see, shown the normal way.</summary>
         static int ShowToPerson(StudioDialog.Question q)
         {
             if (q.alt != null) return EditorUtility.DisplayDialogComplex(q.title, q.message, q.ok, q.cancel, q.alt);
@@ -186,7 +182,6 @@ namespace Avistry.Textures
 
         static bool IsMeshRenderer(Renderer r) => r is SkinnedMeshRenderer || r is MeshRenderer;
 
-        /// <summary>The mesh renderers with a material under an avatar root, in Hierarchy order.</summary>
         static List<Renderer> PartsUnder(Transform root)
         {
             var list = new List<Renderer>();

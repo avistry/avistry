@@ -1,12 +1,8 @@
-// Usage:
-//   node discord.mjs release <version> [--dry]   post the release to Discord (#announcements)
-//   node discord.mjs commits [--dry]             post the pushed commits (GITHUB_EVENT_PATH) to Discord (#dev-commits)
-// The webhook address comes from DISCORD_WEBHOOK and is never printed. Without it, or with --dry, the message is only
-// printed. Runs in GitHub Actions; the tool itself makes no network calls.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { releaseInfo } from './release-info.mjs';
 
 const [mode, arg] = process.argv.slice(2);
 const dry = process.argv.includes('--dry');
@@ -32,11 +28,11 @@ async function send(payload) {
 }
 
 async function release(version) {
+  const { name, subtitle } = releaseInfo(version);
   const here = path.dirname(fileURLToPath(import.meta.url));
   const section = execFileSync(process.execPath, [path.join(here, 'changelog-section.mjs'), version, 'CHANGELOG.md'], { encoding: 'utf8' });
   const lines = section.split('\n').filter((l) => !/^- Website:/.test(l));
 
-  // The lines before the first heading, then the Highlights bullets (wrapped lines joined), then the Added groups.
   const lead = [];
   for (const l of lines) { if (/^###\s/.test(l)) break; if (l.trim()) lead.push(l.trim()); }
   const bullets = [];
@@ -57,19 +53,21 @@ async function release(version) {
   const tag = `v${version}`;
   const url = `https://github.com/${repo}/releases/tag/${tag}`;
   const parts = [];
+  if (subtitle) parts.push(subtitle);
   if (lead.length) parts.push(lead.join(' '));
   if (bullets.length) parts.push(bullets.map((b) => `• ${b}`).join('\n'));
   if (groups.length) parts.push('**What’s inside:** ' + groups.map((g) => `${g.title} (${g.n})`).join(' · '));
   const changed = counts('Changed'), fixed = counts('Fixed');
-  if (changed || fixed) parts.push([changed && `${changed} changed`, fixed && `${fixed} fixed`].filter(Boolean).join(' · '));
+  if (!subtitle && (changed || fixed)) parts.push([changed && `${changed} changed`, fixed && `${fixed} fixed`].filter(Boolean).join(' · '));
   parts.push(`[**Release notes**](${url}) · [**Add to VCC**](${site}download.html) · [**Every feature**](${site}features.html)`);
 
   let description = parts.join('\n\n');
   if (description.length > 4000) description = cut(description, 4000);
 
-  const embed = { title: `Avistry ${version}`, url, description, color: 0xff6f91, timestamp: new Date().toISOString() };
-  const banner = `https://raw.githubusercontent.com/${repo}/${tag}/Website~/media/release/${version}/banner.jpg`;
-  try { if ((await fetch(banner, { method: 'HEAD' })).ok) embed.image = { url: banner }; } catch { /* no banner: text only */ }
+  const embed = { title: name, url, description, color: 0xff6f91, timestamp: new Date().toISOString() };
+  const directory = `Website~/media/release/${version}`;
+  const picture = ['share.jpg', 'banner.jpg'].find((file) => fs.existsSync(path.join(directory, file)));
+  if (picture) embed.image = { url: `https://raw.githubusercontent.com/${repo}/${tag}/${directory}/${picture}` };
   await send({ content: `**Avistry ${version} is out.** Update in VCC, or download it from the release page.`, embeds: [embed] });
 }
 
@@ -78,7 +76,6 @@ async function commits() {
   const list = (event.commits || []).filter((c) => c.distinct !== false);
   if (event.deleted || !list.length) { console.log('No new commits to post.'); return; }
   const branch = (event.ref || '').replace(/^refs\/heads\//, '');
-  // Only the first line of each message, and no author names: people's names stay out of the channel.
   const rows = list.slice(-15).map((c) => `[\`${c.id.slice(0, 7)}\`](${c.url}) ${cut(c.message.split('\n')[0], 90)}`);
   if (list.length > 15) rows.unshift(`…and ${list.length - 15} earlier`);
   const n = list.length;

@@ -7,24 +7,18 @@ namespace Avistry.Textures
 {
     public enum ShaderFamily { Other, Poiyomi, LilToon }
 
-    /// <summary>
-    /// What the tool knows about Poiyomi Pro (11.x / 9.x) and lilToon (2.x) textures: friendly names, roles,
-    /// packed-channel meanings, which feature toggle uses a texture, and UV settings that make baked results misalign.
-    /// Sources: Poiyomi shader attributes, lilToon's fragment shader.
-    /// </summary>
     public static class ShaderProfiles
     {
         public static ShaderFamily Detect(Shader s)
         {
             if (s == null) return ShaderFamily.Other;
-            s = MaterialWriter.SourceShader(s); // Poiyomi's temporary section-locked shader -> the real one
+            s = MaterialWriter.SourceShader(s);
             string n = s.name;
             if (n.IndexOf("poiyomi", StringComparison.OrdinalIgnoreCase) >= 0) return ShaderFamily.Poiyomi;
             if (n.IndexOf("lilToon", StringComparison.OrdinalIgnoreCase) >= 0 || n.StartsWith("_lil/")) return ShaderFamily.LilToon;
             return ShaderFamily.Other;
         }
 
-        /// <summary>lilToon Lite shaders have a reduced property set (no reflection, glitter or second shadow).</summary>
         internal static bool IsLilLite(Shader s) => s != null && MaterialWriter.SourceShader(s).name.IndexOf("Lite", StringComparison.OrdinalIgnoreCase) >= 0;
 
         public static string FamilyLabel(ShaderFamily f) => f switch
@@ -37,7 +31,6 @@ namespace Avistry.Textures
 
         static readonly string[] LookupNames = { "DFG", "SkinLUT", "_TPS_BakedMesh", "_TextGlyphs", "_DitherTex", "_ClothDFG" };
 
-        /// <summary>Lookup tables and generated data that must not be edited as images.</summary>
         public static bool IsLookupTable(Shader s, int index, string prop)
         {
             foreach (var raw in s.GetPropertyAttributes(index))
@@ -49,7 +42,6 @@ namespace Avistry.Textures
             return LookupNames.Any(n => prop.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
-        // lilToon declares no roles besides [Normal].
 
         static readonly HashSet<string> LilColour = new HashSet<string>
         {
@@ -64,12 +56,11 @@ namespace Avistry.Textures
             "_BumpMap", "_Bump2ndMap", "_MatCapBumpMap", "_MatCap2ndBumpMap", "_AnisotropyTangentMap", "_OutlineVectorTex", "_FurVectorTex",
         };
 
-        /// <summary>lilToon role from its texture name (null = unknown, fall back to heuristics).</summary>
         public static TextureRole? LilRole(string prop)
         {
             if (LilNormal.Contains(prop)) return TextureRole.Normal;
             if (LilColour.Contains(prop)) return TextureRole.Color;
-            if (prop.EndsWith("GradTex") || prop == "_MainGradationTex") return TextureRole.Mask; // linear ramps
+            if (prop.EndsWith("GradTex") || prop == "_MainGradationTex") return TextureRole.Mask;
             if (prop.Contains("Mask") || prop.EndsWith("Tex") && (prop.Contains("Smoothness") || prop.Contains("Metallic"))) return TextureRole.Mask;
             return null;
         }
@@ -77,7 +68,6 @@ namespace Avistry.Textures
 
         static string KnownName(string prop) => prop switch
         {
-            // shared / Poiyomi
             "_MainTex" => Loc.T("Main colour"), "_BumpMap" => Loc.T("Normal map"), "_AlphaMask" => Loc.T("Transparency mask"),
             "_Bump2ndMap" => Loc.T("Detail normal map"), "_Bump2ndScaleMask" => Loc.T("Detail normal mask"),
             "_DetailTex" => Loc.T("Detail colour"), "_DetailMask" => Loc.T("Detail mask"), "_DetailNormalMap" => Loc.T("Detail normal map"),
@@ -97,7 +87,6 @@ namespace Avistry.Textures
             "_RGBMask" => Loc.T("RGBA colour mask"), "_DecalMask" => Loc.T("Decal mask"), "_GlitterColorMap" => Loc.T("Glitter colour"), "_GlitterMask" => Loc.T("Glitter mask"),
             "_DecalTexture" => Loc.T("Decal 1"), "_DecalTexture1" => Loc.T("Decal 2"), "_DecalTexture2" => Loc.T("Decal 3"), "_DecalTexture3" => Loc.T("Decal 4"),
             "_DissolveMask" => Loc.T("Dissolve mask"), "_DissolveNoiseTexture" => Loc.T("Dissolve noise"), "_BackFaceTexture" => Loc.T("Back-face texture"),
-            // lilToon
             "_Main2ndTex" => Loc.T("Main colour layer 2"), "_Main3rdTex" => Loc.T("Main colour layer 3"),
             "_Main2ndBlendMask" => Loc.T("Layer 2 mask"), "_Main3rdBlendMask" => Loc.T("Layer 3 mask"), "_MainColorAdjustMask" => Loc.T("Colour adjust mask"),
             "_MatCapTex" => Loc.T("Matcap"), "_MatCap2ndTex" => Loc.T("Matcap 2"), "_MatCapBlendMask" => Loc.T("Matcap mask"), "_MatCap2ndBlendMask" => Loc.T("Matcap 2 mask"),
@@ -109,17 +98,14 @@ namespace Avistry.Textures
             _ => null,
         };
 
-        /// <summary>True for textures this tool has a plain name for.</summary>
         public static bool HasFriendlyName(string prop) => KnownName(prop) != null;
 
         public static string FriendlyName(string prop, string fallback)
         {
             if (KnownName(prop) is string n) return n;
-            // Use the shader's own label unless it's generic ("Texture", "Mask") or a localisation key ("sBorder").
             bool generic = string.IsNullOrEmpty(fallback) || fallback == "Texture" || fallback == "Mask" ||
                            System.Text.RegularExpressions.Regex.IsMatch(fallback, "^s[A-Z]");
             if (!generic) return fallback;
-            // "_Main2ndTex" -> "Main 2nd Tex"
             var t = prop.TrimStart('_');
             return System.Text.RegularExpressions.Regex.Replace(t, "(?<=[a-z0-9])(?=[A-Z])", " ");
         }
@@ -150,7 +136,6 @@ namespace Avistry.Textures
 
         static readonly string[] Rgba = { "R", "G", "B", "A" };
 
-        /// <summary>What the channels of a packed/mask texture mean, if known.</summary>
         public static string ChannelInfo(ShaderFamily f, Material m, string prop)
         {
             if (f == ShaderFamily.Poiyomi)
@@ -172,7 +157,6 @@ namespace Avistry.Textures
         }
 
 
-        /// <summary>The toggle property a texture depends on (if the toggle is 0, the shader ignores the texture).</summary>
         public static string FeatureToggle(ShaderFamily f, string prop)
         {
             if (f == ShaderFamily.LilToon)
@@ -213,7 +197,6 @@ namespace Avistry.Textures
             return null;
         }
 
-        /// <summary>True when the texture's feature toggle exists and is switched off.</summary>
         public static bool FeatureIsOff(ShaderFamily f, Material m, string prop)
         {
             var t = FeatureToggle(f, prop);
@@ -221,7 +204,6 @@ namespace Avistry.Textures
         }
 
 
-        /// <summary>Settings that mean a baked texture or island painting won't line up with the model.</summary>
         public static List<string> UvProblems(ShaderFamily f, Material m, string prop)
         {
             var list = new List<string>();

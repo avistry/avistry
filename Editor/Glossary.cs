@@ -5,11 +5,6 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// The plain-language glossary, the label/tip copy of every control and the UI strings, loaded from
-    /// Editor/Glossary/en.json. For another language, the text of &lt;lang&gt;.json is laid over it field by field;
-    /// ids, order and structure always come from en.json.
-    /// </summary>
     internal static class Glossary
     {
         [System.Serializable] internal class Data { public int schema = 1; public string language = "en"; public bool machineTranslated; public Tier[] tiers; public Entry[] entries; public ControlCopy[] controls; public StringCopy[] strings; }
@@ -20,10 +15,9 @@ namespace Avistry.Textures
             public string id, title, level, tip, definition, what, when, example, whereInUnity, docsUrl;
             public int order;
             public string[] related, usedBy, aliases;
-            // Schema 2. Missing arrays stay null when the file is schema 1; read them through the helpers below.
-            public int tier;                    // 1 to 6; 0 = not set, derived from level
-            public bool bonus;                  // shown in the tree but never counted
-            public bool gotIt;                  // has an "I've got it" button
+            public int tier;
+            public bool bonus;
+            public bool gotIt;
             public string[] requires, doneBy, alsoCalled;
             public string tryIt, tryTab, tryControl, watchOut;
         }
@@ -33,17 +27,13 @@ namespace Avistry.Textures
         internal const int MaxTipWords = 15;
         internal const int MaxBodyWords = 60;
 
-        internal const int TierCount = 6;
-        internal const int CountedTotal = 40;
-        internal const int MinTierEntries = 5, MaxTierEntries = 8;
+        internal static int TierCount { get { Load(); return s_tiers.Length; } }
         internal const int MaxTitleChars = 24, MaxBlurbWords = 12;
         internal const int MaxDefinitionWords = 20, MaxWhatWords = 25, MaxWhenWords = 20, MaxExampleWords = 25, MaxTryItWords = 15, MaxWatchOutWords = 18;
 
-        /// <summary>Tab names (the Tab enum) that appear in the tab bar. Layers is not one of them.</summary>
         internal static readonly string[] TryTabs = { "Target", "Colour", "Select", "Paint", "Save" };
         internal static readonly string[] WindowTargets = { "window:hierarchy", "window:scene", "window:inspector", "window:project" };
 
-        // Used when a schema 1 file has no tiers[]; schema 2 files carry their own.
         static readonly Tier[] DefaultTiers =
         {
             new Tier { n = 1, name = "Find your way", blurb = "The Unity windows and safety nets you use every day.", achievement = "Medal: Found my way" },
@@ -74,7 +64,6 @@ namespace Avistry.Textures
                 if (!string.IsNullOrEmpty(s_path)) return s_path;
                 var pi = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(Glossary).Assembly);
                 if (pi != null) return s_path = pi.assetPath + RelativePath;
-                // Used from the Assets folder instead of as a package.
                 foreach (var guid in AssetDatabase.FindAssets("en t:TextAsset"))
                 {
                     var p = AssetDatabase.GUIDToAssetPath(guid);
@@ -94,13 +83,11 @@ namespace Avistry.Textures
             get { Load(); return s_data.schema; }
         }
 
-        /// <summary>The six tiers, in order. Falls back to built-in names when the file has none.</summary>
         internal static IReadOnlyList<Tier> Tiers
         {
             get { Load(); return s_tiers; }
         }
 
-        /// <summary>Entries that count towards "n of 40" (everything except bonus nodes).</summary>
         internal static int CountedCount
         {
             get { Load(); return s_counted; }
@@ -115,7 +102,6 @@ namespace Avistry.Textures
             return null;
         }
 
-        /// <summary>True when the id is an entry. Unlike Get, it never logs.</summary>
         internal static bool Has(string conceptId)
         {
             if (string.IsNullOrEmpty(conceptId)) return false;
@@ -138,27 +124,25 @@ namespace Avistry.Textures
             return n >= 1 && n <= TierCount ? s_tiers[n - 1] : null;
         }
 
-        /// <summary>The entry's tier: its own when set, otherwise derived from level (basic 1, intermediate 3, advanced 5).</summary>
         internal static int TierOf(Entry e)
         {
             if (e == null) return 1;
-            if (e.tier >= 1 && e.tier <= TierCount) return e.tier;
+            int last = (s_tiers ?? DefaultTiers).Length;
+            if (e.tier >= 1 && e.tier <= last) return e.tier;
             switch (e.level)
             {
-                case "intermediate": return 3;
-                case "advanced": return 5;
+                case "intermediate": return Mathf.Min(3, last);
+                case "advanced": return Mathf.Min(5, last);
                 default: return 1;
             }
         }
 
-        /// <summary>Counted entries in a tier (bonus nodes left out).</summary>
         internal static int TierSize(int n)
         {
             Load();
             return n >= 1 && n <= TierCount ? s_tierSizes[n] : 0;
         }
 
-        /// <summary>Ids of the concepts that a learn event completes, or null. One dictionary lookup.</summary>
         internal static string[] ConceptsDoneBy(string learnEvent)
         {
             if (string.IsNullOrEmpty(learnEvent)) return null;
@@ -166,14 +150,12 @@ namespace Avistry.Textures
             return s_doneBy.TryGetValue(learnEvent, out var ids) ? ids : null;
         }
 
-        /// <summary>The translation of a UI string in the current language. False when there is none.</summary>
         internal static bool TryString(string en, out string text)
         {
             Load();
             return s_strings.TryGetValue(en, out text);
         }
 
-        /// <summary>True when Editor/Glossary/&lt;code&gt;.json says it is an unreviewed machine translation.</summary>
         internal static bool IsMachineTranslated(string code)
         {
             var asset = LanguageAsset(code);
@@ -203,10 +185,6 @@ namespace Avistry.Textures
             s_warned.Clear();
         }
 
-        /// <summary>
-        /// Replaces {ctl:id} and {tab:Name} with the live label in quotes (the Advanced label when asked for).
-        /// A token that does not resolve is left as written.
-        /// </summary>
         internal static string ResolveTokens(string text, bool advanced)
         {
             if (string.IsNullOrEmpty(text) || text.IndexOf('{') < 0) return text;
@@ -242,10 +220,8 @@ namespace Avistry.Textures
             return !string.IsNullOrEmpty(label);
         }
 
-        /// <summary>Copy problems, one line each; empty means the glossary is fine.</summary>
         public static List<string> Validate()
         {
-            // The copy rules (word counts, title length) are rules for the English text, so en.json is checked on its own.
             bool translated = !Loc.English;
             if (translated) { Reload(); s_englishOnly = true; }
             try { return ValidateLoaded(); }
@@ -295,9 +271,8 @@ namespace Avistry.Textures
 
         static void ValidateSchema2(List<string> issues, HashSet<string> ids, HashSet<string> controlIds)
         {
-            // Tiers
             var tiers = s_data.tiers;
-            if (tiers == null || tiers.Length != TierCount) issues.Add("tiers must list exactly " + TierCount + " tiers");
+            if (!ValidTiers(tiers)) issues.Add("tiers must list consecutive chapters starting at 1");
             else
                 for (int i = 0; i < tiers.Length; i++)
                 {
@@ -310,11 +285,8 @@ namespace Avistry.Textures
                     else if (blurb > MaxBlurbWords) issues.Add("tier " + t.n + ": blurb has " + blurb + " words (max " + MaxBlurbWords + ")");
                 }
 
-            // Counts
-            if (s_counted != CountedTotal) issues.Add("there are " + s_counted + " counted entries (must be " + CountedTotal + ")");
             for (int n = 1; n <= TierCount; n++)
-                if (s_tierSizes[n] < MinTierEntries || s_tierSizes[n] > MaxTierEntries)
-                    issues.Add("tier " + n + " has " + s_tierSizes[n] + " entries (must be " + MinTierEntries + " to " + MaxTierEntries + ")");
+                if (s_tierSizes[n] == 0) issues.Add("tier " + n + " has no counted lessons");
 
             var usedEvents = new HashSet<string>();
             foreach (var e in s_data.entries)
@@ -371,7 +343,6 @@ namespace Avistry.Textures
             foreach (var ev in LearnEvents.All)
                 if (!usedEvents.Contains(ev)) issues.Add("learn event '" + ev + "' is not used by any entry");
 
-            // Cycles in requires, by depth-first search. 0 = new, 1 = on the path, 2 = done.
             var state = new Dictionary<string, int>();
             foreach (var e in s_data.entries)
                 if (e != null && !string.IsNullOrEmpty(e.id) && s_entries.ContainsKey(e.id) && Visit(e.id, state, issues)) break;
@@ -397,7 +368,6 @@ namespace Avistry.Textures
             if (n > max) issues.Add(who + field + " has " + n + " words (max " + max + ")");
         }
 
-        // Every {…} must be a token that resolves, so a typo shows up here and not as raw braces in the card.
         static void CheckTokens(List<string> issues, string where, string text)
         {
             if (string.IsNullOrEmpty(text)) return;
@@ -438,7 +408,6 @@ namespace Avistry.Textures
             data.controls ??= new ControlCopy[0];
             s_strings = new Dictionary<string, string>();
             if (!s_englishOnly && !Loc.English) Overlay(data, Loc.Current);
-            // Read while Unity builds a window, the language is not known yet: use English now, load again next time.
             s_provisional = !Loc.Resolved;
             s_data = data;
             s_entries = new Dictionary<string, Entry>();
@@ -455,7 +424,7 @@ namespace Avistry.Textures
                 if (c != null && !string.IsNullOrEmpty(c.id) && !s_controls.ContainsKey(c.id)) s_controls[c.id] = c;
 
             s_tiers = ValidTiers(data.tiers) ? data.tiers : DefaultTiers;
-            s_tierSizes = new int[TierCount + 1];
+            s_tierSizes = new int[s_tiers.Length + 1];
             s_counted = 0;
             var byEvent = new Dictionary<string, List<string>>();
             foreach (var e in s_all)
@@ -477,7 +446,6 @@ namespace Avistry.Textures
             foreach (var kv in byEvent) s_doneBy[kv.Key] = kv.Value.ToArray();
         }
 
-        // Lays the text of <lang>.json over the English data. Anything it does not have stays English.
         static void Overlay(Data en, string lang)
         {
             var asset = LanguageAsset(lang);
@@ -546,7 +514,7 @@ namespace Avistry.Textures
 
         static bool ValidTiers(Tier[] t)
         {
-            if (t == null || t.Length != TierCount) return false;
+            if (t == null || t.Length == 0) return false;
             for (int i = 0; i < t.Length; i++)
                 if (t[i] == null || t[i].n != i + 1 || string.IsNullOrEmpty(t[i].name)) return false;
             return true;

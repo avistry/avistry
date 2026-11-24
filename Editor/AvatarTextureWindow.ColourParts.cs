@@ -5,18 +5,14 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// 2 · Colour › By part: colour one part of the model, then the next, each keeping its own colour. A part is a
-    /// RecolourPartLayer (hue / saturation / brightness limited to its UV islands) in the texture's layer stack, so it
-    /// shows on the model at once and is saved into the texture in 5 · Save. Parts are picked right on the model in the
-    /// Scene view (or on the texture view): click toggles an island, Shift adds, Ctrl removes. Meshes whose own material
-    /// uses the same texture are included automatically, since saving the PNG changes them too.
-    /// </summary>
     partial class AvatarTextureWindow
     {
-        [SerializeField] bool _rcByPart;              // "By part" chosen (old windows: _rc.partial also means it)
-        [SerializeField] string _rcPartId;            // the part the sliders edit
-        [SerializeField] Renderer _rcLastPickRenderer; // the mesh last clicked (for "Whole mesh")
+        [SerializeField] bool _rcByPart;
+        [SerializeField] string _rcPartId;
+        [SerializeField] bool _openRecolourScope = true;
+        [SerializeField] Renderer _rcLastPickRenderer;
+        [SerializeField] string _paintLayerBeforeRecolour;
+        [System.NonSerialized] RecolourPartLayer _highlightedColourPart;
 
         bool ByPart => _rcByPart || _rc.partial;
 
@@ -25,24 +21,36 @@ namespace Avistry.Textures
         RecolourPartLayer CurrentPart =>
             string.IsNullOrEmpty(_rcPartId) || _recipe == null ? null : _recipe.layers.OfType<RecolourPartLayer>().FirstOrDefault(l => l.id == _rcPartId);
 
-        Texture MaterialMainTexture => _material != null && _material.HasProperty("_MainTex") ? _material.GetTexture("_MainTex") : null;
+        bool HighlightUsesFaces => _highlightedColourPart == null && HasFaceSelection;
+        List<int> HighlightElements => _highlightedColourPart?.islands ?? (HasFaceSelection ? _selectedFaces : _selection);
 
-        /// <summary>The texture being edited is the material's main texture (parts change that one).</summary>
-        bool MainSlotEdited => CurrentSlot != null && MaterialMainTexture != null && CurrentSlot.texture == MaterialMainTexture;
+        RecolourPartLayer VisibleColourPart => _tab == Tab.Colour && ByPart && MainSlotEdited ? CurrentPart : null;
 
-        /// <summary>Clicks on the model / texture view go to the parts (not the Select or Paint tools).</summary>
+        void RestorePaintLayerAfterRecolour()
+        {
+            if (_paintLayerBeforeRecolour != null && ActiveLayer is RecolourPartLayer &&
+                _recipe.layers.Exists(layer => layer is PaintLayer && layer.id == _paintLayerBeforeRecolour))
+                _activeLayerId = _paintLayerBeforeRecolour;
+            _paintLayerBeforeRecolour = null;
+        }
+
+        Texture MaterialMainTexture => _material != null ? _material.mainTexture : null;
+
+        bool MainSlotEdited => CurrentSlot?.role == TextureRole.Color && MaterialMainTexture != null && CurrentSlot.texture == MaterialMainTexture;
+
         bool PartPicking => _tab == Tab.Colour && ByPart && _uv != null && _comp != null && MainSlotEdited && _matchPick == MatchPick.None && !_scenePickArmed;
 
         void EnterByPart()
         {
             Undo.RecordObject(this, "Colour by part");
             _rcByPart = true;
-            if (_tool == Tool.Paint) { EndStroke(); _tool = Tool.Select; } // clicks pick parts now, not paint
+            if (_tool == Tool.Paint) { EndStroke(); _tool = Tool.Select; }
             var part = CurrentPart ?? Parts.LastOrDefault();
             _rcPartId = part?.id;
-            if (part != null) { _activeLayerId = part.id; _selection = new List<int>(part.islands); RebuildSelectionVisuals(); }
+            if (part != null) _activeLayerId = part.id;
+            RebuildSelectionVisuals();
             _rcThumbKey = null;
-            EditorApplication.delayCall += PrepareByPart;
+            QueuePrepareByPart();
         }
 
         void LeaveByPart()
@@ -51,31 +59,60 @@ namespace Avistry.Textures
             _rcByPart = false;
             if (_rc.partial)
             {
-                // An old "Selected islands only" shader recolour: back to the whole material, as that mode did.
                 _rc.partial = false;
                 _rcMaskKey = null;
                 ApplyRecolour();
             }
             _rcThumbKey = null;
+            RebuildSelectionVisuals();
             SceneView.RepaintAll();
         }
 
-        /// <summary>Opens the main texture and includes every mesh showing it (they all change when the PNG is saved).</summary>
+        void QueuePrepareByPart()
+        {
+            var renderer = _renderer;
+            var material = _material;
+            var slot = CurrentSlot;
+            var tab = _tab;
+            int materialIndex = _materialIndex;
+            int revision = _historyRevision;
+            EditorApplication.delayCall += () =>
+            {
+                if (this == null || _needsRebuild || renderer == null || material == null || _renderer != renderer ||
+                    _material != material || _materialIndex != materialIndex || CurrentSlot != slot || _tab != tab || revision != _historyRevision) return;
+                var live = renderer.sharedMaterials;
+                if (materialIndex >= 0 && materialIndex < live.Length && live[materialIndex] == material) PrepareByPart();
+            };
+        }
+
         void PrepareByPart()
         {
             if (this == null || !ByPart || _material == null) return;
             if (_needsRebuild) Rebuild();
             var main = MaterialMainTexture;
-            if (main != null && CurrentSlot != null && CurrentSlot.texture != main)
+            if (main != null && !MainSlotEdited)
             {
-                int idx = _slots.FindIndex(s => s.texture == main);
+                int idx = _slots.FindIndex(s => s.texture == main && s.role == TextureRole.Color);
                 if (idx < 0) return;
-                if (!ConfirmTargetChange("texture")) return;
+                var renderer = _renderer;
+                var material = _material;
+                var slot = CurrentSlot;
+                var tab = _tab;
+                int revision = _historyRevision;
+                int materialIndex = _materialIndex;
+                if (!PlanTargetChange("texture", out var apply)) return;
+                if (this == null || renderer == null || _renderer != renderer || _material != material || _materialIndex != materialIndex ||
+                    CurrentSlot != slot || _tab != tab || revision != _historyRevision || _needsRebuild || !ByPart || MaterialMainTexture != main)
+                    return;
+                var live = renderer.sharedMaterials;
+                if (materialIndex < 0 || materialIndex >= live.Length || live[materialIndex] != material) return;
+                apply();
                 Undo.RecordObject(this, "Change texture");
                 ChooseSlot(idx);
                 Rebuild();
             }
-            if (CurrentSlot != null) // look again: meshes may have been added to the avatar since the last rebuild
+            if (!MainSlotEdited) return;
+            if (CurrentSlot != null)
                 _textureUsers = TargetResolver.FindTextureUsers(TargetResolver.AvatarRoot(_renderer), _material, CurrentSlot.texture);
             var off = _textureUsers.Where(u => u.slot.renderer != null && !IsAlsoIncluded(u)).ToList();
             if (off.Count > 0)
@@ -99,7 +136,6 @@ namespace Avistry.Textures
             for (int n = 2; ; n++) if (!names.Contains($"{baseName} {n}")) return $"{baseName} {n}";
         }
 
-        /// <summary>The mesh an island belongs to (the edited mesh or an included one).</summary>
         Renderer RendererOfIsland(int island)
         {
             if (_uv == null || island < 0) return null;
@@ -118,7 +154,6 @@ namespace Avistry.Textures
             return set.OrderBy(i => i).ToList();
         }
 
-        /// <summary>A new part (top of the layer stack) on these islands, made current. Records its own undo.</summary>
         RecolourPartLayer NewPart(List<int> islands, string name)
         {
             if (_recipe == null) return null;
@@ -132,11 +167,10 @@ namespace Avistry.Textures
                 islands = islands.Where(i => i >= 0).Distinct().ToList(),
                 oklab = PreviewOklab,
             };
-            foreach (var other in Parts) other.islands.RemoveAll(part.islands.Contains); // an island belongs to one part
+            foreach (var other in Parts) other.islands.RemoveAll(part.islands.Contains);
             _recipe.layers.Add(part);
             AutoChoosePartMode(part);
             _activeLayerId = _rcPartId = part.id;
-            _selection = new List<int>(part.islands);
             RebuildSelectionVisuals();
             _rcThumbKey = null;
             MarkEdited();
@@ -148,7 +182,6 @@ namespace Avistry.Textures
             if (part == null) return;
             Undo.RecordObject(this, "Choose colour part");
             _rcPartId = _activeLayerId = part.id;
-            _selection = new List<int>(part.islands.Where(i => i >= 0));
             RebuildSelectionVisuals();
             _rcThumbKey = null;
             Repaint();
@@ -159,22 +192,17 @@ namespace Avistry.Textures
             int i = _recipe != null ? _recipe.layers.IndexOf(part) : -1;
             if (i < 0) return;
             bool wasCurrent = part.id == _rcPartId;
-            RemoveLayer(i); // records the undo
+            RemoveLayer(i);
             if (wasCurrent)
             {
                 var next = Parts.LastOrDefault();
                 _rcPartId = next?.id;
                 if (next != null) _activeLayerId = next.id;
-                _selection = next != null ? new List<int>(next.islands.Where(x => x >= 0)) : new List<int>();
                 RebuildSelectionVisuals();
             }
             _rcThumbKey = null;
         }
 
-        /// <summary>
-        /// A click on islands: toggles them in the current part (Shift adds, Ctrl removes). Islands added here leave
-        /// any other part. With no current part, a new part is made from them.
-        /// </summary>
         void PartPick(List<int> islands, bool add, bool remove, Renderer from)
         {
             islands = islands?.Where(i => i >= 0).Distinct().ToList() ?? new List<int>();
@@ -195,7 +223,7 @@ namespace Avistry.Textures
             }
             Undo.RecordObject(_recipe, "Colour part pieces");
             Undo.RecordObject(this, "Colour part pieces");
-            part.islands.RemoveAll(i => i < 0); // "-1 = nothing" left over when a mesh was left out
+            part.islands.RemoveAll(i => i < 0);
             bool takeAway = remove || (!add && islands.All(part.islands.Contains));
             if (takeAway) part.islands.RemoveAll(islands.Contains);
             else
@@ -206,17 +234,15 @@ namespace Avistry.Textures
             part.maskMode = MaskMode.SelectedIslands;
             AutoChoosePartMode(part);
             _activeLayerId = part.id;
-            _selection = new List<int>(part.islands);
             RebuildSelectionVisuals();
             _rcThumbKey = null;
             MarkEdited();
         }
 
-        const float GreyChroma = 0.03f; // average OKLCh chroma below this: hue shift can't give the part a colour
+        const float GreyChroma = 0.03f;
         Color[] _rcRawPixels;
         int _rcRawFor;
 
-        /// <summary>The main texture's own colours, small (without the material's main tint), to judge what a part is made of.</summary>
         Color[] RawMainPixels()
         {
             var tex = MaterialMainTexture;
@@ -226,7 +252,6 @@ namespace Avistry.Textures
             return _rcRawPixels;
         }
 
-        /// <summary>Average chroma of the part's source colours (0 = grey), or -1 when it has no islands to look at.</summary>
         float PartChroma(RecolourPartLayer p)
         {
             var raw = RawMainPixels();
@@ -239,10 +264,6 @@ namespace Avistry.Textures
 
         bool PartIsGrey(RecolourPartLayer p) { float c = PartChroma(p); return c >= 0f && c < GreyChroma; }
 
-        /// <summary>
-        /// A part that is still untouched starts in Tint when its colours are mostly white / grey (a hue shift can't colour
-        /// grey), and goes back to Shift if islands with real colour are added. Edits are recorded by the caller.
-        /// </summary>
         void AutoChoosePartMode(RecolourPartLayer p)
         {
             if (p == null || p.modeChosen || !p.Settings.IsIdentity || p.islands.All(i => i < 0)) return;
@@ -261,7 +282,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>Shift colours / Tint toolbar for the part.</summary>
         void SetPartMode(RecolourPartLayer part, RecolourPartLayer.PartMode mode)
         {
             if (part == null || part.partMode == mode) return;
@@ -273,19 +293,17 @@ namespace Avistry.Textures
             MarkEdited();
         }
 
-        /// <summary>The Tint colour and strength of a part (one undo step per drag).</summary>
         void SetPartTint(RecolourPartLayer part, Color colour, float strength)
         {
             if (part == null) return;
             Undo.RecordObject(_recipe, "Tint part");
             part.tintColour = new Color(colour.r, colour.g, colour.b, 1f);
             part.tintStrength = Mathf.Clamp01(strength);
-            part.modeChosen = true; // (the "white/grey, so it's tinted" note stays until the toolbar is used)
+            part.modeChosen = true;
             _rcThumbKey = null;
             MarkEdited();
         }
 
-        /// <summary>Adds every island of a mesh to the current part (or a new one).</summary>
         void AddWholeMesh(Renderer r)
         {
             var list = IslandsOfRenderer(r);
@@ -295,7 +313,6 @@ namespace Avistry.Textures
             PartPick(list, true, false, r);
         }
 
-        /// <summary>The hue / saturation / brightness of a part, from the Colour sliders (one undo step per drag).</summary>
         void SetPartValues(RecolourPartLayer part, float hue, float sat, float bri)
         {
             if (part == null) return;
@@ -305,10 +322,6 @@ namespace Avistry.Textures
             MarkEdited();
         }
 
-        /// <summary>
-        /// Where a Scene ray lands: on the edited meshes, or on a mesh whose own material uses this texture (that one is
-        /// included first). Returns false when it hit nothing usable.
-        /// </summary>
         bool PartPickRay(Ray ray, bool add, bool remove, bool deferInclude)
         {
             if (_uv == null) return false;
@@ -316,12 +329,22 @@ namespace Avistry.Textures
             float best = float.MaxValue;
             int island = -1;
             Renderer hitR = null;
-            if (_uv.Raycast(ray, out var h)) { best = Vector3.Distance(ray.origin, h.point); island = h.island; hitR = RendererOfHit(h); }
+            if (_uv.RaycastFiltered(ray, out var h, p => p.renderer != null && IsDrawn(p.renderer)))
+            {
+                if (!SceneTriangleUsesCurrentUv(h.triangle))
+                {
+                    Toast(IncludedUvChangedHint, MessageType.Info, 4f);
+                    return false;
+                }
+                best = Vector3.Distance(ray.origin, h.point);
+                island = h.island;
+                hitR = RendererOfHit(h);
+            }
 
             TargetResolver.TextureUser other = null;
             foreach (var u in _textureUsers)
             {
-                if (u.slot.renderer == null || !u.slot.renderer.gameObject.activeInHierarchy || IsAlsoIncluded(u)) continue;
+                if (u.slot.renderer == null || !IsDrawn(u.slot.renderer) || IsAlsoIncluded(u)) continue;
                 var mu = PickMesh(u.slot.renderer, u.slot.materialIndex);
                 if (mu == null) continue;
                 if (mu.PoseChanged()) mu.RefreshPose();
@@ -337,13 +360,22 @@ namespace Avistry.Textures
             if (other != null)
             {
                 var u = other;
-                if (deferInclude) EditorApplication.delayCall += () => { if (this != null) IncludeAndPick(u, ray, add, remove); };
+                if (deferInclude)
+                {
+                    var surface = _uv;
+                    int revision = _historyRevision;
+                    EditorApplication.delayCall += () =>
+                    {
+                        if (this != null && ScenePartPicking && _uv == surface && revision == _historyRevision)
+                            IncludeAndPick(u, ray, add, remove);
+                    };
+                }
                 else IncludeAndPick(u, ray, add, remove);
                 return true;
             }
             if (island < 0)
             {
-                PartPick(null, add, remove, null); // explains where to click
+                PartPick(null, add, remove, null);
                 return false;
             }
             PartPick(new List<int> { island }, add, remove, hitR);
@@ -353,27 +385,27 @@ namespace Avistry.Textures
         void IncludeAndPick(TargetResolver.TextureUser u, Ray ray, bool add, bool remove)
         {
             var r = u.slot.renderer;
-            SetMeshesIncluded(new[] { u }, true);
-            if (_uv == null) return;
-            if (_uv.PoseChanged()) _uv.RefreshPose();
-            if (_uv.Raycast(ray, out var h)) PartPick(new List<int> { h.island }, add, remove, RendererOfHit(h));
+            if (r == null || !IsDrawn(r) || u.material == null || _uv == null || _needsRebuild) return;
+            var mats = r.sharedMaterials;
+            int index = u.slot.materialIndex;
+            if (index < 0 || index >= mats.Length || mats[index] != u.material ||
+                CurrentSlot?.texture is not Texture2D texture ||
+                !u.properties.Any(p => u.material.HasProperty(p) && u.material.GetTexture(p) == texture)) return;
+            var mesh = PickMesh(r, index);
+            if (mesh == null) return;
+            if (mesh.PoseChanged()) mesh.RefreshPose();
+            if (!mesh.Raycast(ray, out var hit) || FrontBlocker(ray, Vector3.Distance(ray.origin, hit.point)) != null) return;
+            if (!SetMeshesIncluded(new[] { u }, true) || !RaycastVisible(ray, out var h, out _) || RendererOfHit(h) != r) return;
+            PartPick(new List<int> { h.island }, add, remove, r);
             Toast(Loc.F("Included {0}: its material ‘{1}’ uses the same texture, so it's coloured (and saved) along with this one. Ctrl+Z undoes.", r.name, u.material.name), MessageType.Info, 6f);
             Repaint();
         }
 
-        /// <summary>Selection follows the current part (the part's islands are what counts). Layout only.</summary>
         void SyncPartSelection()
         {
             if (Event.current.type != EventType.Layout || !ByPart || _recipe == null) return;
             if (ActiveLayer is RecolourPartLayer active && active.id != _rcPartId) { _rcPartId = active.id; _rcThumbKey = null; }
-            var part = CurrentPart;
-            if (part == null) return;
-            var want = part.islands.Where(i => i >= 0).ToList();
-            if (want.Count != _selection.Count || want.Except(_selection).Any())
-            {
-                _selection = want;
-                RebuildSelectionVisuals();
-            }
+            if (_highlightedColourPart != VisibleColourPart) RebuildSelectionVisuals();
         }
 
         void HandleScenePartPick(SceneView sv, Event e)
@@ -388,8 +420,7 @@ namespace Avistry.Textures
             {
                 case EventType.MouseMove:
                 {
-                    if (_uv.PoseChanged()) _uv.RefreshPose();
-                    int island = _uv.PickIslandWorld(HandleUtility.GUIPointToWorldRay(e.mousePosition));
+                    int island = RaycastVisible(HandleUtility.GUIPointToWorldRay(e.mousePosition), out var hit, out _) ? hit.island : -1;
                     if (island != _hoverIsland)
                     {
                         _hoverIsland = island;
@@ -428,7 +459,6 @@ namespace Avistry.Textures
 
         string PartsKey() => string.Join(";", Parts.Select(p => $"{p.id}|{p.enabled}|{p.hue:0.0}|{p.saturation:0.000}|{p.brightness:0.000}|{p.oklab}|{p.partMode}|{ColorUtility.ToHtmlStringRGB(p.tintColour)}|{p.tintStrength:0.000}|{p.opacity:0.00}|{string.Join(",", p.islands)}"));
 
-        /// <summary>The "after" thumbnail in By part: every part's colour inside its islands (bottom to top); updates the swatches.</summary>
         Color[] PartsAfterPixels()
         {
             var o = (Color[])_rcPixels.Clone();
@@ -451,7 +481,6 @@ namespace Avistry.Textures
             return o;
         }
 
-        /// <summary>Main colours of the current part's islands (for "Shift the selected colour to"), or of the texture.</summary>
         List<Color> PartPalette(RecolourPartLayer part)
         {
             if (part == null || _rcPixels == null) return _rcPalette;
@@ -466,22 +495,128 @@ namespace Avistry.Textures
             return _partPalette;
         }
 
-        void DrawPartChoice()
+        static readonly SelectGlyph[] RecolourScopes = { SelectGlyph.Material, SelectGlyph.Piece };
+        static readonly SelectGlyph[] RecolourMethods = { SelectGlyph.Rotate, SelectGlyph.Tint };
+        static string s_recolourPaletteLanguage;
+        static GUIContent[] s_recolourScopes, s_recolourMethods;
+
+        int DrawRecolourChoice(bool scope, int selected, float width, bool scene)
+        {
+            if (s_recolourScopes == null || s_recolourPaletteLanguage != Loc.Current)
+            {
+                s_recolourScopes = new[]
+                {
+                    new GUIContent(Loc.T("Material"), Loc.T("Recolour everything on the selected materials, through the shader's colour settings (no new PNG)")),
+                    new GUIContent(Loc.T("Pieces"), Loc.T("Colour one part of the model, then the next: each part keeps its own colour. Changes the texture (save it in 5 · Save)")),
+                };
+                s_recolourMethods = new[]
+                {
+                    new GUIContent(Loc.T("Rotate colours"), Loc.T("Turn the part's colours around the colour wheel. Keeps every colour's own look, but can't colour white or grey.")),
+                    new GUIContent(Loc.T("Tint"), Loc.T("Give the part one colour and keep its light and shadow. Works on white and grey.")),
+                };
+                s_recolourPaletteLanguage = Loc.Current;
+            }
+            return ToolPalette(selected, scope ? RecolourScopes : RecolourMethods,
+                scope ? s_recolourScopes : s_recolourMethods, width, scene);
+        }
+
+        bool DrawRecolourButton(Rect rect, SelectGlyph glyph, GUIContent content, bool scene, bool selected = false)
+        {
+            return scene ? SceneToolCell(rect, glyph, content, selected) : StudioGUI.SelectionCell(rect, glyph, content, selected, true);
+        }
+
+        System.Action PlanNewColourPart()
+        {
+            var uv = _uv;
+            var recipe = _recipe;
+            var part = CurrentPart;
+            var islands = part == null ? new List<int>(_selection) : new List<int>();
+            string name = islands.Count > 0 ? RendererOfIsland(islands[0])?.name : null;
+            return () =>
+            {
+                if (!ByPart || _uv != uv || _recipe != recipe || CurrentPart != part) return;
+                NewPart(islands, name ?? "Part");
+                if (islands.Count == 0) Toast(Loc.T("New part: now click it on the model in the Scene view."), MessageType.Info, 4f);
+            };
+        }
+
+        void DrawColourPartActions(float width, bool scene, ref System.Action change)
+        {
+            var pick = new GUIContent(Loc.T("Select"), Loc.T("Select on model") + "\n" + Loc.T("Click a piece to choose where the colour goes."));
+            bool fromSelection = CurrentPart == null && _selection.Count > 0;
+            var add = new GUIContent(Loc.T("New part"), fromSelection
+                ? Loc.F("A new part from the {0} selected piece(s)", _selection.Count) : Loc.T("Start a new part, then click it on the model"));
+            var whole = new GUIContent(Loc.T("Whole part ▾"), Loc.T("Add every piece of a part to this part"));
+            const float gap = 3f, height = 26f;
+            float min = scene ? 26f : Mathf.Max(StudioGUI.SelectionCellWidth(pick),
+                Mathf.Max(StudioGUI.SelectionCellWidth(add), StudioGUI.SelectionCellWidth(whole)));
+            int columns = Mathf.Clamp(Mathf.FloorToInt((width + gap) / (min + gap)), 1, 3);
+            int rows = (3 + columns - 1) / columns;
+            var row = EditorGUILayout.GetControlRect(false, rows * (height + gap) - gap, GUILayout.MinWidth(0f));
+            float cellWidth = (Mathf.Min(width, row.width) - (columns - 1) * gap) / columns;
+            Rect Cell(int i) => new Rect(row.x + (i % columns) * (cellWidth + gap), row.y + (i / columns) * (height + gap), cellWidth, height);
+
+            var recipe = _recipe;
+            var uv = _uv;
+            using (new EditorGUI.DisabledScope(!MainSlotEdited || uv == null))
+            {
+                if (DrawRecolourButton(Cell(0), SelectGlyph.Click, pick, scene, _recolourInScene))
+                {
+                    bool enabled = !_recolourInScene;
+                    change = () => ChangeSceneBar("Toggle recolour picking", () => _recolourInScene = enabled);
+                }
+                if (DrawRecolourButton(Cell(1), SelectGlyph.Add, add, scene))
+                    change = PlanNewColourPart();
+                using (new EditorGUI.DisabledScope(uv == null || uv.parts.Count == 0))
+                    if (DrawRecolourButton(Cell(2), SelectGlyph.Part, whole, scene))
+                    {
+                        var menu = new GenericMenu();
+                        foreach (var renderer in uv.parts.Select(p => p.renderer).Where(r => r != null).Distinct().OrderBy(r => r != _rcLastPickRenderer))
+                        {
+                            var choice = renderer;
+                            menu.AddItem(new GUIContent(NoSubmenu(choice.name) + (choice == _rcLastPickRenderer ? Loc.T("  (last clicked)") : "")), false, () =>
+                            {
+                                if (this != null && ByPart && _uv == uv && _recipe == recipe && choice != null) AddWholeMesh(choice);
+                            });
+                        }
+                        menu.DropDown(Cell(2));
+                    }
+            }
+            if (scene)
+            {
+                StudioGUI.Count("scene.recolourOnModel", Cell(0));
+                StudioGUI.Track("scene.newColourPart", Cell(1));
+            }
+            else StudioGUI.Track("colour.pickOnModel", Cell(0));
+        }
+
+        void DrawPartChoice(bool offerWholeMaterial = true)
         {
             SyncPartSelection();
-            StudioGUI.BeginGroup(Loc.T("Which part"));
-            StudioGUI.Count("colour.scope");
-            int mode = WrapToolbar(ByPart ? 1 : 0, new[]
+            string scope = ByPart ? Loc.T("Pieces") : Loc.T("Material");
+            if (!StudioGUI.BeginFoldGroup(ref _openRecolourScope, Loc.T("Which part"), scope))
             {
-                new GUIContent(Loc.T("Everything"), Loc.T("Recolour everything on the selected materials, through the shader's colour settings (no new PNG)")),
-                new GUIContent(Loc.T("One piece at a time"), Loc.T("Colour one part of the model, then the next: each part keeps its own colour. Changes the texture (save it in 5 · Save)")),
-            });
-            if (mode != (ByPart ? 1 : 0))
+                StudioGUI.EndGroup();
+                return;
+            }
+            if (offerWholeMaterial)
             {
-                if (mode == 1) EnterByPart(); else LeaveByPart();
+                int mode = DrawRecolourChoice(true, ByPart ? 1 : 0, PanelContentWidth, false);
+                StudioGUI.Count("colour.scope", GUILayoutUtility.GetLastRect());
+                if (mode != (ByPart ? 1 : 0))
+                    ChangeRecolourChoice(mode == 1 ? (System.Action)EnterByPart : LeaveByPart);
             }
             if (ByPart) DrawPartsList();
             StudioGUI.EndGroup();
+        }
+
+        static void ChangeRecolourChoice(System.Action change)
+        {
+            Undo.FlushUndoRecordObjects();
+            Undo.IncrementCurrentGroup();
+            change();
+            Undo.FlushUndoRecordObjects();
+            Undo.IncrementCurrentGroup();
         }
 
         void DrawPartsList()
@@ -499,7 +634,7 @@ namespace Avistry.Textures
                 StudioGUI.CheckRow(StudioGUI.Check.Problem, main != null
                     ? Loc.F("Parts colour the main texture (‘{0}’), but ‘{1}’ is open.", main.name, CurrentSlot?.texture?.name)
                     : Loc.T("This material has no main texture to colour."));
-                if (main != null && GUILayout.Button(Loc.F("Edit ‘{0}’", main.name))) EditorApplication.delayCall += PrepareByPart;
+                if (main != null && GUILayout.Button(Loc.F("Edit ‘{0}’", main.name))) QueuePrepareByPart();
                 return;
             }
 
@@ -510,7 +645,7 @@ namespace Avistry.Textures
             System.Action pending = null;
             var parts = Parts;
             var e = Event.current;
-            for (int k = parts.Count - 1; k >= 0; k--) // top of the stack first, like the layer list
+            for (int k = parts.Count - 1; k >= 0; k--)
             {
                 var p = parts[k];
                 bool current = p.id == _rcPartId;
@@ -550,39 +685,14 @@ namespace Avistry.Textures
             if (parts.Count == 0)
                 StudioGUI.CheckRow(StudioGUI.Check.Note, Loc.T("No parts yet. Click the first part on the model (for example the front hair)."));
 
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                bool fromSelection = CurrentPart == null && _selection.Count > 0;
-                if (GUILayout.Button(new GUIContent(Loc.T("+ New part"), fromSelection ? Loc.F("A new part from the {0} selected piece(s)", _selection.Count) : Loc.T("Start a new part, then click it on the model")), GUILayout.Height(22)))
-                {
-                    var sel = fromSelection ? new List<int>(_selection) : new List<int>();
-                    string nm = fromSelection ? (RendererOfIsland(sel[0])?.name ?? "Part") : "Part";
-                    pending = () =>
-                    {
-                        NewPart(sel, nm);
-                        if (sel.Count == 0) Toast(Loc.T("New part: now click it on the model in the Scene view."), MessageType.Info, 4f);
-                    };
-                }
-                var meshes = _uv.parts.Select(x => x.renderer).Where(r => r != null).Distinct().ToList();
-                using (new EditorGUI.DisabledScope(meshes.Count == 0))
-                    if (GUILayout.Button(new GUIContent(Loc.T("Whole part ▾"), Loc.T("Add every piece of a part to this part")), GUILayout.Height(22), GUILayout.Width(100)))
-                    {
-                        var menu = new GenericMenu();
-                        foreach (var r in meshes.OrderBy(r => r == _rcLastPickRenderer ? 0 : 1))
-                        {
-                            var rr = r;
-                            menu.AddItem(new GUIContent(NoSubmenu(r.name) + (r == _rcLastPickRenderer ? Loc.T("  (last clicked)") : "")), false, () => AddWholeMesh(rr));
-                        }
-                        menu.ShowAsContext();
-                    }
-            }
+            DrawColourPartActions(PanelContentWidth, false, ref pending);
 
             int others = _textureUsers.Count(u => u.slot.renderer != null && !IsAlsoIncluded(u));
             var shown = _uv.parts.Select(x => x.renderer).Where(r => r != null).Distinct().Count();
             if (others > 0)
             {
                 StudioGUI.CheckRow(StudioGUI.Check.Note, others == 1 ? Loc.T("1 more part uses this texture with its own material and will change too when you save.") : Loc.F("{0} more parts use this texture with their own material and will change too when you save.", others));
-                if (GUILayout.Button(Loc.T("Include them so they can be coloured too"))) EditorApplication.delayCall += PrepareByPart;
+                if (GUILayout.Button(Loc.T("Include them so they can be coloured too"))) QueuePrepareByPart();
             }
             else if (shown > 1)
                 GUILayout.Label(Loc.F("{0} parts use this texture; you can click any of them.", shown), StudioGUI.Hint);
@@ -590,13 +700,12 @@ namespace Avistry.Textures
             if (pending != null) { EditorApplication.delayCall += () => { if (this != null) { pending(); Repaint(); } }; }
         }
 
-        /// <summary>By part: the texture is changed, so point at saving; the material-wide shader recolour is only a note.</summary>
         void DrawPartsFooter()
         {
             StudioGUI.BeginGroup(null);
-            GUILayout.Label(Loc.T("These colours change the texture itself. Save it as a new PNG in 5 · Save; until then they're only a preview. " +
-                            "Shadow, rim and emission colours are material-wide, so they stay as they are here (use Everything for those). " +
-                            "Ctrl+Z undoes each step."), StudioGUI.Hint);
+            GUILayout.Label(Loc.T("Preview colours on the texture, then save them as a new PNG in 5 · Save. Ctrl+Z undoes each step."), StudioGUI.Hint);
+            if (Recolour.Supports(_material))
+                GUILayout.Label(Loc.T("Use Everything to adjust material-wide shadow, rim and emission colours."), StudioGUI.Hint);
             using (new EditorGUI.DisabledScope(Parts.Count == 0))
                 if (GUILayout.Button(new GUIContent(Loc.T("  Save as PNG in 5 · Save →"), StudioGUI.Icon("SaveAs", "").image), GUILayout.Height(26)))
                     EditorApplication.delayCall += () => SetTab(Tab.Save);
@@ -626,7 +735,6 @@ namespace Avistry.Textures
         internal void AutoPartDelete(RecolourPartLayer p) { DeletePart(p); AutoSettle(); }
         internal void AutoPartWholeMesh(Renderer r) { AddWholeMesh(r ?? _rcLastPickRenderer); AutoSettle(); }
 
-        /// <summary>"Shift the selected colour to": a Shift part turns its hue; a white / grey part can't, so it becomes a Tint of that colour.</summary>
         void ShiftPartToColour(RecolourPartLayer part, List<Color> palette, int swatch, Color target, bool matchBrightness)
         {
             if (PartIsGrey(part))
@@ -646,7 +754,6 @@ namespace Avistry.Textures
             SetPartValues(part, m.hue, m.saturation, m.brightness);
         }
 
-        /// <summary>Part settings for the harness. mode: "shift" | "tint"; tint colour and strength 0..1.</summary>
         internal string AutoPartTint(string mode, Color? tint, float? strength)
         {
             var p = CurrentPart;
@@ -678,7 +785,6 @@ namespace Avistry.Textures
             return null;
         }
 
-        /// <summary>"Shift the selected colour to": sourceSwatch = index in the current part's palette.</summary>
         internal string AutoPartShiftTo(Color target, int sourceSwatch, bool matchBrightness)
         {
             var p = CurrentPart;
@@ -691,11 +797,10 @@ namespace Avistry.Textures
             return null;
         }
 
-        /// <summary>Scene clicks as rays (Shift = add, Ctrl = remove), the same as clicking the model in By part.</summary>
         internal string AutoPartPickRays(IList<Ray> rays, bool add, bool remove, out int hits)
         {
             hits = 0;
-            if (!ByPart) return "Choose One piece at a time first (part_mode).";
+            if (!ByPart) return "Choose Pieces first (part_mode).";
             if (_uv == null) return "Choose a target first.";
             AutoClearToast();
             foreach (var ray in rays) if (PartPickRay(ray, add, remove, false)) hits++;
@@ -703,7 +808,6 @@ namespace Avistry.Textures
             return hits == 0 ? "No point hit a part that uses this texture." : null;
         }
 
-        /// <summary>Texture view clicks in By part (UV points).</summary>
         internal void AutoPartPickUV(Vector2 uv, bool add, bool remove)
         {
             if (_uv != null) PartPick(_uv.IslandsAtUV(uv), add, remove, null);

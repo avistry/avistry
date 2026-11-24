@@ -13,8 +13,8 @@ body:
     id: version
     attributes:
       label: Avistry version
-      description: Shown under the **?** button in the window.
-      placeholder: "0.2.0"
+      description: Open Settings in the Avistry window to see the installed version.
+      placeholder: "0.3.0"
     validations:
       required: true
 
@@ -73,17 +73,17 @@ body:
   - type: textarea
     id: diagnostics
     attributes:
-      label: Copy diagnostics
+      label: Support report
       description: |
-        In the window, open the **?** menu and choose **Copy diagnostics**, then paste the text here. It lists the tool and Unity versions, your graphics card and the target's shader and texture sizes. It contains no file paths or user names.
-        Older versions do not have this button yet. Then please write your operating system and graphics card instead.
+        In Avistry, choose **Settings → Review support report…**. Read the preview, choose **Copy report** and paste it here. The report includes editor versions, graphics capabilities, shader family, texture sizes and the most recent recorded event.
+        If your version has no report, list your operating system and graphics card.
       render: text
 
   - type: textarea
     id: console
     attributes:
       label: Console errors
-      description: Copy any red error from Unity's Console, including the lines below it. Remove file paths if there are any.
+      description: Optional. If the Console contains a related error, share the relevant lines after removing file paths, asset names, account information and credentials.
       render: text
 
   - type: textarea

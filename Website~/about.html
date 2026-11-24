@@ -12,13 +12,13 @@
 <meta property="og:title" content="About Avistry: safety, FAQ and how to help">
 <meta property="og:url" content="https://avistry.github.io/avistry/about.html">
 <meta property="og:description" content="What Avistry is and is not, how to check a download yourself, answers to common questions and how to help.">
-<meta property="og:image" content="https://avistry.github.io/avistry/media/og-about.jpg">
+<meta property="og:image" content="https://avistry.github.io/avistry/media/og-about.jpg?v=030-release-1">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:alt" content="The Avistry safety promises next to an avatar in the Frost look.">
 <meta property="og:site_name" content="Avistry">
-<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-about.jpg">
+<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-about.jpg?v=030-release-1">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://avistry.github.io/avistry/about.html">
 <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
@@ -34,8 +34,6 @@
   try {
     var theme = localStorage.getItem('ats-theme');
     root.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
-    /* Performance mode by itself: on weak devices, with data saver, or after this tab crashed or ran short of memory
-       (app.js keeps ats-alive set while the page is on screen); never just for being a phone on strong hardware */
     var perf = localStorage.getItem('ats-perf'), nav = navigator, mem = nav.deviceMemory, cores = nav.hardwareConcurrency, con = nav.connection || {};
     var ss = sessionStorage, sick = ss.getItem('ats-sick') === '1' || ss.getItem('ats-alive') === '1';
     if (sick) ss.setItem('ats-sick', '1');
@@ -64,7 +62,7 @@
 })();
 </script>
 <style>html{background:#141218}html[data-theme="light"]{background:#F3F1F6}html.i18n-wait body{visibility:hidden}</style>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=030-paper-3">
 </head>
 <body class="v4 sub-page">
 
@@ -155,9 +153,11 @@
 </div>
 
 <section class="page-head" data-hero aria-labelledby="page-title">
-  <span class="stk stk-corner" data-stk="lgtm" aria-hidden="true"></span>
   <div class="wrap">
-    <h1 class="h-display" id="page-title" data-i18n="ab.title" data-emo="avistry_blink">Safety, FAQ, and how to help.</h1>
+    <div class="sticker-heading">
+      <h1 class="h-display" id="page-title" data-i18n="ab.title" data-emo="avistry_blink">Safety, FAQ, and how to help.</h1>
+      <span class="stk stk-placed" data-stk="lgtm" aria-hidden="true"></span>
+    </div>
   </div>
 </section>
 
@@ -167,7 +167,7 @@
     <div class="split-body">
       <p class="note-lg" data-i18n="ab.vision.p">A free, open-source toolkit for VRChat avatars: recolour, paint and fix your avatar inside Unity, in plain words.</p>
       <ul class="made-list" role="list">
-        <li><h3 data-i18n="ab.vision.1.t">Safe by design</h3><p data-i18n="ab.vision.1.b">It never overwrites your originals, lives only in the Unity Editor and sends no data. These are rules in the code, not settings.</p></li>
+        <li><h3 data-i18n="ab.vision.1.t">Safe by design</h3><p data-i18n="ab.vision.1.b">Avistry runs in the Unity Editor. The default save makes copies, and the tool collects no telemetry. Update checks and the AI helper are optional.</p></li>
         <li><h3 data-i18n="ab.vision.4.t">Grown together</h3><p data-i18n="ab.vision.4.b">New ideas are discussed on Discord first. Contributions, often built with AI agents, are reviewed and tested in Unity by the maintainers before they ship.</p></li>
       </ul>
       <p class="made-links"><a class="btn btn-outline" href="https://discord.gg/sSeWgDJJjY" rel="noopener" data-i18n="ab.vision.cta">Talk ideas on Discord</a></p>
@@ -175,19 +175,17 @@
   </div>
 </section>
 
-<!-- 1. WHAT IT IS AND IS NOT -->
 <section class="sec" id="what" aria-labelledby="what-title" data-fx="soft">
   <div class="wrap">
     <h2 id="what-title" data-i18n="ab.what">What Avistry is, and is not.</h2>
     <ul class="facts facts--3" role="list">
-      <li id="editor-only"><svg class="ic ic-lg" aria-hidden="true" focusable="false"><use href="#i-shield"/></svg><h3 data-i18n="trust.r4">Editor only</h3><p data-i18n="ab.f1">It lives in the Unity Editor. Nothing goes into your upload.</p></li>
-      <li id="no-runtime"><svg class="ic ic-lg" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg><h3 data-i18n="ab.f2.t">No runtime component</h3><p data-i18n="ab.f2.b">No script, component or assembly is added to your avatar. Saving makes new files and never overwrites yours.</p></li>
-      <li id="no-network"><svg class="ic ic-lg" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><h3 data-i18n="trust.r5">No telemetry</h3><p data-i18n="trust.r5.data">No telemetry. The only network call is an optional update check that asks GitHub for the latest version number, and it is off until you turn it on.</p></li>
+      <li id="editor-only"><svg class="ic ic-lg" aria-hidden="true" focusable="false"><use href="#i-shield"/></svg><h3 data-i18n="trust.r4">Editor only</h3><p data-i18n="ab.f1">The tool stays in the Unity Editor</p></li>
+      <li id="no-runtime"><svg class="ic ic-lg" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg><h3 data-i18n="ab.f2.t">No runtime component</h3><p data-i18n="ab.f2.b">Avistry adds no runtime scripts or components to your avatar. The default save creates a new texture and material copy.</p></li>
+      <li id="no-network"><svg class="ic ic-lg" aria-hidden="true" focusable="false"><use href="#i-check"/></svg><h3 data-i18n="trust.r5">No telemetry</h3><p data-i18n="trust.r5.data">No telemetry. You can check GitHub for updates once or turn on automatic checks. Automatic checks are off by default.</p></li>
     </ul>
   </div>
 </section>
 
-<!-- 2. CHECKS YOU CAN DO YOURSELF -->
 <section class="sec band" id="checks" aria-labelledby="checks-title" data-fx="soft">
   <div class="wrap split">
     <h2 id="checks-title" data-i18n="trust.title">Check it before you install</h2>
@@ -242,25 +240,27 @@
   </div>
 </section>
 
-<!-- 3. FAQ -->
 <section class="sec" id="faq" aria-labelledby="faq-title" data-fx="soft">
   <div class="wrap split">
-    <h2 id="faq-title"><span data-i18n="faq.title">Questions</span><i class="emo" data-emo="e_avistry_think" aria-hidden="true"></i></h2>
+    <div class="sticker-heading">
+      <h2 id="faq-title"><span data-i18n="faq.title">Questions</span><i class="emo" data-emo="e_avistry_think" aria-hidden="true"></i></h2>
+      <span class="stk stk-placed" data-stk="need_help" data-stk-pool="need_help pink_again" aria-hidden="true"></span>
+    </div>
     <div class="split-body">
       <h3 class="faq-group" data-i18n="faq.g.safety">Safety</h3>
       <div class="faq">
-        <details id="q-originals"><summary data-i18n="faq.q1">Does it change my original textures?</summary><p data-i18n="faq.a1">No. Saving always creates a new PNG with _ats added to the name. Your original files are never overwritten.</p></details>
+        <details id="q-originals"><summary data-i18n="faq.q1">Does it change my original textures?</summary><p data-i18n="faq.a1">Saving creates a new PNG with an _ats suffix and leaves the source image intact. By default, Avistry also copies the material. Choose “PNG + update material” only if you want to change the existing material.</p></details>
         <details id="q-upload"><summary data-i18n="faq.q2">Is anything uploaded with my avatar?</summary><p data-i18n="faq.a2">No. It is an editor-only package, so none of it is included in your avatar or VRChat upload.</p></details>
-        <details id="q-data"><summary data-i18n="faq.q8">Does it send any data?</summary><p data-i18n="faq.a8">No. Avistry has no telemetry. Its only network call is an optional update check, off until you turn it on, that asks GitHub for the latest version number and sends nothing about you or your project. The optional AI helper is separate: it works through your own AI app, which sends part and material names to its service, and pictures only after you click Allow.</p></details>
+        <details id="q-data"><summary data-i18n="faq.q8">Does it send any data?</summary><p data-i18n="faq.a8">Avistry has no telemetry. If you check for updates, it asks GitHub for the latest release. Automatic checks are off by default. If you enable the separate AI helper, your AI app can send part, material and texture names to its service. Pictures require your permission, either for one request or until Unity closes.</p></details>
       </div>
       <h3 class="faq-group" data-i18n="faq.g.shaders">Shaders</h3>
       <div class="faq">
-        <details id="q-shaders"><summary data-i18n="faq.q3">Which shaders does it support?</summary><p data-i18n="faq.a3">Quick recolour works with Poiyomi and lilToon materials. Selecting and painting work on any texture, whatever the shader. Quick material controls also need Poiyomi or lilToon.</p></details>
+        <details id="q-shaders"><summary data-i18n="faq.q3">Which shaders does it support?</summary><p data-i18n="faq.a3">Quick recolour works with Poiyomi and lilToon. You can also select and paint colour textures used by other shaders. Normal maps cannot be painted. Quick material offers controls for Poiyomi, lilToon, Unity Standard and supported URP Lit materials.</p></details>
       </div>
       <h3 class="faq-group" data-i18n="faq.g.avatars">Avatars</h3>
       <div class="faq">
-        <details id="q-bought"><summary data-i18n="faq.q7">Can I use it on a bought avatar?</summary><p data-i18n="faq.a7">Yes. Avistry saves new files next to the ones you bought, so the originals stay as they came. Check the avatar's terms before you share edited textures.</p></details>
-        <details id="q-ai"><summary data-i18n="faq.qai">Can an AI app help me with it?</summary><p data-i18n="faq.aai">Optionally. With MCP for Unity (a separate free package), an AI app can recolour and add layers while you watch. It starts off, saving and pictures wait for your Allow, and the README has the steps and notes.</p></details>
+        <details id="q-bought"><summary data-i18n="faq.q7">Can I use it on a bought avatar?</summary><p data-i18n="faq.a7">Yes. The default save creates a new texture and material copy in Assets/Avistry/Output. Check the avatar’s terms before sharing edited textures.</p></details>
+        <details id="q-ai"><summary data-i18n="faq.qai">Can an AI app help me with it?</summary><p data-i18n="faq.aai">Yes. With the optional MCP for Unity package, your AI app can recolour and add layers while you watch. The helper starts off. You control whether it can save files or share a picture. The README explains how to set it up.</p></details>
       </div>
       <h3 class="faq-group" data-i18n="faq.g.install">Install</h3>
       <div class="faq">
@@ -272,7 +272,6 @@
   </div>
 </section>
 
-<!-- 4. HOW THIS WAS MADE -->
 <section class="sec band" id="made" aria-labelledby="made-title" data-fx="soft">
   <div class="wrap split">
     <h2 id="made-title"><span data-i18n="made.title">How this was made</span><i class="emo" data-emo="e_ai_helper" aria-hidden="true"></i></h2>
@@ -298,21 +297,26 @@
 
 <section class="sec install" id="install" aria-labelledby="install-title" data-fx>
   <div class="wrap">
-    <div class="inst-head">
-      <p class="tag" data-i18n="nav.get">Get it</p>
-      <h2 class="h-display" id="install-title" data-i18n="final.title" data-emo="avistry_party">Your avatar. Your colours.</h2>
-      <svg class="inst-stroke" viewBox="0 0 600 36" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="s3" pathLength="1" d="M6 26C120 14 230 30 340 21S520 12 594 20"/><path class="s2" pathLength="1" d="M6 22C120 10 230 26 340 17S520 8 594 16"/><path class="s1" pathLength="1" d="M6 18C120 6 230 22 340 13S520 4 594 12"/></svg>
-      <span class="inst-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-    </div>
-    <div class="inst-quick">
-      <a class="btn btn-primary btn-lg" id="btn-vcc" href="vcc://vpm/addRepo?url=https://avistry.github.io/avistry/index.json" data-i18n="cta.vcc">Get it in VCC</a>
-      <a class="btn btn-outline btn-lg" href="download.html"><span data-i18n="dl.all">All download options</span> <svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
-    </div>
-    <p class="vcc-help" id="vcc-help" hidden data-i18n-html="dl.vcchelp">VCC did not open? The <a href="download.html">Download page</a> has the listing URL and the other ways to install.</p>
-    <p class="inst-meta"><span class="tnum" id="inst-version" hidden></span><span class="tnum js-dl-line" hidden><span class="js-dl-total"></span> <span data-i18n="dl.downloads">downloads</span> · </span><a class="js-vt" href="https://github.com/avistry/avistry/releases/latest" rel="noopener" data-i18n="trust.r1">Scanned on VirusTotal</a> <span aria-hidden="true">&middot;</span> <span data-i18n="install.meta">Unity 2022.3 · VRChat avatars</span></p>
-    <div class="share-pc" id="share-pc-box" hidden>
-      <button type="button" class="btn btn-outline btn-lg" id="share-pc" data-share-url="https://avistry.github.io/avistry/" data-i18n="share.btn">Send this link to your PC</button>
-      <p class="small" id="share-pc-note" data-i18n="share.note">Avistry runs in Unity on a PC.</p>
+    <div class="install-invite">
+      <div class="inst-head">
+        <p class="tag" data-i18n="nav.get">Get it</p>
+        <h2 class="h-display" id="install-title" data-i18n="final.title" data-emo="avistry_party">Your avatar. Your colours.</h2>
+        <svg class="inst-stroke" viewBox="0 0 600 36" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="s3" pathLength="1" d="M6 26C120 14 230 30 340 21S520 12 594 20"/><path class="s2" pathLength="1" d="M6 22C120 10 230 26 340 17S520 8 594 16"/><path class="s1" pathLength="1" d="M6 18C120 6 230 22 340 13S520 4 594 12"/></svg>
+        <span class="inst-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>
+      <div class="inst-quick">
+        <a class="btn btn-primary btn-lg" id="btn-vcc" href="vcc://vpm/addRepo?url=https://avistry.github.io/avistry/index.json" data-i18n="cta.vcc">Get it in VCC</a>
+        <a class="btn btn-outline btn-lg" href="download.html"><span data-i18n="dl.all">All download options</span> <svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
+      </div>
+      <p class="vcc-help" id="vcc-help" hidden data-i18n-html="dl.vcchelp">VCC did not open? The <a href="download.html">Download page</a> has the listing URL and the other ways to install.</p>
+      <p class="inst-meta"><span class="tnum" id="inst-version" hidden></span><span class="tnum js-dl-line" hidden><span class="js-dl-total"></span> <span data-i18n="dl.downloads">downloads</span> · </span><a class="js-vt" href="https://github.com/avistry/avistry/releases/latest" rel="noopener" data-i18n="trust.r1">Scanned on VirusTotal</a> <span aria-hidden="true">&middot;</span> <span data-i18n="install.meta">Unity 2022.3 · VRChat avatars</span></p>
+      <div class="share-pc" id="share-pc-box" hidden>
+        <button type="button" class="btn btn-outline btn-lg" id="share-pc" data-share-url="https://avistry.github.io/avistry/" data-i18n="share.btn">Send this link to your PC</button>
+        <p class="small" id="share-pc-note" data-i18n="share.note">Avistry runs in Unity on a PC.</p>
+      </div>
+      <div class="install-samples" aria-hidden="true">
+        <i></i><i></i><i></i>
+      </div>
     </div>
   </div>
 </section>
@@ -361,8 +365,9 @@
 
 <p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
 
-<script src="tour.js" defer></script>
-<script src="paint.js" defer></script>
-<script src="app.js" defer></script>
+<script src="tour.js?v=030-paper-3" defer></script>
+<script src="ink-effects.js?v=030-paper-3" defer></script>
+<script src="paint.js?v=030-paper-3" defer></script>
+<script src="app.js?v=030-learning-1" defer></script>
 </body>
 </html>

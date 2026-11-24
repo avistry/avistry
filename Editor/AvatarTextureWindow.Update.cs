@@ -17,7 +17,6 @@ namespace Avistry.Textures
             EditorApplication.delayCall += UpdateCheck.MaybeCheckAutomatically;
         }
 
-        /// <summary>Height of the update line: the opt-in question, or the "is out" notice. 0 when there is nothing to show.</summary>
         float UpdateBannerHeight(float width)
         {
             if (UpdateCheck.NotAsked) return 33f + StudioGUI.Hint.CalcHeight(UpdateAskContent, width - 16f);

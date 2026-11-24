@@ -131,7 +131,7 @@
 
 - **烘焙辅助贴图。**环境光遮蔽、由贴图生成的法线贴图，还有给动漫风脸部用的脸部阴影图。
 - **检查材质。**粉红色着色器、空槽位、缺失的贴图和不对的导入设置，都用大白话讲清楚，能安全修复的地方有一键修复按钮。
-- **边用边学。**有 Simple 和 Advanced 两种模式、信息图标、41 个词条的术语表，还有给 Unity 新手的技能树。
+- **边用边学。**有 Simple 和 Advanced 两种模式、信息图标、65 个词条的术语表，还有给 Unity 新手的技能树。
 - **你的语言。**整个工具支持英语、日语、韩语和简体中文，默认跟随 Unity 编辑器的语言。
 
 所有功能都列在[功能页面](https://avistry.github.io/avistry/features.html)里。
@@ -154,22 +154,22 @@
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/learn.html?lang=zh-CN"><img alt="学习: 工具内的短课程、涵盖每个词的术语表，以及每个工具的实际演示。" src="../../Website~/media/og-learn-zh-CN.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/learn.html?lang=zh-CN"><b>学习</b></a> · <sub>工具内的短课程、涵盖每个词的术语表，以及每个工具的实际演示。</sub>
+      <a href="https://avistry.github.io/avistry/learn.html?lang=zh-CN"><img alt="学习: 从在 Unity 中落下第一笔，到测试自己的化身。按技能树动手练习，碰到生词就查术语表。" src="../../Website~/media/og-learn-zh-CN.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/learn.html?lang=zh-CN"><b>学习</b></a> · <sub>从在 Unity 中落下第一笔，到测试自己的化身。按技能树动手练习，碰到生词就查术语表。</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/skills.html?lang=zh-CN"><img alt="技能树: 从找到 Hierarchy 到烘焙贴图，6 个阶段，40 项简短技能。" src="../../Website~/media/og-skills-zh-CN.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/skills.html?lang=zh-CN"><b>技能树</b></a> · <sub>从找到 Hierarchy 到烘焙贴图，6 个阶段，40 项简短技能。</sub>
+      <a href="https://avistry.github.io/avistry/skills.html?lang=zh-CN"><img alt="技能树: 从画下第一笔到测试化身开关，跟着 64 项技能动手练习。" src="../../Website~/media/og-skills-zh-CN.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/skills.html?lang=zh-CN"><b>技能树</b></a> · <sub>从画下第一笔到测试化身开关，跟着 64 项技能动手练习。</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/glossary.html?lang=zh-CN"><img alt="术语表: Unity、贴图和 VRChat Avatar 的 41 个词，并告诉你每个词在哪里找。" src="../../Website~/media/og-glossary-zh-CN.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/glossary.html?lang=zh-CN"><b>术语表</b></a> · <sub>Unity、贴图和 VRChat Avatar 的 41 个词，并告诉你每个词在哪里找。</sub>
+      <a href="https://avistry.github.io/avistry/glossary.html?lang=zh-CN"><img alt="术语表: 查找 Unity、着色器和 VRChat 控件中用到的术语。" src="../../Website~/media/og-glossary-zh-CN.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/glossary.html?lang=zh-CN"><b>术语表</b></a> · <sub>查找 Unity、着色器和 VRChat 控件中用到的术语。</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/about.html?lang=zh-CN"><img alt="关于: 它能做什么、不能做什么，如何自己检查下载，以及如何参与。" src="../../Website~/media/og-about-zh-CN.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/about.html?lang=zh-CN"><b>关于</b></a> · <sub>它能做什么、不能做什么，如何自己检查下载，以及如何参与。</sub>
+      <a href="https://avistry.github.io/avistry/about.html?lang=zh-CN"><img alt="关于: 了解 Avistry 的功能和限制、如何核对下载文件，以及怎样参与项目。" src="../../Website~/media/og-about-zh-CN.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/about.html?lang=zh-CN"><b>关于</b></a> · <sub>了解 Avistry 的功能和限制、如何核对下载文件，以及怎样参与项目。</sub>
     </td>
   </tr>
   <tr>
@@ -178,8 +178,8 @@
       <br><a href="https://avistry.github.io/avistry/download.html?lang=zh-CN"><b>下载</b></a> · <sub>VCC 是最简单的方式，还会让 Avistry 保持最新。</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/?lang=zh-CN"><img alt="首页: 给部位换色，在图层上绘制，另存为新的 PNG。原始文件不会改变。" src="../../Website~/media/og-zh-CN.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/?lang=zh-CN"><b>首页</b></a> · <sub>给部位换色，在图层上绘制，另存为新的 PNG。原始文件不会改变。</sub>
+      <a href="https://avistry.github.io/avistry/?lang=zh-CN"><img alt="首页: 给部位换色，在图层上绘制，再另存为新的 PNG，保留原始贴图。" src="../../Website~/media/og-zh-CN.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/?lang=zh-CN"><b>首页</b></a> · <sub>给部位换色，在图层上绘制，再另存为新的 PNG，保留原始贴图。</sub>
     </td>
   </tr>
 </table>
@@ -200,8 +200,8 @@
 
 <!-- release-banner:start -->
 <p align="center">
-  <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0"><img alt="Avistry 0.2.0" src="../../Website~/media/release/0.2.0/banner-zh-CN.jpg" width="880"></a>
-  <br><sub>最新版本 0.2.0 · <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0">阅读发布说明</a></sub>
+  <a href="https://github.com/avistry/avistry/releases/tag/v0.3.0"><img alt="Avistry 0.3.0「Surface Studio」。棕色头戴式耳机，耳罩上绘有樱花。" src="../../Website~/media/release/0.3.0/banner-zh-CN.jpg" width="880"></a>
+  <br><sub>最新版本 0.3.0 · Surface Studio · <a href="https://github.com/avistry/avistry/releases/tag/v0.3.0">阅读发布说明</a></sub>
 </p>
 <!-- release-banner:end -->
 
@@ -233,8 +233,8 @@
 ## 安全与信任
 
 - 代码全部都在这里，采用 [MIT 许可证](../../LICENSE)。它只在编辑器里运行：不会有任何东西进入你的上传包，也不会在 VRChat 里运行。
-- 每个发布文件都扫描过 VirusTotal，SHA-256 校验值列在 `SHA256SUMS.txt` 里。在 PowerShell 里用
-  `Get-FileHash <文件> -Algorithm SHA256` 就能核对下载的文件。
+- 每个下载文件的 SHA-256 校验值都列在 `SHA256SUMS.txt` 中。你可以在 PowerShell 中运行
+  `Get-FileHash <文件> -Algorithm SHA256` 并核对结果。如果有 VirusTotal 扫描结果，可以在发行说明中查看。
 - 没有遥测。唯一的网络请求是可选的更新检查（帮助 › 自动检查更新）。它默认关闭，
   开启后每天只向 GitHub 的公开 API 询问一次最新版本，不会发送任何关于你的信息。
 - 试用任何新工具之前，包括这个，都请先备份项目。

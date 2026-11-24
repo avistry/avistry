@@ -1,6 +1,5 @@
 namespace Avistry.Textures
 {
-    // These texts were written and reviewed as one set; keep the wording consistent when changing one.
     internal static class Msg
     {
         internal static string BtnShowFile => Loc.T("Show file");
@@ -172,7 +171,7 @@ namespace Avistry.Textures
 
         internal static string M27CopiedSettings(int settings, string source, string target)
         {
-            return Loc.F("Copied {0} lighting settings from \"{1}\" to \"{2}\". This changed the real material. Ctrl+Z undoes it.", settings, source, target);
+            return Loc.F("Copied {0} lighting settings from \"{1}\" to \"{2}\".", settings, source, target);
         }
     }
 }

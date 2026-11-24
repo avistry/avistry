@@ -1,25 +1,30 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Several meshes at once (1 · Pick › Meshes on this texture). Every mesh using the edited material is always
-    /// edited. Meshes whose OWN material shows the same texture (hair pieces with separate materials, for example) can be
-    /// included: their UV islands join the texture view, painting and picking work on them in the Scene view, the
-    /// preview shows on them, and the bake gives their material the new texture too.
-    /// Included meshes' islands are numbered after the edited material's own, so those ids never change.
-    /// </summary>
     partial class AvatarTextureWindow
     {
-        // Included meshes (renderer + material slot), as two lists so old windows reload without them.
         [SerializeField] List<Renderer> _alsoRenderers = new List<Renderer>();
         [SerializeField] List<int> _alsoSlots = new List<int>();
+        [SerializeField] List<IncludedUv> _alsoUvs = new List<IncludedUv>();
 
-        List<TargetResolver.TextureUser> _textureUsers = new List<TargetResolver.TextureUser>(); // could be included
-        List<TargetResolver.TextureUser> _alsoUsers = new List<TargetResolver.TextureUser>();    // are included
+        [Serializable]
+        struct IncludedUv
+        {
+            public Renderer renderer;
+            public int slot;
+            public Texture2D texture;
+            public int channel;
+        }
+
+        List<TargetResolver.TextureUser> _textureUsers = new List<TargetResolver.TextureUser>();
+        List<TargetResolver.TextureUser> _alsoUsers = new List<TargetResolver.TextureUser>();
+        readonly List<Material> _includedMaterials = new List<Material>();
         string _alsoSignature = "";
 
         bool IsAlsoIncluded(TargetResolver.TextureUser u)
@@ -30,23 +35,67 @@ namespace Avistry.Textures
         }
 
         string AlsoSignature() =>
-            string.Join(",", _alsoRenderers.Select((r, i) => $"{(r != null ? r.GetInstanceID() : 0)}:{(i < _alsoSlots.Count ? _alsoSlots[i] : 0)}"));
+            string.Join(",", _alsoRenderers.Select((r, i) => $"{(r != null ? r.GetInstanceID() : 0)}:{(i < _alsoSlots.Count ? _alsoSlots[i] : 0)}")) +
+            "|" + string.Join(",", _alsoUvs.Select(u => $"{(u.renderer != null ? u.renderer.GetInstanceID() : 0)}:{u.slot}:" +
+                $"{(u.texture != null ? u.texture.GetInstanceID() : 0)}:{u.channel}"));
 
-        /// <summary>Called by Rebuild: finds the meshes that could be included and the slots the UVs are built from.</summary>
+        bool TryGetIncludedUvChannel(Renderer renderer, int materialIndex, Texture2D texture, out int channel)
+        {
+            foreach (var binding in _alsoUvs)
+                if (binding.renderer == renderer && binding.slot == materialIndex && binding.texture == texture)
+                {
+                    channel = binding.channel;
+                    return true;
+                }
+            channel = 0;
+            return false;
+        }
+
+        void BindIncludedUv(Renderer renderer, int materialIndex, Texture2D texture, int channel)
+        {
+            _alsoUvs.RemoveAll(binding => binding.renderer == renderer && binding.slot == materialIndex && binding.texture == texture);
+            _alsoUvs.Add(new IncludedUv { renderer = renderer, slot = materialIndex, texture = texture, channel = channel });
+        }
+
+        TargetResolver.SlotRef BoundIncludedSlot(TargetResolver.TextureUser user, Texture2D texture)
+        {
+            var slot = user.slot;
+            slot.uvChannel = TryGetIncludedUvChannel(slot.renderer, slot.materialIndex, texture, out int channel) ? channel : null;
+            return slot;
+        }
+
+        static string IncludedUvChangedHint =>
+            Loc.T("An included part uses a different UV set. Paint on the texture here, or include it again in a new edit.");
+
+        static string SharedPartsChangedHint => Loc.T("The parts sharing this texture changed. Check Pick and try again.");
+
+        bool TextureUserStillAssigned(TargetResolver.TextureUser user, Texture2D texture)
+        {
+            var renderer = user.slot.renderer;
+            int index = user.slot.materialIndex;
+            if (renderer == null || user.material == null || texture == null || user.properties.Count == 0) return false;
+            renderer.GetSharedMaterials(_includedMaterials);
+            if ((uint)index >= (uint)_includedMaterials.Count || _includedMaterials[index] != user.material) return false;
+            foreach (var property in user.properties)
+                if (!user.material.HasProperty(property) || user.material.GetTexture(property) != texture) return false;
+            return true;
+        }
+
+        List<TargetResolver.SlotRef> PrimaryMeshSlots() => _users.Count > 0
+            ? new List<TargetResolver.SlotRef>(_users)
+            : new List<TargetResolver.SlotRef> { new TargetResolver.SlotRef { renderer = _renderer, materialIndex = _materialIndex } };
+
         List<TargetResolver.SlotRef> ResolveIncludedMeshes(Transform root, TextureSlot slot)
         {
             _textureUsers = TargetResolver.FindTextureUsers(root, _material, slot.texture);
             _otherMaterials = _textureUsers.Select(u => u.material).Distinct().ToList();
             _alsoUsers = _textureUsers.Where(IsAlsoIncluded).ToList();
             _alsoSignature = AlsoSignature();
-            var parts = _users.Count > 0
-                ? new List<TargetResolver.SlotRef>(_users)
-                : new List<TargetResolver.SlotRef> { new TargetResolver.SlotRef { renderer = _renderer, materialIndex = _materialIndex } };
-            parts.AddRange(_alsoUsers.Select(u => u.slot));
+            var parts = PrimaryMeshSlots();
+            foreach (var user in _alsoUsers) parts.Add(BoundIncludedSlot(user, slot.texture));
             return parts;
         }
 
-        /// <summary>Every slot that shows the edited texture right now, with the properties to preview it in.</summary>
         List<(TargetResolver.SlotRef slot, List<string> props)> PreviewSlots(TextureSlot slot)
         {
             var list = _users.Select(u => (u, slot.properties)).ToList();
@@ -54,7 +103,6 @@ namespace Avistry.Textures
             return list;
         }
 
-        /// <summary>True for a renderer slot whose texture is being edited (same material, or an included mesh).</summary>
         bool IsEditedSlot(Renderer r, int index)
         {
             if (r == null) return false;
@@ -63,75 +111,141 @@ namespace Avistry.Textures
             return _alsoUsers.Any(u => u.slot.renderer == r && u.slot.materialIndex == index);
         }
 
-        /// <summary>The renderer under a hit on the edited meshes (the target, or an included mesh).</summary>
         Renderer RendererOfHit(MeshUV.SurfaceHit hit) => _uv?.PartOfTriangle(hit.triangle)?.renderer ?? _renderer;
 
-        /// <summary>Includes or leaves out meshes (undoable). Island ids of the other meshes are carried over.</summary>
-        void SetMeshesIncluded(IEnumerable<TargetResolver.TextureUser> users, bool on)
+        void QueueMeshesIncluded(IEnumerable<TargetResolver.TextureUser> users, bool on)
         {
-            var list = users.Where(u => u.slot.renderer != null && IsAlsoIncluded(u) != on).ToList();
-            if (list.Count == 0) return;
+            if (_needsRebuild || _recipe == null || CurrentSlot == null) return;
+            var stillMatches = CaptureSavedEditContext(_recipe, CurrentSlot);
+            string signature = AlsoSignature();
+            var requested = users.ToList();
+            EditorApplication.delayCall += () =>
+            {
+                if (this == null) return;
+                if (!stillMatches() || signature != AlsoSignature())
+                {
+                    Toast(SharedPartsChangedHint, MessageType.Info, 4f);
+                    return;
+                }
+                SetMeshesIncluded(requested, on);
+            };
+        }
+
+        bool SetMeshesIncluded(IEnumerable<TargetResolver.TextureUser> users, bool on)
+        {
+            if (_needsRebuild || _recipe == null || CurrentSlot == null) return false;
+            var list = users.Where(u => IsAlsoIncluded(u) != on).ToList();
+            if (list.Count == 0) return true;
             EndStroke();
-            var oldKeys = _uv?.IslandKeys();
-            var oldSelection = new List<int>(_selection);
+            var slot = CurrentSlot;
+            if (slot == null || _recipe == null) return false;
+            var stillMatches = CaptureSavedEditContext(_recipe, slot);
+            string signature = AlsoSignature();
+            Undo.FlushUndoRecordObjects();
+            var root = TargetResolver.AvatarRoot(_renderer);
+            bool Matches(TargetResolver.TextureUser user) => TextureUserStillAssigned(user, slot.texture) &&
+                root != null && user.slot.renderer.transform.IsChildOf(root) &&
+                user.properties.SequenceEqual(TargetResolver.TextureProperties(user.material, slot.texture)) &&
+                TargetResolver.CommonUvChannel(user.material, user.properties) == user.slot.uvChannel;
+            if (!stillMatches() || signature != AlsoSignature() || !list.TrueForAll(Matches) ||
+                !_alsoUsers.TrueForAll(Matches) || !_users.SequenceEqual(TargetResolver.FindMaterialUsers(root, _material)))
+            {
+                _needsRebuild = true;
+                Toast(SharedPartsChangedHint, MessageType.Info, 4f);
+                return false;
+            }
+
+            var changes = new HashSet<(Renderer, int)>(list.Select(user => (user.slot.renderer, user.slot.materialIndex)));
+            var plannedSlots = PrimaryMeshSlots();
+            foreach (var user in _textureUsers)
+            {
+                var key = (user.slot.renderer, user.slot.materialIndex);
+                if (changes.Contains(key))
+                {
+                    if (on) plannedSlots.Add(user.slot);
+                }
+                else if (IsAlsoIncluded(user)) plannedSlots.Add(BoundIncludedSlot(user, slot.texture));
+            }
+            var previous = _uv;
+            var planned = MeshUV.Build(plannedSlots, slot.uvChannel);
+            if (!TryPlanCombinedUvRemap(previous, planned, out var apply))
+            {
+                planned?.ReleaseSurfaceMesh();
+                Toast(CombinedUvChangeBlockedHint, MessageType.Info, 5f);
+                return false;
+            }
             string what = on ? (list.Count == 1 ? $"Include {list[0].slot.renderer.name}" : "Include parts")
                              : (list.Count == 1 ? $"Leave out {list[0].slot.renderer.name}" : "Leave out parts");
-            Undo.RecordObject(this, what);
-            if (_recipe != null) Undo.RecordObject(_recipe, what);
+            var renderer = _renderer;
+            int materialIndex = _materialIndex;
+            var material = _material;
+            var recipe = _recipe;
+            Undo.IncrementCurrentGroup();
+            int group = Undo.GetCurrentGroup();
+            Undo.SetCurrentGroupName(what);
+            Undo.RecordObjects(new Object[] { this, _recipe }, what);
             foreach (var u in list)
             {
-                if (on) { _alsoRenderers.Add(u.slot.renderer); _alsoSlots.Add(u.slot.materialIndex); }
+                if (on)
+                {
+                    _alsoRenderers.Add(u.slot.renderer);
+                    _alsoSlots.Add(u.slot.materialIndex);
+                    if (u.slot.uvChannel is int channel)
+                        BindIncludedUv(u.slot.renderer, u.slot.materialIndex, slot.texture, channel);
+                }
                 else
                 {
+                    _alsoUvs.RemoveAll(binding => binding.renderer == u.slot.renderer && binding.slot == u.slot.materialIndex);
                     for (int i = _alsoRenderers.Count - 1; i >= 0; i--)
                         if (_alsoRenderers[i] == u.slot.renderer && i < _alsoSlots.Count && _alsoSlots[i] == u.slot.materialIndex)
                         { _alsoRenderers.RemoveAt(i); _alsoSlots.RemoveAt(i); }
                 }
             }
             float zoom = _zoom; var pan = _pan;
-            Rebuild();
-            _zoom = zoom; _pan = pan; // same texture: keep the view where it was
-            if (oldKeys != null && _uv != null) RemapIslands(oldKeys, oldSelection);
+            bool committed = false;
+            try
+            {
+                RebuildUsing(planned);
+                if (_comp != null && _uv == planned && _renderer == renderer && _materialIndex == materialIndex &&
+                    _material == material && _recipe == recipe && CurrentSlot?.texture == slot.texture)
+                {
+                    apply();
+                    committed = true;
+                }
+            }
+            catch (Exception error)
+            {
+                Debug.LogException(error);
+            }
+            if (!committed)
+            {
+                Undo.FlushUndoRecordObjects();
+                Undo.RevertAllDownToGroup(group);
+                Rebuild();
+                _zoom = zoom; _pan = pan;
+                Toast(SharedPartsChangedHint, MessageType.Info, 4f);
+                return false;
+            }
+            _zoom = zoom; _pan = pan;
             RebuildSelectionVisuals();
             _dirty = true;
+            if (previous?.CombinedLayout != _uv?.CombinedLayout)
+            {
+                if (_recipe.layers.Count > 0) RefreshEditedRecipe(affectsImage: false);
+                _historyRevision = ++_nextHistoryRevision;
+                ClearHistory();
+            }
+            Undo.FlushUndoRecordObjects();
+            Undo.IncrementCurrentGroup();
             int n = _alsoUsers.Count;
             Toast(on ? Loc.F("Included {0}: its pieces are in the texture view now. Ctrl+Z undoes it.", string.Join(", ", list.Select(u => u.slot.renderer.name)))
                      : Loc.F("Left out {0}.", string.Join(", ", list.Select(u => u.slot.renderer.name))) + (n > 0 ? Loc.F(" {0} other part{1} still included.", n, n == 1 ? "" : "s") : ""),
                 MessageType.Info, 4f);
             Repaint();
             SceneView.RepaintAll();
+            return true;
         }
 
-        /// <summary>Points the selection and every layer's island lists at the same islands after the UVs were rebuilt.</summary>
-        void RemapIslands((int, int, int)[] oldKeys, List<int> oldSelection)
-        {
-            var newKeys = _uv.IslandKeys();
-            var lookup = new Dictionary<(int, int, int), int>();
-            for (int i = 0; i < newKeys.Length; i++) lookup[newKeys[i]] = i;
-            int Map(int id) => id >= 0 && id < oldKeys.Length && lookup.TryGetValue(oldKeys[id], out int n) ? n : -1;
-
-            // A list that only pointed at islands of a mesh that left keeps a -1 ("nothing"), not an empty list ("everywhere").
-            void Remap(List<int> l)
-            {
-                if (l == null || l.Count == 0) return;
-                var m = l.Select(Map).Where(i => i >= 0).Distinct().ToList();
-                if (m.Count == 0) m.Add(-1);
-                l.Clear();
-                l.AddRange(m);
-            }
-
-            _selection = oldSelection.Select(Map).Where(i => i >= 0).Distinct().ToList();
-            if (_recipe == null) return;
-            foreach (var layer in _recipe.layers)
-            {
-                if (layer == null) continue;
-                Remap(layer.islands);
-                foreach (var s in layer.maskStrokes) Remap(s.clipIslands);
-                if (layer is PaintLayer pl) foreach (var s in pl.strokes) Remap(s.clipIslands);
-            }
-        }
-
-        /// <summary>1 · Pick: the meshes showing this texture, each editing / included / off.</summary>
         void DrawMeshList()
         {
             var same = _users.Where(u => u.renderer != null).Select(u => u.renderer).Distinct().ToList();
@@ -155,12 +269,27 @@ namespace Avistry.Textures
             {
                 if (u.slot.renderer == null) continue;
                 bool inc = IsAlsoIncluded(u);
-                string label = u.slot.renderer.name; // its material is in the tooltip
+                string label = u.slot.renderer.name;
                 bool now = EditorGUILayout.ToggleLeft(new GUIContent(label + (inc ? Loc.T("  (shares this texture, edited too)") : Loc.T("  (shares this texture)")),
                     Loc.F("Its own material ‘{0}’ uses this texture ({1}). ", u.material.name, string.Join(", ", u.properties)) +
                     (inc ? Loc.T("Included: its pieces are in the texture view and saving gives its material the new texture. Untick to leave it out")
                          : Loc.T("Tick to edit it together with this part: its pieces join the texture view, and saving gives its material the new texture"))), inc);
                 if (now != inc) { toggled = u; toggledOn = now; }
+                if (!inc) continue;
+                var boundChannel = BoundIncludedSlot(u, CurrentSlot.texture).uvChannel;
+                int? actualChannel = TargetResolver.CommonUvChannel(u.material, u.properties);
+                if (boundChannel.HasValue && boundChannel != actualChannel ||
+                    actualChannel.HasValue && actualChannel.Value != (boundChannel ?? CurrentSlot.uvChannel))
+                    GUILayout.Label(IncludedUvChangedHint, StudioGUI.Hint);
+                else if (!actualChannel.HasValue)
+                    GUILayout.Label(Loc.T("This part uses the texture on several UV sets. Scene tools use the UV set from the part you picked."), StudioGUI.Hint);
+                else
+                {
+                    int channel = actualChannel.Value;
+                    var mesh = TargetResolver.GetSharedMesh(u.slot.renderer);
+                    if (mesh != null && !MeshUV.HasUvChannel(mesh, channel))
+                        GUILayout.Label(Loc.F("This part is missing UV{0}. Edit its texture from the texture view.", channel), StudioGUI.Hint);
+                }
             }
 
             if (_textureUsers.Count > 1)
@@ -172,22 +301,20 @@ namespace Avistry.Textures
                     StudioGUI.Count("pick.includeAll");
                     using (new EditorGUI.DisabledScope(all))
                         if (GUILayout.Button(new GUIContent(Loc.T("Edit all sharing parts"), Loc.T("Edit every part that shows this texture together")), EditorStyles.miniButtonLeft))
-                            EditorApplication.delayCall += () => SetMeshesIncluded(_textureUsers.ToList(), true);
+                            QueueMeshesIncluded(_textureUsers, true);
                     StudioGUI.Count("pick.onlyThisOne");
                     using (new EditorGUI.DisabledScope(none))
                         if (GUILayout.Button(new GUIContent(Loc.T("Edit just this part"), Loc.T("Leave the other materials' parts out again")), EditorStyles.miniButtonRight))
-                            EditorApplication.delayCall += () => SetMeshesIncluded(_textureUsers.ToList(), false);
+                            QueueMeshesIncluded(_textureUsers, false);
                 }
             }
             if (_textureUsers.Count > 0 && _alsoUsers.Count == 0)
                 GUILayout.Label(Loc.T("Tick a part to edit it too: its pieces join the texture view, you can paint it in the Scene view, " +
                                 "and saving gives its material the new texture."), StudioGUI.Hint);
 
-            // Rebuilding changes what is drawn, so do it after this GUI pass.
-            if (toggled != null) EditorApplication.delayCall += () => SetMeshesIncluded(new[] { toggled }, toggledOn);
+            if (toggled != null) QueueMeshesIncluded(new[] { toggled }, toggledOn);
         }
 
-        /// <summary>The meshes on this texture: name, material, state (editing / same material / included / off).</summary>
         internal List<(Renderer renderer, int slot, string material, string state)> AutoMeshList()
         {
             var list = new List<(Renderer, int, string, string)>();
@@ -198,13 +325,12 @@ namespace Avistry.Textures
             return list;
         }
 
-        /// <summary>Includes or leaves out meshes by renderer (null = all of them), like ticking them in 1 · Pick.</summary>
         internal string AutoIncludeMeshes(IList<Renderer> renderers, bool on)
         {
             if (_needsRebuild) Rebuild();
             var pick = renderers == null ? _textureUsers.ToList() : _textureUsers.Where(u => renderers.Contains(u.slot.renderer)).ToList();
             if (pick.Count == 0) return _textureUsers.Count == 0 ? "No other material on this avatar uses this texture." : "None of those parts shows this texture with its own material.";
-            SetMeshesIncluded(pick, on);
+            if (!SetMeshesIncluded(pick, on)) return AutoLastToast() ?? SharedPartsChangedHint;
             AutoSettle();
             return null;
         }

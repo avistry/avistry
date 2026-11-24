@@ -7,12 +7,18 @@ namespace Avistry.Textures
 {
     partial class AvatarTextureWindow
     {
-        internal enum StatusFix { None = 0, PickAnotherMesh = 1 }
+        internal enum StatusFix { None = 0, PickAnotherMesh = 1, RetryPreview = 2 }
 
         [System.NonSerialized] internal StatusFix _statusFix;
-        [SerializeField] bool _slotChosenByUser;   // true when the user (or a harness/explicit path) chose the texture slot
+        [SerializeField] bool _slotChosenByUser;
 
         internal static void OpenConsole() => EditorApplication.ExecuteMenuItem("Window/General/Console");
+
+        void RetryTexturePreview()
+        {
+            _needsRebuild = true;
+            Repaint();
+        }
 
         internal static void ShowFile(string assetPath)
         {
@@ -57,7 +63,7 @@ namespace Avistry.Textures
             Repaint();
         }
 
-        internal void TickAllMeshes() => SetMeshesIncluded(_textureUsers, true);
+        internal void TickAllMeshes() => QueueMeshesIncluded(_textureUsers, true);
 
         internal bool SwitchFeatureOn(TextureSlot slot) => SwitchFeatureOn(_material, slot);
 
@@ -72,7 +78,6 @@ namespace Avistry.Textures
             return true;
         }
 
-        /// <summary>For toast buttons: switches the effect on for the material the toast was about, then rebuilds if it is still the target.</summary>
         void SwitchFeatureOnFor(Material material, TextureSlot slot)
         {
             if (!SwitchFeatureOn(material, slot)) return;
@@ -100,6 +105,7 @@ namespace Avistry.Textures
 
         internal void ChooseSlot(int index)
         {
+            if (index != _builtSlotIndex || _materialIndex != _builtMaterialIndex) RememberSelectionBeforeSwitch();
             _slotIndex = index;
             _slotChosenByUser = true;
             _needsRebuild = true;

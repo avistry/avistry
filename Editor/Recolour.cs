@@ -5,13 +5,12 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>The recolour controls (relative to each material's starting values).</summary>
     [Serializable]
     public class RecolourSettings
     {
-        [Range(-180, 180)] public float hue;          // degrees
-        [Range(-1, 1)] public float saturation;       // -1 = grey, 0 = unchanged, +1 = double
-        [Range(-1, 1)] public float brightness;       // -1 = black, 0 = unchanged, +1 = double
+        [Range(-180, 180)] public float hue;
+        [Range(-1, 1)] public float saturation;
+        [Range(-1, 1)] public float brightness;
         public bool main = true, shadows = true, rim = true, matcap = true, outline = true, emission, other = true;
         [Tooltip("Only recolour the selected pieces, through the shader's colour-adjust mask")]
         public bool partial;
@@ -19,7 +18,6 @@ namespace Avistry.Textures
         public bool IsIdentity => Mathf.Abs(hue) < 0.01f && Mathf.Abs(saturation) < 0.001f && Mathf.Abs(brightness) < 0.001f;
     }
 
-    /// <summary>One material's starting values, so the recolour is always applied relative to them and Reset is exact.</summary>
     [Serializable]
     public class RecolourEntry
     {
@@ -33,8 +31,8 @@ namespace Avistry.Textures
         public List<Vector4> vectorValues = new List<Vector4>();
         public bool colorGradingKeyword;
         public bool unlockedByUs;
-        public bool oklab;   // which colour space this material's hue shift uses (Poiyomi: OKLab by default; lilToon: HSV)
-        public List<string> textureNames = new List<string>();   // e.g. the colour-adjust mask (partial recolour replaces it)
+        public bool oklab;
+        public List<string> textureNames = new List<string>();
         public List<Texture> textureValues = new List<Texture>();
 
         public Color BaseColor(string n) => colorValues[colorNames.IndexOf(n)];
@@ -42,13 +40,8 @@ namespace Avistry.Textures
         public Vector4 BaseVector(string n, Vector4 fallback) { int i = vectorNames.IndexOf(n); return i >= 0 ? vectorValues[i] : fallback; }
     }
 
-    /// <summary>
-    /// Harmonised recolour: the main texture is shifted through the shader's own colour adjustment (lossless, no new PNG),
-    /// and every tint colour (shadows, rim, matcap, outline, emission…) is shifted by the same amount so the look stays consistent.
-    /// </summary>
     public static class Recolour
     {
-        // Tint colours per group. Only properties that exist on the material are touched.
         static readonly Dictionary<string, string[]> PoiTints = new Dictionary<string, string[]>
         {
             { "shadows", new[] { "_ShadowColor", "_Shadow2ndColor", "_Shadow3rdColor", "_1st_ShadeColor", "_2nd_ShadeColor", "_LightingShadowColor", "_ShadowBorderColor" } },
@@ -61,7 +54,6 @@ namespace Avistry.Textures
 
         static readonly Dictionary<string, string[]> LilTints = new Dictionary<string, string[]>
         {
-            // lilToon applies _Color after its HSVG adjustment, so the main tints must follow too.
             { "main", new[] { "_Color", "_Color2nd", "_Color3rd" } },
             { "shadows", new[] { "_ShadowColor", "_Shadow2ndColor", "_Shadow3rdColor", "_ShadowBorderColor" } },
             { "rim", new[] { "_RimColor", "_RimShadeColor" } },
@@ -74,10 +66,6 @@ namespace Avistry.Textures
         static readonly string[] PoiMainFloats =
             { "_MainColorAdjustToggle", "_MainHueShiftToggle", "_MainHueShift", "_MainHueShiftColorSpace", "_MainHueShiftSelectOrShift", "_Saturation", "_MainBrightness" };
 
-        /// <summary>
-        /// Poiyomi's per-feature hue shift: shifts the colour coming from that feature's *texture* (emission map, matcap,
-        /// rim, outline, glitter, decals) without baking. Tint colours alone can't do this when they're white.
-        /// </summary>
         struct HueKnob
         {
             public string group, enabled, space, shift, selectOrShift;
@@ -104,7 +92,6 @@ namespace Avistry.Textures
             return k.ToArray();
         }
 
-        /// <summary>True if this Poiyomi material can hue-shift the given group's textures losslessly.</summary>
         public static bool CanHueShiftGroup(Material m, string group) =>
             m != null && ShaderProfiles.Detect(m.shader) == ShaderFamily.Poiyomi && PoiHueKnobs.Any(k => k.group == group && m.HasProperty(k.shift) && m.HasProperty(k.enabled));
 
@@ -130,14 +117,12 @@ namespace Avistry.Textures
                 foreach (var k in PoiHueKnobs)
                     foreach (var p in new[] { k.enabled, k.space, k.shift, k.selectOrShift })
                         if (p != null && m.HasProperty(p) && !e.floatNames.Contains(p)) { e.floatNames.Add(p); e.floatValues.Add(m.GetFloat(p)); }
-                // Global Theme colours: tints linked to a theme ignore their own value, so the theme gets shifted instead.
                 for (int t = 0; t < 4; t++)
                 {
                     string tp = "_GlobalThemeColor" + t;
                     if (m.HasProperty(tp) && !e.colorNames.Contains(tp)) { e.colorNames.Add(tp); e.colorValues.Add(m.GetColor(tp)); }
                 }
                 e.colorGradingKeyword = m.IsKeywordEnabled(PoiKeyword);
-                // Poiyomi's hue shift defaults to (and recommends) OKLab; keep a material's own choice if hue shift is already in use.
                 bool hueInUse = e.BaseFloat("_MainColorAdjustToggle") > 0.5f && e.BaseFloat("_MainHueShiftToggle") > 0.5f;
                 e.oklab = !hueInUse || e.BaseFloat("_MainHueShiftColorSpace") < 0.5f;
             }
@@ -147,7 +132,6 @@ namespace Avistry.Textures
                     if (m.HasProperty(p)) { e.vectorNames.Add(p); e.vectorValues.Add(m.GetVector(p)); }
             }
 
-            // Partial recolour swaps in our island mask: remember the material's own mask (and its UV/replace settings).
             string maskProp = RecolourMask.MaskProperty(m);
             if (maskProp != null) { e.textureNames.Add(maskProp); e.textureValues.Add(m.GetTexture(maskProp)); }
             foreach (var p in new[] { "_MainColorAdjustTextureUV", "_MainHueShiftReplace" })
@@ -170,11 +154,6 @@ namespace Avistry.Textures
         }
 
 
-        /// <summary>
-        /// Starting values + the recolour. Always computed from the captured baseline, so it's repeatable.
-        /// With <paramref name="partialMask"/> (partial mode), only the main texture changes, inside the mask: tints and
-        /// feature hue shifts would change everywhere, so they're left alone.
-        /// </summary>
         public static void Apply(RecolourEntry e, RecolourSettings s, Texture partialMask = null)
         {
             var m = e.material;
@@ -185,13 +164,13 @@ namespace Avistry.Textures
             if (s.partial)
             {
                 string maskProp = RecolourMask.MaskProperty(m);
-                if (partialMask == null || maskProp == null) return; // not eligible: leave this material unchanged
+                if (partialMask == null || maskProp == null) return;
                 m.SetTexture(maskProp, partialMask);
                 if (e.family == ShaderFamily.Poiyomi)
                 {
                     if (m.HasProperty("_MainColorAdjustTextureUV"))
-                        m.SetFloat("_MainColorAdjustTextureUV", m.HasProperty("_MainTexUV") ? m.GetFloat("_MainTexUV") : 0); // same UVs as the main texture
-                    if (m.HasProperty("_MainHueShiftReplace")) m.SetFloat("_MainHueShiftReplace", 1); // hue only where the mask is
+                        m.SetFloat("_MainColorAdjustTextureUV", m.HasProperty("_MainTexUV") ? m.GetFloat("_MainTexUV") : 0);
+                    if (m.HasProperty("_MainHueShiftReplace")) m.SetFloat("_MainHueShiftReplace", 1);
                 }
                 ApplyMain(e, m, s);
                 return;
@@ -211,8 +190,6 @@ namespace Avistry.Textures
 
             if (e.family == ShaderFamily.Poiyomi)
             {
-                // A tint linked to a Global Theme shows the theme colour, not its own: shift the theme instead.
-                // (Not the theme the main colour uses: the main Color Adjust already shifts that.)
                 if (s.main && ThemeOf(m, "_Color") is int mainTheme && mainTheme >= 0) themes.Remove(mainTheme);
                 foreach (int t in themes)
                 {
@@ -220,7 +197,6 @@ namespace Avistry.Textures
                     if (e.colorNames.Contains(tp)) m.SetColor(tp, Shift(e.BaseColor(tp), s, e.oklab));
                 }
 
-                // Also turn the hue of each feature's own texture (emission map, matcap…), not just its tint.
                 if (Mathf.Abs(s.hue) > 0.01f)
                 {
                     foreach (var k in PoiHueKnobs)
@@ -230,8 +206,6 @@ namespace Avistry.Textures
                         m.SetFloat(k.enabled, 1);
                         if (!wasOn)
                         {
-                            // Turning it on fresh: OKLab (Poiyomi's recommended space) and "Shift" mode.
-                            // If it was already on, keep the user's colour space and Hue Select/Shift choice.
                             if (k.space != null && m.HasProperty(k.space)) m.SetFloat(k.space, e.oklab ? 0 : 1);
                             if (k.selectOrShift != null && m.HasProperty(k.selectOrShift)) m.SetFloat(k.selectOrShift, 1);
                         }
@@ -246,7 +220,6 @@ namespace Avistry.Textures
             ApplyMain(e, m, s);
         }
 
-        /// <summary>The main texture through the shader's own colour adjustment (Poiyomi Color Adjust / lilToon HSVG).</summary>
         static void ApplyMain(RecolourEntry e, Material m, RecolourSettings s)
         {
             if (e.family == ShaderFamily.Poiyomi && m.HasProperty("_MainColorAdjustToggle"))
@@ -259,8 +232,6 @@ namespace Avistry.Textures
                     m.SetFloat("_MainHueShiftToggle", 1);
                     if (!hueWasOn)
                     {
-                        // Fresh: Shift mode in OKLab (Poiyomi's default/recommendation). Already in use: keep the
-                        // material's own colour space and Hue Select/Shift mode, so its look isn't changed under it.
                         if (m.HasProperty("_MainHueShiftSelectOrShift")) m.SetFloat("_MainHueShiftSelectOrShift", 1);
                         if (m.HasProperty("_MainHueShiftColorSpace")) m.SetFloat("_MainHueShiftColorSpace", e.oklab ? 0 : 1);
                     }
@@ -277,10 +248,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>
-        /// Why partial (masked) recolour can't be used on this material, or null if it can. A colour-adjust mask limits the
-        /// material's *whole* colour adjustment, so an adjustment that's already on would disappear outside the selection.
-        /// </summary>
         public static string PartialBlocker(RecolourEntry e)
         {
             var m = e?.material;
@@ -312,7 +279,7 @@ namespace Avistry.Textures
             if (!m.HasProperty(prop)) return;
             var b = e.BaseVector(prop, DefaultHSVG);
             float h = b.x + s.hue / 360f;
-            h = Mathf.Repeat(h + 0.5f, 1f) - 0.5f;                      // lilToon hue range is -0.5..0.5
+            h = Mathf.Repeat(h + 0.5f, 1f) - 0.5f;
             m.SetVector(prop, new Vector4(h,
                 Mathf.Clamp(b.y * (1f + s.saturation), 0f, 2f),
                 Mathf.Clamp(b.z * (1f + s.brightness), 0f, 2f),
@@ -330,7 +297,6 @@ namespace Avistry.Textures
             _ => s.other,
         };
 
-        /// <summary>Global Theme (0–3) a Poiyomi colour property is linked to, or -1 (unlinked, or an AudioLink/ColorChord theme).</summary>
         public static int ThemeOf(Material m, string colorProp)
         {
             string p = colorProp + "ThemeIndex";
@@ -339,7 +305,6 @@ namespace Avistry.Textures
             return v >= 1 && v <= 4 ? v - 1 : -1;
         }
 
-        /// <summary>Colour properties driven by AudioLink / ColorChord themes (ThemeIndex 5–12): a recolour can't change them.</summary>
         public static int AudioLinkDrivenCount(Material m)
         {
             int n = 0;
@@ -350,7 +315,6 @@ namespace Avistry.Textures
             return n;
         }
 
-        /// <summary>Theme colours (0–3) that tints on this material are linked to.</summary>
         public static List<int> LinkedThemes(Material m)
         {
             var set = new SortedSet<int>();
@@ -361,10 +325,8 @@ namespace Avistry.Textures
             return set.ToList();
         }
 
-        /// <summary>Hue rotate / saturation / brightness, in OKLab (Poiyomi's recommended space) or HSV, keeping alpha and HDR.</summary>
         public static Color Shift(Color c, RecolourSettings s, bool oklab) => oklab ? ShiftOklab(c, s) : Shift(c, s);
 
-        /// <summary>Hue rotate / saturation / brightness in HSV, keeping alpha and HDR intensity.</summary>
         public static Color Shift(Color c, RecolourSettings s)
         {
             float a = c.a;
@@ -377,13 +339,11 @@ namespace Avistry.Textures
             return r;
         }
 
-        // OKLab: perceptual hue, so brightness stays even while rotating.
 
         static float ToLinear(float c) { c = Mathf.Max(0f, c); return c <= 0.04045f ? c / 12.92f : Mathf.Pow((c + 0.055f) / 1.055f, 2.4f); }
         static float ToGamma(float c) { c = Mathf.Max(0f, c); return c <= 0.0031308f ? c * 12.92f : 1.055f * Mathf.Pow(c, 1f / 2.4f) - 0.055f; }
         static float Cbrt(float x) => x < 0 ? -Mathf.Pow(-x, 1f / 3f) : Mathf.Pow(x, 1f / 3f);
 
-        /// <summary>sRGB (gamma) colour -> OKLab (L, a, b).</summary>
         public static Vector3 ToOklab(Color c)
         {
             float r = ToLinear(c.r), g = ToLinear(c.g), b = ToLinear(c.b);
@@ -396,7 +356,6 @@ namespace Avistry.Textures
                 0.0259040371f * l + 0.7827717662f * m - 0.8086757660f * s);
         }
 
-        /// <summary>OKLab -> sRGB (gamma) colour (out-of-gamut values clamped at 0, HDR allowed above 1).</summary>
         public static Color FromOklab(Vector3 lab, float alpha)
         {
             float l = lab.x + 0.3963377774f * lab.y + 0.2158037573f * lab.z;
@@ -409,7 +368,6 @@ namespace Avistry.Textures
             return new Color(ToGamma(r), ToGamma(g), ToGamma(b), alpha);
         }
 
-        /// <summary>Hue rotation and chroma scale in OKLCh (like Poiyomi's OKLab hue shift); brightness scales the result.</summary>
         public static Color ShiftOklab(Color c, RecolourSettings s)
         {
             var lab = ToOklab(c);
@@ -422,9 +380,7 @@ namespace Avistry.Textures
             return new Color(o.r * k, o.g * k, o.b * k, c.a);
         }
 
-        // Tint colours white or grey and keeps the shading.
 
-        /// <summary>The tint colour's OKLCh chroma (times strength) and hue (0..1 turns), as the "Recolour part" shader pass takes them.</summary>
         public static void TintParams(Color tint, float strength, out float chroma, out float hueTurns)
         {
             var lab = ToOklab(tint);
@@ -444,11 +400,6 @@ namespace Avistry.Textures
             return r >= 0 && r <= 1 && g >= 0 && g <= 1 && b >= 0 && b <= 1;
         }
 
-        /// <summary>
-        /// Gives a colour the tint's hue and chroma (times strength) while keeping its own lightness (+ brightness), like the
-        /// shader pass. Chroma fades out near black and white so shadows and highlights stay natural; the result is kept
-        /// inside the sRGB gamut by lowering the chroma (same search as the HSL layer's Add / Set colour).
-        /// </summary>
         public static Color Tint(Color c, Color tint, float strength, float brightness)
         {
             TintParams(tint, strength, out float chroma, out float hueTurns);
@@ -469,7 +420,6 @@ namespace Avistry.Textures
             return new Color(Mathf.Clamp01(o.r), Mathf.Clamp01(o.g), Mathf.Clamp01(o.b), c.a);
         }
 
-        /// <summary>Average OKLCh chroma of some colours (0 = grey; real colours are roughly 0.05 and up).</summary>
         public static float AverageChroma(IList<Color> px)
         {
             if (px == null || px.Count == 0) return 0f;
@@ -478,25 +428,20 @@ namespace Avistry.Textures
             return (float)(sum / px.Count);
         }
 
-        /// <summary>
-        /// Sets a material's main tint (lilToon / Poiyomi `_Color`) for a recolour session. `_Color` joins the captured
-        /// starting values the first time (Poiyomi's isn't shifted by the hue sliders), so Restore / Reset put it back.
-        /// </summary>
         public static bool SetMainTint(RecolourEntry e, Color tint)
         {
             var m = e.material;
             if (m == null || !m.HasProperty("_Color")) return false;
             if (!e.colorNames.Contains("_Color")) { e.colorNames.Add("_Color"); e.colorValues.Add(m.GetColor("_Color")); }
             if (e.family == ShaderFamily.LilToon && m.HasProperty("_BaseColor") && !e.colorNames.Contains("_BaseColor"))
-            { e.colorNames.Add("_BaseColor"); e.colorValues.Add(m.GetColor("_BaseColor")); } // so Reset puts it back too
+            { e.colorNames.Add("_BaseColor"); e.colorValues.Add(m.GetColor("_BaseColor")); }
             var baseCol = e.BaseColor("_Color");
             m.SetColor("_Color", new Color(tint.r, tint.g, tint.b, baseCol.a));
-            if (e.family == ShaderFamily.LilToon && m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", m.GetColor("_Color")); // lilToon's own rule, live
+            if (e.family == ShaderFamily.LilToon && m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", m.GetColor("_Color"));
             return true;
         }
 
 
-        /// <summary>Plain-language note on where this material's shadow colour comes from, and whether recolour moves it.</summary>
         public static string ShadowNote(Material m)
         {
             if (m == null) return null;
@@ -530,10 +475,6 @@ namespace Avistry.Textures
         }
 
 
-        /// <summary>
-        /// The main texture's dominant colour (saturation-weighted average hue, times the main tint), for the
-        /// before/after swatch and for "shift towards a colour".
-        /// </summary>
         public static bool DominantColour(Material m, out Color dominant)
         {
             dominant = Color.gray;
@@ -579,14 +520,12 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>The main texture (times the main tint) downscaled to size×size, as displayable gamma colours.</summary>
         public static Color[] SampleMainTexture(Material m, int size)
         {
             if (m == null || !m.HasProperty("_MainTex")) return null;
             return SampleTexture(m.GetTexture("_MainTex"), size, m.HasProperty("_Color") ? m.GetColor("_Color") : Color.white);
         }
 
-        /// <summary>Any texture downscaled to size×size (gamma colours), multiplied by a tint.</summary>
         public static Color[] SampleTexture(Texture tex, int size, Color tint)
         {
             if (tex == null) return null;
@@ -612,17 +551,13 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>
-        /// The texture's main colours (up to <paramref name="max"/>), weighted so small vivid areas (e.g. coloured tips)
-        /// still show next to large dark/grey areas. <paramref name="colourful"/> = share of visible pixels with real colour.
-        /// </summary>
         public static List<Color> Palette(Color[] px, int max, out float colourful)
         {
             colourful = 0;
             var result = new List<Color>();
             if (px == null || px.Length == 0) return result;
             const int bins = 12;
-            var w = new float[bins + 3];          // 12 hue bins + dark / mid / light neutrals
+            var w = new float[bins + 3];
             var sum = new Color[bins + 3];
             float visible = 0, coloured = 0;
             foreach (var c in px)
@@ -635,7 +570,7 @@ namespace Avistry.Textures
                 if (s > 0.15f && v > 0.12f)
                 {
                     bin = Mathf.Min(bins - 1, (int)(h * bins));
-                    weight = c.a * (0.3f + s * v * 2f); // vivid colours count more than their area
+                    weight = c.a * (0.3f + s * v * 2f);
                     coloured += c.a;
                 }
                 else
@@ -659,7 +594,6 @@ namespace Avistry.Textures
             return result;
         }
 
-        /// <summary>Applies the recolour to sampled pixels (approximate: HSV, like the tint colours) for the preview.</summary>
         public static Color[] ShiftPixels(Color[] px, RecolourSettings s, bool oklab)
         {
             if (px == null) return null;
@@ -668,12 +602,10 @@ namespace Avistry.Textures
             return o;
         }
 
-        /// <summary>Hue/saturation needed to turn <paramref name="from"/> into <paramref name="to"/>.</summary>
         public static void Match(Color from, Color to, RecolourSettings s, bool matchBrightness, bool oklab)
         {
             if (oklab)
             {
-                // Match in OKLCh, the space the shader rotates in.
                 var a = ToOklab(from);
                 var b = ToOklab(to);
                 float c0 = Mathf.Sqrt(a.y * a.y + a.z * a.z), c1 = Mathf.Sqrt(b.y * b.y + b.z * b.z);
@@ -697,14 +629,13 @@ namespace Avistry.Textures
             if (matchBrightness) s.brightness = v0 > 0.02f ? Mathf.Clamp(v1 / v0 - 1f, -1f, 1f) : 0f;
         }
 
-        /// <summary>One place a material's visible colour comes from (a colour texture of an active feature).</summary>
         public class ColourSource
         {
-            public string label;      // "Emission · White_Hair_ats"
-            public string group;      // recolour group that controls it ("main", "emission", …)
-            public Color swatch;      // its most colourful main colour
-            public float colourful;   // share of its pixels with real colour
-            public bool canShift;     // a recolour moves it (main adjust, or a Poiyomi per-feature hue shift)
+            public string label;
+            public string group;
+            public Color swatch;
+            public float colourful;
+            public bool canShift;
         }
 
         public static string GroupOf(string prop)
@@ -718,10 +649,6 @@ namespace Avistry.Textures
             return "other";
         }
 
-        /// <summary>
-        /// Where the material's colour actually comes from: every colour texture of an active feature, how colourful it is,
-        /// and whether recolour can shift it. Explains "I moved Hue and nothing happened" (grey main texture, colour in emission).
-        /// </summary>
         public static List<ColourSource> ColourSources(Material m)
         {
             var list = new List<ColourSource>();

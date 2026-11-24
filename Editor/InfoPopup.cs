@@ -4,7 +4,6 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>The click popup of an info icon: one glossary entry as a <see cref="ConceptCard"/>, with links to related ones.</summary>
     internal class InfoPopup : PopupWindowContent
     {
         const int MaxBack = 8;
@@ -19,13 +18,8 @@ namespace Avistry.Textures
 
         public InfoPopup(string conceptId) { _id = conceptId; }
 
-        /// <summary>The concept whose popup is open now, or null. The icon uses it to draw its "open" state.</summary>
         internal static string Current => s_current;
 
-        /// <summary>
-        /// Opens the popup below <paramref name="anchor"/>. Inside OnGUI the anchor is a GUI rect; outside it, a screen rect.
-        /// Opening a card marks it Read, unless <paramref name="markRead"/> is false (tests outside the sandbox).
-        /// </summary>
         public static void Show(Rect anchor, string conceptId, bool markRead = true)
         {
             if (Glossary.Get(conceptId) == null) return;
@@ -38,7 +32,6 @@ namespace Avistry.Textures
                 Floating.ShowAt(anchor, conceptId);
         }
 
-        /// <summary>The window size the popup for this concept opens with.</summary>
         internal static Vector2 SizeOf(string conceptId)
         {
             var e = Glossary.Get(conceptId);
@@ -78,7 +71,6 @@ namespace Avistry.Textures
             return res;
         }
 
-        // The card only reports clicks. What they do happens here, after drawing and (for anything that opens a window) a frame later.
         static void Act(CardResult res, string conceptId, Rect screenAnchor, EditorWindow window)
         {
             if (res.GoTo != null)
@@ -107,7 +99,6 @@ namespace Avistry.Textures
             else if (res.Close) window.Close();
         }
 
-        // Closing and reopening, because a popup cannot change its size once it is shown. delayCall: not while drawing.
         static void Swap(string conceptId, Rect screenAnchor, string pushed)
         {
             if (Glossary.Get(conceptId) == null) return;
@@ -121,7 +112,6 @@ namespace Avistry.Textures
             EditorApplication.delayCall += () => Floating.ShowAt(screenAnchor, conceptId);
         }
 
-        /// <summary>The same card in a small window, for when no GUI is being drawn (and for swapping to a related concept).</summary>
         internal class Floating : EditorWindow
         {
             string _id;
@@ -142,7 +132,6 @@ namespace Avistry.Textures
 
             void OnGUI()
             {
-                // After a domain reload the id is gone.
                 if (string.IsNullOrEmpty(_id)) { Close(); return; }
                 var e = Event.current;
                 if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape) { e.Use(); Close(); return; }

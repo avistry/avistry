@@ -1,1 +1,32 @@
-{"placeholder":false,"materials":36,"textures":125,"rows":[{"id":"crunch","status":"warn","count":32},{"id":"format","status":"warn","count":3},{"id":"size","status":"warn","count":7},{"id":"mips","status":"warn","count":124},{"id":"srgb","status":"warn","count":15}]}
+{
+  "placeholder": false,
+  "materials": 2,
+  "textures": 2,
+  "rows": [
+    {
+      "id": "crunch",
+      "status": "ok",
+      "count": 0
+    },
+    {
+      "id": "format",
+      "status": "ok",
+      "count": 0
+    },
+    {
+      "id": "size",
+      "status": "ok",
+      "count": 0
+    },
+    {
+      "id": "mips",
+      "status": "warn",
+      "count": 2
+    },
+    {
+      "id": "srgb",
+      "status": "warn",
+      "count": 1
+    }
+  ]
+}

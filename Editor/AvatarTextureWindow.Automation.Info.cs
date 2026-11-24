@@ -6,7 +6,6 @@ namespace Avistry.Textures
 {
     partial class AvatarTextureWindow
     {
-        /// <summary>Number of counted controls on a tab as the window draws it now (Simple or Advanced). -1 for an unknown tab.</summary>
         internal int AutoVisibleControls(string tab)
         {
             if (!TryAutoTab(tab, out var t)) return -1;
@@ -21,7 +20,6 @@ namespace Avistry.Textures
             return new List<string>(StudioGUI.VisibleControlIds);
         }
 
-        /// <summary>"overLength=N unresolved=M" then one line per problem: over-long copy, and control ids on any tab (both modes) with no glossary entry.</summary>
         internal string AutoGlossaryCheck()
         {
             Glossary.Reload();
@@ -55,10 +53,6 @@ namespace Avistry.Textures
             return "overLength=" + over + " unresolved=" + unresolved.Count + (lines.Count > 0 ? "\n" + string.Join("\n", lines) : "");
         }
 
-        /// <summary>
-        /// Opens the info popup for a concept 40 px in and 60 px down from the window's top-left corner and returns
-        /// "w=360 h=&lt;height&gt; title=18", or "unknown concept". Outside the skill sandbox it does not mark the card Read.
-        /// </summary>
         internal string AutoOpenInfo(string conceptId)
         {
             if (Glossary.Get(conceptId) == null) return "unknown concept";
@@ -70,15 +64,25 @@ namespace Avistry.Textures
 
         static bool TryAutoTab(string name, out Tab t) => System.Enum.TryParse(name, true, out t) && System.Enum.IsDefined(typeof(Tab), t);
 
-        // Counting happens while repainting, so repaint right now instead of waiting for the editor loop.
         void CountTab(Tab t)
         {
             SetTab(t);
             AutoSettle();
+            CountDrawnControls();
+        }
+
+        static readonly MethodInfo RepaintImmediatelyMethod = typeof(UnityEditor.EditorWindow).GetMethod("RepaintImmediately",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+        void CountDrawnControls()
+        {
             StudioGUI.BeginCount();
-            Focus();
-            typeof(UnityEditor.EditorWindow).GetMethod("RepaintImmediately", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.Invoke(this, null);
-            StudioGUI.EndCount();
+            try
+            {
+                Focus();
+                RepaintImmediatelyMethod?.Invoke(this, null);
+            }
+            finally { StudioGUI.EndCount(); }
         }
     }
 }

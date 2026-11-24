@@ -5,34 +5,45 @@ namespace Avistry.Textures
 {
     internal class DiagnosticsWindow : EditorWindow
     {
-        string _text = "";
+        [SerializeField] string _text = "";
+        bool _copied;
         Vector2 _scroll;
 
         internal static void Show(string text)
         {
-            var w = GetWindow<DiagnosticsWindow>(true, Loc.T("Copy diagnostics"));
-            w.minSize = new Vector2(420, 320);
-            w._text = text;
-            w.Show();
+            var window = GetWindow<DiagnosticsWindow>(true, Loc.T("Support report"));
+            window.titleContent = new GUIContent(Loc.T("Support report"), DiagnosticsReport.Logo);
+            window.minSize = new Vector2(420, 340);
+            window._text = text;
+            window._copied = false;
+            window._scroll = Vector2.zero;
+            window.Show();
         }
 
         void OnGUI()
         {
-            EditorGUILayout.HelpBox(Loc.T("Check this before you share it. It has no file paths or user names. Nothing is copied until you press Copy."), MessageType.Info);
-            _scroll = EditorGUILayout.BeginScrollView(_scroll);
-            EditorGUILayout.SelectableLabel(_text, EditorStyles.textArea, GUILayout.ExpandHeight(true), GUILayout.MinHeight(position.height - 90));
-            EditorGUILayout.EndScrollView();
+            EditorGUILayout.Space();
             using (new EditorGUILayout.HorizontalScope())
             {
-                GUILayout.FlexibleSpace();
-                if (GUILayout.Button(Loc.T("Copy"), GUILayout.Width(90)))
-                {
-                    GUIUtility.systemCopyBuffer = _text;
-                    Close();
-                    GUIUtility.ExitGUI();
-                }
-                if (GUILayout.Button(Loc.T("Close"), GUILayout.Width(90))) { Close(); GUIUtility.ExitGUI(); }
+                GUILayout.Label(DiagnosticsReport.Logo, GUILayout.Width(32), GUILayout.Height(32));
+                GUILayout.Label(Loc.T("Support report"), EditorStyles.boldLabel, GUILayout.Height(32));
             }
+            EditorGUILayout.HelpBox(Loc.T("Review the report, then copy it to share on Discord or GitHub. You choose what to send."), MessageType.Info);
+            _scroll = EditorGUILayout.BeginScrollView(_scroll);
+            EditorGUILayout.SelectableLabel(_text, EditorStyles.textArea,
+                GUILayout.ExpandWidth(true), GUILayout.Height(EditorStyles.textArea.CalcHeight(new GUIContent(_text), Mathf.Max(200, position.width - 30)) + 8));
+            EditorGUILayout.EndScrollView();
+            if (StudioGUI.PrimaryButton(new GUIContent(_copied ? Loc.T("Copied") : Loc.T("Copy report")), StudioGUI.InfoBlue))
+            {
+                GUIUtility.systemCopyBuffer = _text;
+                _copied = true;
+            }
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button(Loc.T("Open Discord"))) OnlineGuide.OpenSupport(false);
+                if (GUILayout.Button(Loc.T("Open GitHub issue"))) OnlineGuide.OpenSupport(true);
+            }
+            EditorGUILayout.Space();
         }
     }
 }

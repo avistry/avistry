@@ -6,17 +6,12 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// The skill tree: six tier rows of nodes, a medals strip, the detail card and a "Next up" footer. Nothing here locks
-    /// anything: a node only shows whether it is new, read or done. Positions are measured once per window width and
-    /// cached, and the view draws only on events, so it costs nothing while the window sits idle.
-    /// </summary>
-    internal sealed class SkillTreeView
+    internal sealed partial class SkillTreeView
     {
-        internal const float MedalsH = 24f, FooterH = 24f, PanelW = 320f, SideMinWidth = 640f, RowsMaxWidth = 420f;
+        internal const float MedalsH = 24f, FooterH = 24f, SideMinWidth = 640f, RowsMaxWidth = 420f;
 
-        const float MinNodeW = 132f, MaxNodeW = 160f, NodeH = 54f, SubH = 26f, Gap = 6f, Margin = 12f, TierH = 28f, RowH = 28f, RowGap = 2f;
-        const float BlockGap = 10f, TopGap = 8f, ScrollBarW = 15f, CardGap = 6f, RightZone = 70f, ChevronLead = 16f;
+        const float MinNodeW = 132f, NodeH = 54f, SubH = 26f, Gap = 6f, Margin = 12f, TierH = 28f, RowH = 28f, RowGap = 2f;
+        const float BlockGap = 10f, TopGap = 8f, ScrollBarW = 15f, RightZone = 70f;
         const int NextCount = 3;
 
         internal enum Mode { Side, Inline, Rows }
@@ -24,67 +19,53 @@ namespace Avistry.Textures
         struct NodeBox
         {
             public Glossary.Entry E;
-            public Rect R;                 // zero width = hidden (its tier is folded)
+            public Rect R;
             public GUIContent Title, SubNew, Tip;
             public float TitleW;
-            public int Block;
         }
 
         internal sealed class TierHead
         {
-            public int Tier;               // 0 = the bonus box
+            public int Tier;
             public GUIContent Name, Blurb;
             public float NameW, BlurbX, Lead;
-            public GUIContent Wrap;        // the blurb on a second line, when it does not fit beside the name
-            public float Extra;            // height the second line adds to the header
-        }
-
-        sealed class Block
-        {
-            public TierHead Head;
-            public float Y, H;
-            public bool Open = true;
+            public GUIContent Wrap;
+            public float Extra;
         }
 
         sealed class Plan
         {
             public float Height;
-            public Block[] Blocks;
+            public TierHead Head;
             public NodeBox[] Nodes;
             public readonly Dictionary<string, int> Index = new Dictionary<string, int>();
         }
 
         readonly Action _repaint;
-        readonly Dictionary<int, Plan> _plans = new Dictionary<int, Plan>();
+        readonly Dictionary<(int width, int tier, bool rows, bool advanced), Plan> _plans = new Dictionary<(int, int, bool, bool), Plan>();
         IReadOnlyList<Glossary.Entry> _gloss;
-        bool _advSeen;
 
         internal string Selected;
         Vector2 _scroll, _cardScroll;
         string _cursor, _hover, _scrollTo;
-        bool _scrollTop, _openInit, _cursorVisible;
+        bool _scrollTop, _browseLessons, _cursorVisible;
         Plan _lastPlan;
-        int _openMask;
         int _version, _cachedVersion = -1;
 
         string _cardId;
         float _cardW, _cardH;
         bool _cardAdv;
 
-        Plan _matchPlan;
-        string _matchQuery;
-        bool[] _match;
 
-        // Progress texts, rebuilt only when the progress changes.
         readonly List<string> _next = new List<string>(NextCount);
-        readonly GUIContent[] _tierCount = new GUIContent[Glossary.TierCount + 1];
-        readonly GUIContent[] _medalTip = new GUIContent[Glossary.TierCount + 1];
-        readonly bool[] _tierComplete = new bool[Glossary.TierCount + 1];
+        GUIContent[] _tierCount;
+        GUIContent[] _medalTip;
+        bool[] _tierComplete;
+        float[] _tierFraction;
         GUIContent _medalsText, _nextLabel;
         readonly List<GUIContent> _nextLinks = new List<GUIContent>(NextCount);
         readonly List<float> _nextLinkW = new List<float>(NextCount);
         float _nextLabelW;
-        // The "Skill tree online" link opens the website at the selected skill. Rebuilt only when the selection changes.
         string _webFor, _webUrl;
         GUIContent _webLabel, _webHover;
         float _webW;
@@ -93,14 +74,12 @@ namespace Avistry.Textures
 
         internal string ProgressText { get; private set; } = "";
         internal float ProgressFraction { get; private set; }
-        /// <summary>Layout of the last draw: "side", "inline" or "rows". Tests read it.</summary>
         internal string LastMode { get; private set; } = "";
         internal float LastHeight { get; private set; }
 
         static GUIContent s_done => new GUIContent(Loc.T("Done"));
         static GUIContent s_read => new GUIContent(Loc.T("Read"));
         static GUIContent s_nextUp => new GUIContent(Loc.T("Next up"));
-        static GUIContent s_empty => new GUIContent(Loc.T("Pick a skill on the left to read about it.\nNothing here is ever switched off: it is only a guide."));
         static readonly GUIContent s_emptyInline = new GUIContent("");
 
         public SkillTreeView(Action repaint) { _repaint = repaint; }
@@ -112,7 +91,7 @@ namespace Avistry.Textures
         }
 
 
-        static GUIStyle s_tierBlurbWrap, s_nodeTitle, s_nodeSub, s_nodeSubWrap, s_nodeNext, s_tierName, s_tierBlurb, s_count, s_countDone, s_medals, s_note, s_footer, s_link;
+        static GUIStyle s_tierBlurbWrap, s_nodeTitle, s_nodeSub, s_nodeSubWrap, s_nodeNext, s_tierName, s_tierBlurb, s_count, s_countDone, s_medals, s_footer, s_link;
         static bool s_stylesPro;
 
         static GUIStyle Plain(int size, Color colour, FontStyle weight, TextAnchor anchor)
@@ -148,8 +127,6 @@ namespace Avistry.Textures
             s_count = Plain(11, StudioGUI.CardTextDim, FontStyle.Normal, TextAnchor.MiddleRight);
             s_countDone = Plain(11, StudioGUI.CardGood, FontStyle.Bold, TextAnchor.MiddleRight);
             s_medals = Plain(11, StudioGUI.CardTextDim, FontStyle.Normal, TextAnchor.MiddleLeft);
-            s_note = Plain(12, StudioGUI.CardTextDim, FontStyle.Normal, TextAnchor.MiddleCenter);
-            s_note.wordWrap = true;
             s_footer = Plain(11, StudioGUI.CardTextDim, FontStyle.Normal, TextAnchor.MiddleLeft);
             s_link = Plain(11, StudioGUI.CardAccent, FontStyle.Bold, TextAnchor.MiddleLeft);
         }
@@ -171,7 +148,6 @@ namespace Avistry.Textures
             return c;
         }
 
-        /// <summary>The text wrapped to at most <paramref name="maxH"/> pixels of height, ending in an ellipsis when it is cut.</summary>
         static GUIContent FitWrapped(string text, GUIStyle style, float maxW, float maxH)
         {
             if (string.IsNullOrEmpty(text) || maxW <= 8f) return new GUIContent("");
@@ -188,19 +164,21 @@ namespace Avistry.Textures
         }
 
 
-        /// <summary>Rebuilds the progress texts when progress or the glossary changed. Cheap when nothing did.</summary>
         internal void Refresh()
         {
             var all = Glossary.All;
             if (!ReferenceEquals(all, _gloss))
             {
                 _gloss = all;
+                int slots = Glossary.TierCount + 1;
+                _tierCount = new GUIContent[slots];
+                _medalTip = new GUIContent[slots];
+                _tierComplete = new bool[slots];
+                _tierFraction = new float[slots];
+                _cardId = null;
                 _plans.Clear();
-                _matchPlan = null;
                 _version++;
             }
-            bool adv = StudioMode.Advanced;
-            if (adv != _advSeen) { _advSeen = adv; _matchPlan = null; }
             if (_cachedVersion == _version) return;
             _cachedVersion = _version;
             Styles();
@@ -215,6 +193,7 @@ namespace Avistry.Textures
             for (int t = 1; t <= Glossary.TierCount; t++)
             {
                 int size = Glossary.TierSize(t), done = Learn.TierDoneCount(t);
+                _tierFraction[t] = size > 0 ? done / (float)size : 0f;
                 _tierComplete[t] = size > 0 && done >= size;
                 _tierCount[t] = new GUIContent(done + "/" + size);
                 string name = MedalName(t);
@@ -227,7 +206,7 @@ namespace Avistry.Textures
                 else _medalTip[t] = new GUIContent("", Loc.F("Finish all {0} skills in tier {1} to earn the medal “{2}”.", size, t, name));
             }
             bool graduate = Learn.IsGraduate;
-            if (graduate) { if (earned++ > 0) medals.Append(" · "); medals.Append(Learn.GraduateName); }
+            if (Learn.HasGraduateMedal) { if (earned++ > 0) medals.Append(" · "); medals.Append(Learn.GraduateName); }
             _medalsText = new GUIContent(earned == 0 ? Loc.T("No medals yet. Finish a tier to earn one.") : Loc.F("Medals: {0}", medals));
 
             Learn.NextUp(_next, NextCount);
@@ -257,11 +236,10 @@ namespace Avistry.Textures
         internal bool IsComplete(int tier) => tier >= 1 && tier <= Glossary.TierCount && _tierComplete[tier];
 
 
-        /// <summary>Title, also called, aliases, definition, what, when, example, tryIt and watchOut. Empty query matches all.</summary>
         internal static bool Matches(Glossary.Entry e, string q, bool advanced)
         {
             if (string.IsNullOrEmpty(q)) return true;
-            if (Has(e.title, q) || Has(e.definition, q) || Has(e.what, q) || Has(e.when, q)) return true;
+            if (Has(e.id, q) || Has(e.whereInUnity, q) || Has(e.title, q) || Has(e.definition, q) || Has(e.what, q) || Has(e.when, q)) return true;
             if (Has(Glossary.ResolveTokens(e.example, advanced), q) || Has(Glossary.ResolveTokens(e.tryIt, advanced), q) || Has(Glossary.ResolveTokens(e.watchOut, advanced), q)) return true;
             if (e.alsoCalled != null) foreach (var a in e.alsoCalled) if (Has(a, q)) return true;
             if (e.aliases != null) foreach (var a in e.aliases) if (Has(a, q)) return true;
@@ -270,20 +248,6 @@ namespace Avistry.Textures
 
         static bool Has(string s, string q) => s != null && s.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0;
 
-        bool[] MatchesFor(Plan plan, string query)
-        {
-            if (string.IsNullOrEmpty(query)) return null;
-            if (ReferenceEquals(plan, _matchPlan) && query == _matchQuery) return _match;
-            _matchPlan = plan;
-            _matchQuery = query;
-            bool adv = StudioMode.Advanced;
-            _match = new bool[plan.Nodes.Length];
-            for (int i = 0; i < _match.Length; i++) _match[i] = Matches(plan.Nodes[i].E, query, adv);
-            return _match;
-        }
-
-
-        /// <summary>Selects a concept, opens its card (which marks it Read) and scrolls it into view.</summary>
         internal void Select(string conceptId, bool toTop)
         {
             if (!Glossary.Has(conceptId)) return;
@@ -292,16 +256,16 @@ namespace Avistry.Textures
             _cardScroll = Vector2.zero;
             _scrollTo = conceptId;
             _scrollTop = toTop;
-            var e = Glossary.Get(conceptId);
-            int tier = e.bonus ? 0 : Glossary.TierOf(e);
-            if (tier >= 1) _openMask |= 1 << tier;
+            _browseLessons = false;
             Learn.MarkRead(conceptId);
             _repaint?.Invoke();
         }
 
-        void Deselect()
+        internal void ShowChapters()
         {
             Selected = null;
+            _lastPlan = null;
+            _browseLessons = false;
             _repaint?.Invoke();
         }
 
@@ -313,7 +277,7 @@ namespace Avistry.Textures
             Styles();
             var h = new TierHead { Tier = tier, Lead = lead };
             string name, blurb;
-            if (tier == 0) { name = Loc.T("BONUS · NOT COUNTED"); blurb = Loc.T("A skill that never counts towards the 40."); }
+            if (tier == 0) { name = Loc.T("Optional lessons"); blurb = ""; }
             else
             {
                 var t = Glossary.TierInfo(tier);
@@ -340,77 +304,43 @@ namespace Avistry.Textures
         Plan GetPlan(int width, bool rows)
         {
             bool adv = StudioMode.Advanced;
-            int key = Mathf.Min(width, 4095) | ((rows ? _openMask : 0) << 12) | ((adv ? 1 : 0) << 20) | ((rows ? 1 : 0) << 21);
+            var chapter = Glossary.Get(Selected);
+            int tier = chapter.bonus ? 0 : Glossary.TierOf(chapter);
+            var key = (width, tier, rows, adv);
             if (_plans.TryGetValue(key, out var plan)) return plan;
             if (_plans.Count > 16) _plans.Clear();
-            plan = Build(width, rows, adv);
+            plan = Build(width, rows, adv, tier);
             _plans[key] = plan;
             return plan;
         }
 
-        Plan Build(int width, bool rows, bool adv)
+        Plan Build(int width, bool rows, bool adv, int chapter)
         {
             Styles();
             var plan = new Plan();
-            var nodes = new List<NodeBox>(48);
-            var blocks = new List<Block>(Glossary.TierCount + 1);
-            float lead = rows ? ChevronLead : 0f;
-            float y = TopGap;
-            float avail = width - Margin * 2f;
-            var all = Glossary.All;
-            // Nodes share the row: wide enough for the longest title (and never under 132 px), so no title is cut short.
-            float longest = 0f;
-            for (int i = 0; i < all.Count; i++) longest = Mathf.Max(longest, s_nodeTitle.CalcSize(new GUIContent(all[i].title)).x);
-            float minW = Mathf.Max(MinNodeW, Mathf.Ceil(longest) + 36f), maxW = Mathf.Max(MaxNodeW, minW + 40f);
-            int cols = rows ? 1 : Mathf.Max(1, Mathf.FloorToInt((avail + Gap) / (minW + Gap)));
-            float nodeW = rows ? avail : Mathf.Floor(Mathf.Min(maxW, (avail - (cols - 1) * Gap) / cols));
-
-            for (int tier = 1; tier <= Glossary.TierCount + 1; tier++)
+            var nodes = new List<NodeBox>();
+            foreach (var e in _gloss)
             {
-                int tierNo = tier <= Glossary.TierCount ? tier : 0;
-                bool any = false;
-                for (int i = 0; i < all.Count && !any; i++) any = tierNo == 0 ? all[i].bonus : !all[i].bonus && Glossary.TierOf(all[i]) == tierNo;
-                if (!any) continue;
-
-                var block = new Block { Head = MakeHead(tierNo, width, tierNo > 0 && rows ? lead : 0f), Y = y };
-                block.Open = !rows || tierNo == 0 || (_openMask & (1 << tierNo)) != 0;
-                int blockIndex = blocks.Count;
-                blocks.Add(block);
-                float headH = TierH + block.Head.Extra;
-                float cy = y + headH + 4f;
-                int n = 0;
-                for (int i = 0; i < all.Count; i++)
-                {
-                    var e = all[i];
-                    if (tierNo == 0 ? !e.bonus : (e.bonus || Glossary.TierOf(e) != tierNo)) continue;
-                    var box = new NodeBox { E = e, Block = blockIndex, Title = new GUIContent(e.title), Tip = new GUIContent("", Glossary.ResolveTokens(e.tip, adv)) };
-                    if (block.Open)
-                    {
-                        bool wide = tierNo == 0 || rows;
-                        float w = wide ? avail : nodeW;
-                        float h = rows ? RowH : NodeH;
-                        float x = Margin, ny = cy;
-                        if (!wide) { x += (n % cols) * (nodeW + Gap); ny += (n / cols) * (NodeH + Gap); }
-                        else ny = cy + n * (h + (rows ? RowGap : Gap));
-                        box.R = new Rect(x, ny, w, h);
-                        FitNode(ref box, e, w, rows, adv);
-                    }
-                    nodes.Add(box);
-                    n++;
-                }
-                if (block.Open && n > 0)
-                {
-                    float rowsUsed = (tierNo == 0 || rows) ? n : Mathf.Ceil(n / (float)cols);
-                    float rowH = rows ? RowH : NodeH;
-                    float step = rowH + (rows ? RowGap : Gap);
-                    block.H = headH + 4f + rowsUsed * step - (rows ? RowGap : Gap);
-                }
-                else block.H = headH;
-                y += block.H + BlockGap;
+                if (chapter == 0 ? e.bonus : !e.bonus && Glossary.TierOf(e) == chapter)
+                    nodes.Add(new NodeBox { E = e, Title = new GUIContent(e.title), Tip = new GUIContent("", Glossary.ResolveTokens(e.tip, adv)) });
             }
-
-            plan.Height = y;
-            plan.Blocks = blocks.ToArray();
+            plan.Head = MakeHead(chapter, width, 0f);
+            float avail = width - Margin * 2f;
+            float minW = MinNodeW;
+            foreach (var n in nodes) minW = Mathf.Max(minW, s_nodeTitle.CalcSize(n.Title).x + 36f);
+            int cols = rows || chapter == 0 ? 1 : Mathf.Max(1, Mathf.FloorToInt((avail + Gap) / (minW + Gap)));
+            float nodeW = (avail - (cols - 1) * Gap) / cols;
+            float nodeH = rows ? RowH : NodeH;
+            float rowGap = rows ? RowGap : Gap;
+            float y = TopGap + TierH + plan.Head.Extra + 4f;
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                var n = nodes[i];
+                n.R = new Rect(Margin + (i % cols) * (nodeW + Gap), y + (i / cols) * (nodeH + rowGap), nodeW, nodeH);
+                FitNode(ref n, n.E, nodeW, rows, adv);
+                nodes[i] = n;
+            }
+            plan.Height = y + Mathf.CeilToInt(nodes.Count / (float)cols) * (nodeH + rowGap) + BlockGap;
             plan.Nodes = nodes.ToArray();
             for (int i = 0; i < plan.Nodes.Length; i++) plan.Index[plan.Nodes[i].E.id] = i;
             return plan;
@@ -437,9 +367,6 @@ namespace Avistry.Textures
             }
         }
 
-        // How far a block moves down to make room for the inline card.
-        static float Shift(Plan plan, int block, int cardBlock, float cardBlockH) => cardBlock >= 0 && block > cardBlock ? cardBlockH : 0f;
-
         float CardHeight(Glossary.Entry e, float width)
         {
             bool adv = StudioMode.Advanced;
@@ -452,34 +379,51 @@ namespace Avistry.Textures
         }
 
 
-        /// <summary>Draws the medals strip, the tree (with its card) and the footer inside <paramref name="area"/>.</summary>
-        internal void Draw(Rect area, string search)
+        internal void Draw(Rect area)
         {
             Styles();
             Refresh();
             var mode = ModeFor(area.width);
             LastMode = mode == Mode.Side ? "side" : mode == Mode.Rows ? "rows" : "inline";
-            if (mode == Mode.Rows && !_openInit)
+            if (Selected == null || !Glossary.Has(Selected))
             {
-                _openInit = true;
-                if (_next.Count > 0) { var e = Glossary.Get(_next[0]); if (e != null) _openMask |= 1 << Glossary.TierOf(e); }
-                if (_openMask == 0) _openMask = 1 << 1;
+                DrawChapters(area);
+                return;
             }
 
-            DrawMedals(new Rect(area.x, area.y, area.width, MedalsH));
+            var nav = new Rect(area.x, area.y, area.width, 36f);
+            if (Event.current.type == EventType.Repaint) EditorGUI.DrawRect(nav, StudioGUI.CardInset);
+            var back = new Rect(nav.x + Margin, nav.y + 5f, 126f, 26f);
+            if (GUI.Button(back, "‹  " + Loc.T("All chapters"), EditorStyles.miniButton))
+            {
+                ShowChapters();
+                return;
+            }
+            if (mode != Mode.Side)
+            {
+                var choose = new Rect(back.xMax + 6f, back.y, 100f, back.height);
+                if (GUI.Button(choose, Loc.T("Lessons"), EditorStyles.miniButton))
+                {
+                    _browseLessons = !_browseLessons;
+                    _scrollTo = Selected;
+                    _repaint?.Invoke();
+                }
+            }
             DrawFooter(new Rect(area.x, area.yMax - FooterH, area.width, FooterH));
-            var body = new Rect(area.x, area.y + MedalsH, area.width, Mathf.Max(0f, area.height - MedalsH - FooterH));
+            var body = new Rect(area.x, nav.yMax, area.width, Mathf.Max(0f, area.height - nav.height - FooterH));
 
             if (mode == Mode.Side)
             {
-                var tree = new Rect(body.x, body.y, body.width - PanelW - 1f, body.height);
-                DrawTree(tree, search, mode);
+                float detailWidth = Mathf.Clamp(body.width * .55f, 330f, 720f);
+                var tree = new Rect(body.x, body.y, body.width - detailWidth - 1f, body.height);
+                DrawTree(tree, false);
                 if (Event.current.type == EventType.Repaint) EditorGUI.DrawRect(new Rect(tree.xMax, body.y, 1f, body.height), StudioGUI.CardBorder);
-                DrawDetail(new Rect(tree.xMax + 1f, body.y, PanelW, body.height));
+                DrawDetail(new Rect(tree.xMax + 1f, body.y, detailWidth, body.height));
             }
-            else DrawTree(body, search, mode);
+            else if (_browseLessons) DrawTree(body, true);
+            else DrawDetail(body);
 
-            HandleKeys();
+            if (mode == Mode.Side || _browseLessons) HandleKeys();
         }
 
         void DrawMedals(Rect r)
@@ -559,7 +503,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>The address of the footer's "Skill tree online" link: the selected skill on the website, or the whole tree.</summary>
         internal string WebLink()
         {
             string key = Selected ?? "";
@@ -574,48 +517,19 @@ namespace Avistry.Textures
             return _webUrl;
         }
 
-        void DrawTree(Rect area, string search, Mode mode)
+        void DrawTree(Rect area, bool rows)
         {
             var ev = Event.current;
-            bool rows = mode == Mode.Rows;
-            bool inlineCard = mode != Mode.Side;
-            int width = Mathf.FloorToInt(area.width);
+            int width = Mathf.FloorToInt(area.width - ScrollBarW);
             var plan = GetPlan(width, rows);
-            Glossary.Entry sel = Selected != null && Glossary.Has(Selected) ? Glossary.Get(Selected) : null;
-
-            float cardH = 0f, cardW = 0f;
-            int cardBlock = -1;
-            float Content(Plan p, int w)
-            {
-                cardBlock = -1;
-                cardH = 0f;
-                if (inlineCard && sel != null && p.Index.TryGetValue(sel.id, out var si) && p.Nodes[si].R.width > 0f)
-                {
-                    cardBlock = p.Nodes[si].Block;
-                    cardW = w - Margin * 2f;
-                    cardH = CardHeight(sel, cardW) + CardGap;
-                }
-                return p.Height + cardH;
-            }
-            // The scroll bar takes 15 px, so measure again at the narrower width before drawing.
-            float contentH = Content(plan, width);
-            if (contentH > area.height)
-            {
-                width -= (int)ScrollBarW;
-                plan = GetPlan(width, rows);
-                contentH = Content(plan, width);
-            }
-            LastHeight = contentH;
-
+            LastHeight = plan.Height;
             _lastPlan = plan;
-            var match = MatchesFor(plan, search);
-            if (_scrollTo != null) ResolveScroll(plan, area.height, cardBlock, cardH);
+            if (_scrollTo != null) ResolveScroll(plan, area.height);
 
             if (ev.type == EventType.Repaint) EditorGUI.DrawRect(area, StudioGUI.CardBg);
-            _scroll = GUI.BeginScrollView(area, _scroll, new Rect(0, 0, width, contentH));
+            _scroll = GUI.BeginScrollView(area, _scroll, new Rect(0, 0, width, plan.Height));
             float top = _scroll.y - 60f, bottom = _scroll.y + area.height + 60f;
 
-            // Which node the pointer is over (also while it moves, so the lines follow it).
             if (ev.type == EventType.Repaint || ev.type == EventType.MouseMove || ev.type == EventType.MouseDown)
             {
                 string over = null;
@@ -623,7 +537,7 @@ namespace Avistry.Textures
                 {
                     var r = plan.Nodes[i].R;
                     if (r.width <= 0f) continue;
-                    r.y += Shift(plan, plan.Nodes[i].Block, cardBlock, cardH);
+
                     if (r.Contains(ev.mousePosition) && InView(area, ev.mousePosition)) over = plan.Nodes[i].E.id;
                 }
                 if (over != _hover)
@@ -634,44 +548,20 @@ namespace Avistry.Textures
             }
             if (ev.type == EventType.MouseLeaveWindow && _hover != null) { _hover = null; _repaint?.Invoke(); }
 
-            // Tier headers, with a click to fold them in the narrow layout.
-            for (int b = 0; b < plan.Blocks.Length; b++)
-            {
-                var block = plan.Blocks[b];
-                float dy = Shift(plan, b, cardBlock, cardH);
-                var hr = new Rect(0, block.Y + dy, width, TierH + block.Head.Extra);
-                if (hr.yMax < top || hr.y > bottom) continue;
-                int tier = block.Head.Tier;
-                bool fold = rows && tier > 0;
-                DrawHead(hr, block.Head, fold ? (block.Open ? 2 : 1) : 0);
-                if (fold)
-                {
-                    if (ev.type == EventType.Repaint) EditorGUIUtility.AddCursorRect(hr, MouseCursor.Link);
-                    else if (ev.type == EventType.MouseDown && ev.button == 0 && hr.Contains(ev.mousePosition))
-                    {
-                        ev.Use();
-                        GUI.FocusControl(null);
-                        _openMask ^= 1 << tier;
-                        if (block.Open && Selected != null && Glossary.Has(Selected) && !Glossary.Get(Selected).bonus && Glossary.TierOf(Glossary.Get(Selected)) == tier) Deselect();
-                        _repaint?.Invoke();
-                    }
-                }
-            }
-
-            if (ev.type == EventType.Repaint && !rows) DrawEdges(plan, _hover ?? Selected, cardBlock, cardH);
+            DrawHead(new Rect(0f, TopGap, width, TierH + plan.Head.Extra), plan.Head);
+            if (ev.type == EventType.Repaint && !rows) DrawEdges(plan, _hover ?? Selected);
 
             for (int i = 0; i < plan.Nodes.Length; i++)
             {
                 ref var n = ref plan.Nodes[i];
                 if (n.R.width <= 0f) continue;
                 var r = n.R;
-                r.y += Shift(plan, n.Block, cardBlock, cardH);
+
                 if (r.yMax < top || r.y > bottom) continue;
                 string id = n.E.id;
                 bool isSel = id == Selected;
-                bool dim = match != null && !match[i];
                 bool isNext = _next.Contains(id);
-                DrawNode(ref n, r, isSel, isNext, id == _hover, _cursorVisible && id == _cursor, dim, rows);
+                DrawNode(ref n, r, isSel, isNext, id == _hover, _cursorVisible && id == _cursor, rows);
 
                 if (ev.type == EventType.Repaint) EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
                 else if (ev.type == EventType.MouseDown && ev.button == 0 && r.Contains(ev.mousePosition))
@@ -684,57 +574,40 @@ namespace Avistry.Textures
                 }
             }
 
-            if (cardBlock >= 0 && sel != null)
-            {
-                var block = plan.Blocks[cardBlock];
-                var cr = new Rect(Margin, block.Y + block.H + CardGap, cardW, cardH - CardGap);
-                var res = default(CardResult);
-                ConceptCard.Layout(sel, new Rect(cr.x, cr.y, cr.width, 0), CardMode.Detail, true, ref res);
-                if (ev.type == EventType.Repaint) StudioGUI.DrawBorder(cr, StudioGUI.CardBorder, 1f);
-                Act(res, sel.id);
-            }
             GUI.EndScrollView();
         }
 
-        // Whether a point (in scroll-content space) is also inside the visible view, so a node scrolled out of sight is not "hovered".
         bool InView(Rect view, Vector2 contentMouse)
         {
             float my = contentMouse.y - _scroll.y;
             return my >= 0f && my <= view.height;
         }
 
-        void ResolveScroll(Plan plan, float viewH, int cardBlock, float cardH)
+        void ResolveScroll(Plan plan, float viewH)
         {
             string id = _scrollTo;
             _scrollTo = null;
             if (!plan.Index.TryGetValue(id, out int i) || plan.Nodes[i].R.width <= 0f) return;
             var r = plan.Nodes[i].R;
-            r.y += Shift(plan, plan.Nodes[i].Block, cardBlock, cardH);
+
             if (_scrollTop) _scroll.y = Mathf.Max(0f, r.y - TierH - 12f);
             else if (r.y < _scroll.y + TierH) _scroll.y = Mathf.Max(0f, r.y - TierH - 12f);
             else if (r.yMax > _scroll.y + viewH - 8f) _scroll.y = r.yMax - viewH + 12f;
-            // The inline card sits under the node's tier: bring it into view too, but keep the node on screen.
-            if (cardBlock >= 0 && plan.Nodes[i].Block == cardBlock)
-            {
-                var block = plan.Blocks[cardBlock];
-                float cardBottom = block.Y + block.H + cardH;
-                if (cardBottom > _scroll.y + viewH - 8f) _scroll.y = Mathf.Max(0f, Mathf.Min(cardBottom - viewH + 12f, r.y - TierH - 12f));
-            }
+
         }
 
-        // Prerequisite lines for one node: the tier colour when that prerequisite is done, a dim line when it is not.
-        void DrawEdges(Plan plan, string focus, int cardBlock, float cardH)
+        void DrawEdges(Plan plan, string focus)
         {
             if (focus == null || !plan.Index.TryGetValue(focus, out int fi)) return;
             var f = plan.Nodes[fi];
             if (f.R.width <= 0f || f.E.requires == null) return;
             var to = f.R;
-            to.y += Shift(plan, f.Block, cardBlock, cardH);
+
             foreach (var rid in f.E.requires)
             {
                 if (!plan.Index.TryGetValue(rid, out int ri) || plan.Nodes[ri].R.width <= 0f) continue;
                 var from = plan.Nodes[ri].R;
-                from.y += Shift(plan, plan.Nodes[ri].Block, cardBlock, cardH);
+
                 var req = plan.Nodes[ri].E;
                 var colour = Learn.IsDone(rid) ? Fade(StudioGUI.TierColour(Glossary.TierOf(req)), 0.75f) : Fade(StudioGUI.CardTextDim, 0.4f);
                 Vector3 a, b, ta, tb;
@@ -746,14 +619,12 @@ namespace Avistry.Textures
             }
         }
 
-        // chevron: 0 none, 1 folded, 2 open
-        internal void DrawHead(Rect r, TierHead h, int chevron)
+        internal void DrawHead(Rect r, TierHead h)
         {
             if (Event.current.type != EventType.Repaint) return;
             Styles();
             int tier = h.Tier;
             EditorGUI.DrawRect(new Rect(r.x, r.y + 2f, 4f, r.height - 4f), tier == 0 ? StudioGUI.CardBorder : StudioGUI.TierColour(tier));
-            if (chevron != 0) DrawChevron(new Rect(r.x + Margin, r.y + (TierH - 10f) * 0.5f, 10f, 10f), chevron == 2);
             GUI.Label(new Rect(r.x + Margin + h.Lead, r.y, h.NameW, TierH), h.Name, s_tierName);
             if (h.Blurb != null) GUI.Label(new Rect(r.x + h.BlurbX, r.y, Mathf.Max(0f, r.width - h.BlurbX - RightZone - 8f), TierH), h.Blurb, s_tierBlurb);
             else if (h.Wrap != null) GUI.Label(new Rect(r.x + Margin + h.Lead, r.y + TierH - 6f, Mathf.Max(0f, r.width - Margin * 2f - h.Lead), h.Extra + 4f), h.Wrap, s_tierBlurbWrap);
@@ -766,39 +637,22 @@ namespace Avistry.Textures
             }
         }
 
-        static readonly Vector3[] s_chev = new Vector3[3];
-
-        static void DrawChevron(Rect r, bool open)
-        {
-            if (open) { s_chev[0] = new Vector3(r.x + 1f, r.y + 3f); s_chev[1] = new Vector3(r.center.x, r.y + 7.5f); s_chev[2] = new Vector3(r.xMax - 1f, r.y + 3f); }
-            else { s_chev[0] = new Vector3(r.x + 3f, r.y + 1f); s_chev[1] = new Vector3(r.x + 7.5f, r.center.y); s_chev[2] = new Vector3(r.x + 3f, r.yMax - 1f); }
-            var old = Handles.color;
-            Handles.color = StudioGUI.CardTextDim;
-            Handles.DrawAAPolyLine(2f, s_chev);
-            Handles.color = old;
-        }
-
-        void DrawNode(ref NodeBox n, Rect r, bool selected, bool next, bool hover, bool cursor, bool dim, bool rows)
+        void DrawNode(ref NodeBox n, Rect r, bool selected, bool next, bool hover, bool cursor, bool rows)
         {
             var ev = Event.current;
             if (ev.type != EventType.Repaint) return;
             var e = n.E;
             int tier = e.bonus ? 0 : Glossary.TierOf(e);
             var state = Learn.StateOf(e.id);
-            float a = dim ? 0.35f : 1f;
-            var fill = hover && !dim ? Color.Lerp(StudioGUI.CardInset, StudioGUI.CardBorder, 0.4f) : StudioGUI.CardInset;
-            StudioGUI.DrawRounded(r, Fade(fill, a), 6f);
-            if (selected) StudioGUI.DrawRoundedBorder(r, Fade(tier > 0 ? StudioGUI.TierColour(tier) : StudioGUI.CardAccent, a), 6f, 2f);
-            else if (next) StudioGUI.DrawRoundedBorder(r, Fade(StudioGUI.CardAccent, a), 6f, 2f);
-            else StudioGUI.DrawRoundedBorder(r, Fade(StudioGUI.CardBorder, a), 6f, 1f);
-            if (cursor) StudioGUI.DrawRoundedBorder(new Rect(r.x - 2f, r.y - 2f, r.width + 4f, r.height + 4f), Fade(StudioGUI.CardText, 0.8f), 8f, 1f);
-
+            var fill = hover ? Color.Lerp(StudioGUI.CardInset, StudioGUI.CardBorder, .4f) : StudioGUI.CardInset;
+            StudioGUI.DrawRounded(r, fill, 6f);
+            if (selected) StudioGUI.DrawRoundedBorder(r, tier > 0 ? StudioGUI.TierColour(tier) : StudioGUI.CardAccent, 6f, 2f);
+            else if (next) StudioGUI.DrawRoundedBorder(r, StudioGUI.CardAccent, 6f, 2f);
+            else StudioGUI.DrawRoundedBorder(r, StudioGUI.CardBorder, 6f, 1f);
+            if (cursor) StudioGUI.DrawRoundedBorder(new Rect(r.x - 2f, r.y - 2f, r.width + 4f, r.height + 4f), Fade(StudioGUI.CardText, .8f), 8f, 1f);
             Color glyph = state == Learn.State.Done ? StudioGUI.CardGood : state == Learn.State.Read ? (tier > 0 ? StudioGUI.TierColour(tier) : StudioGUI.CardAccent) : StudioGUI.CardTextDim;
-            float gy = rows ? r.y + (r.height - 12f) * 0.5f : r.y + 9f;
-            StudioGUI.DrawStateGlyph(new Rect(r.x + 8f, gy, 12f, 12f), state, Fade(glyph, a));
-
-            var old = GUI.contentColor;
-            if (dim) GUI.contentColor = new Color(1f, 1f, 1f, a);
+            float gy = rows ? r.y + (r.height - 12f) * .5f : r.y + 9f;
+            StudioGUI.DrawStateGlyph(new Rect(r.x + 8f, gy, 12f, 12f), state, glyph);
             var sub = state == Learn.State.Done ? s_done : state == Learn.State.Read ? (next ? s_nextUp : s_read) : (next ? s_nextUp : n.SubNew);
             var subStyle = next && state != Learn.State.Done ? s_nodeNext : s_nodeSub;
             if (rows)
@@ -812,7 +666,6 @@ namespace Avistry.Textures
                 if (ReferenceEquals(sub, n.SubNew)) GUI.Label(new Rect(r.x + 26f, r.y + 24f, r.width - 34f, SubH), sub, s_nodeSubWrap);
                 else GUI.Label(new Rect(r.x + 26f, r.y + 24f, r.width - 34f, 14f), sub, subStyle);
             }
-            GUI.contentColor = old;
             GUI.Label(r, n.Tip, GUIStyle.none);
         }
 
@@ -821,19 +674,10 @@ namespace Avistry.Textures
         {
             var ev = Event.current;
             if (ev.type == EventType.Repaint) EditorGUI.DrawRect(area, StudioGUI.CardBg);
-            if (Selected == null || !Glossary.Has(Selected))
-            {
-                if (ev.type == EventType.Repaint) GUI.Label(new Rect(area.x + 20f, area.y, area.width - 40f, area.height), s_empty, s_note);
-                return;
-            }
             var e = Glossary.Get(Selected);
-            float cw = area.width;
+            float cw = area.width - ScrollBarW;
             float h = CardHeight(e, cw);
-            if (h > area.height)
-            {
-                cw -= ScrollBarW;
-                h = CardHeight(e, cw);
-            }
+            if (area.width < SideMinWidth) LastHeight = h;
             var res = default(CardResult);
             _cardScroll = GUI.BeginScrollView(area, _cardScroll, new Rect(0, 0, cw, h));
             ConceptCard.Layout(e, new Rect(0, 0, cw, 0), CardMode.Detail, true, ref res);
@@ -841,7 +685,6 @@ namespace Avistry.Textures
             Act(res, e.id);
         }
 
-        // The card only reports clicks; they act here, after it has drawn.
         void Act(CardResult res, string conceptId)
         {
             if (res.GoTo != null) Select(res.GoTo, true);
@@ -856,7 +699,6 @@ namespace Avistry.Textures
         }
 
 
-        // Arrows move a cursor between nodes and Enter opens its card. The search box keeps its own keys.
         void HandleKeys()
         {
             var ev = Event.current;

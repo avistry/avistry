@@ -4,24 +4,43 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// The editable layer stack. Lives in memory while editing and is saved next to a baked PNG
-    /// so the edit can be reopened and tweaked later. (Own file: ScriptableObject assets need a matching file name.)
-    /// </summary>
     public class TextureRecipe : ScriptableObject
     {
         public Texture2D sourceTexture;
         public Material sourceMaterial;
         [Tooltip("The PNG this edit was baked into (empty for edits saved without baking)")]
         public Texture2D bakedTexture;
+        [SerializeField] internal Material bakedMaterial;
+        [SerializeField] internal bool savedAsDraft;
+        [SerializeField] internal bool savedAsTemplate;
+        [SerializeReference] internal StylePack.Entry draftTarget;
+        [SerializeReference] internal IncludedLayout includedLayout;
         public string rendererPath;
         public int materialIndex;
         [SerializeReference] public List<Layer> layers = new List<Layer>();
 
-        /// <summary>
-        /// Removes empty entries from a layer list in place and warns once with the count. Unity leaves a null in a
-        /// [SerializeReference] list when it restores a snapshot (undo, reload, loaded asset) that lacks the object.
-        /// </summary>
+        [Serializable]
+        internal sealed class IncludedLayout
+        {
+            public string fingerprint;
+            public StylePack.Binding primary;
+            public StylePack.Binding[] primarySlots;
+            public string[] primaryProperties;
+            public int primaryChannel;
+            public IncludedPart[] included;
+        }
+
+        [Serializable]
+        internal sealed class IncludedPart
+        {
+            public StylePack.Binding binding;
+            public Material sourceMaterial;
+            public Material bakedMaterial;
+            public string[] properties;
+            public int channel;
+            public int uvChannel;
+        }
+
         internal static int DropNullLayers(List<Layer> list, string where)
         {
             if (list == null) return 0;

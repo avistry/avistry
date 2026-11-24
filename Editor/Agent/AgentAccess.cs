@@ -5,32 +5,23 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// What the AI helper may do, who allowed it and what it did. Only the person changes the level, in the AI helper
-    /// window or with the Stop button, so no tool can reach the setter. The level is a preference like the Advanced
-    /// toggle, so it uses no Undo. Tests switch <see cref="Sandbox"/> on to keep everything in memory.
-    /// </summary>
     internal static class AgentAccess
     {
         internal enum Level { Off = 0, LookOnly = 1, LookAndEdit = 2 }
         internal enum RequestState { Waiting, Allowed, Denied, Expired, Cancelled }
 
-        /// <summary>One thing the helper asked the person to approve.</summary>
         internal class Request
         {
-            public string kind;       // save_png, bake_ao, make_normal_map, make_face_shadow or picture
-            public string summary;    // the text the banner shows
-            public double since;      // EditorApplication.timeSinceStartup
+            public string kind;
+            public string summary;
+            public double since;
             public RequestState state;
-            public AgentResult result; // set when the approved work has finished
+            public AgentResult result;
         }
 
-        /// <summary>One thing the helper did, for the strip and the AI helper window. Memory only.</summary>
         internal class Activity
         {
             public string text;
-            public string undoName;   // the Undo group name, or null
-            public int undoGroup;     // Undo.GetCurrentGroup() when it was made
             public double time;
         }
 
@@ -56,7 +47,6 @@ namespace Avistry.Textures
 
         static Mem M => s_sandbox ?? s_real;
 
-        /// <summary>Keeps level, allowances, request and log in memory only, starting from Off. For tests.</summary>
         internal static bool Sandbox
         {
             get => s_sandbox != null;
@@ -68,7 +58,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>Off by default.</summary>
         internal static Level Current
         {
             get
@@ -90,21 +79,18 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>"Allow saves until Unity closes". Unchecked by default and never stored.</summary>
         internal static bool AllowSaves
         {
             get => s_sandbox != null ? s_sandbox.allowSaves : SessionState.GetBool(SavesKey, false);
             set { if (s_sandbox != null) s_sandbox.allowSaves = value; else SessionState.SetBool(SavesKey, value); Changed?.Invoke(); }
         }
 
-        /// <summary>"Allow pictures until Unity closes". Unchecked by default and never stored.</summary>
         internal static bool AllowPictures
         {
             get => s_sandbox != null ? s_sandbox.allowPictures : SessionState.GetBool(PicturesKey, false);
             set { if (s_sandbox != null) s_sandbox.allowPictures = value; else SessionState.SetBool(PicturesKey, value); Changed?.Invoke(); }
         }
 
-        /// <summary>Null when the call may go ahead; otherwise the access_off or read_only answer.</summary>
         internal static AgentResult Gate(string action, bool edits)
         {
             var level = Current;
@@ -115,7 +101,6 @@ namespace Avistry.Textures
             return null;
         }
 
-        /// <summary>The request that is waiting or was just answered, or null. A waiting one older than five minutes becomes Expired.</summary>
         internal static Request OpenRequest
         {
             get
@@ -130,7 +115,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>Opens a request. Returns null when another one is still waiting (the caller answers request_open).</summary>
         internal static Request BeginRequest(string kind, string summary)
         {
             var open = OpenRequest;
@@ -141,7 +125,6 @@ namespace Avistry.Textures
             return r;
         }
 
-        /// <summary>Records the person's answer. Only a waiting request can be answered.</summary>
         internal static void AnswerRequest(RequestState answer)
         {
             var r = OpenRequest;
@@ -150,7 +133,6 @@ namespace Avistry.Textures
             Changed?.Invoke();
         }
 
-        /// <summary>Forgets the request once its answer was delivered.</summary>
         internal static void CloseRequest()
         {
             if (M.request == null) return;
@@ -161,10 +143,10 @@ namespace Avistry.Textures
 
         internal static IReadOnlyList<Activity> Recent => M.log;
 
-        internal static void Log(string text, string undoName = null, int undoGroup = -1)
+        internal static void Log(string text)
         {
             var log = M.log;
-            log.Add(new Activity { text = text, undoName = undoName, undoGroup = undoGroup, time = EditorApplication.timeSinceStartup });
+            log.Add(new Activity { text = text, time = EditorApplication.timeSinceStartup });
             if (log.Count > ActivityMax) log.RemoveAt(0);
             Changed?.Invoke();
         }

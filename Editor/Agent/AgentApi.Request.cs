@@ -12,19 +12,17 @@ namespace Avistry.Textures
         const string PictureFile = "agent-picture.png";
         const string SaveDialogTitle = "Save your edit";
 
-        /// <summary>What the open request will do once the person clicks Allow.</summary>
         class PendingWork
         {
             public string kind;
             public bool use;
             public int size;
-            public string detail;       // the text behind "What will change?"
+            public string detail;
             public AgentAccess.Request request;
         }
 
         static PendingWork s_pending;
 
-        /// <summary>The longer description of the open request, for the banner's "What will change?" button.</summary>
         internal static string OpenRequestDetail => s_pending?.detail;
 
         static AgentResult RequestAction(string action, AgentArgs a)
@@ -102,7 +100,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>The exact text of the tool's own Save question: Bake asks it and a one-shot answer says no, so nothing is written.</summary>
         static string SaveDialogText(AvatarTextureWindow w)
         {
             string text = null;
@@ -142,10 +139,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>
-        /// The person's answer to the open request, from the banner or a test. Allow runs the work at once (or on the next
-        /// editor tick when <paramref name="defer"/> is set, so a click never saves from inside OnGUI).
-        /// </summary>
         internal static bool Answer(bool allow, bool forSession = false, bool defer = false, bool fireLearn = true)
         {
             var req = AgentAccess.OpenRequest;
@@ -186,7 +179,6 @@ namespace Avistry.Textures
             req.result = Clean(res);
         }
 
-        /// <summary>Runs an approved request like the person's own click, in one Undo step named "AI: ...".</summary>
         static AgentResult Execute(AvatarTextureWindow w, PendingWork work)
         {
             switch (work.kind)
@@ -231,7 +223,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>The current result as a PNG under the project's Temp folder, which Unity clears. Nothing in Assets is touched.</summary>
         static AgentResult MakePicture(AvatarTextureWindow w, int size)
         {
             var slot = w.AutoCurrentSlot;

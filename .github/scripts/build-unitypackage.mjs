@@ -1,6 +1,3 @@
-// Usage: node build-unitypackage.mjs <packageDir> <out.unitypackage>
-// Writes a .unitypackage (gzip tar) from the committed .meta GUIDs, so no Unity licence is needed.
-// Layout per asset: <guid>/pathname, <guid>/asset (files only), <guid>/asset.meta.
 import fs from 'node:fs';
 import path from 'node:path';
 import { collectPackage, makeTarGz } from './lib.mjs';

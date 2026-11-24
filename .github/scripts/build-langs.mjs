@@ -1,9 +1,3 @@
-// Gives every page a copy per language (ja/, ko/, zh-CN/) whose title, description and share picture are already in
-// that language, so a shared link previews in the language it was copied in: link previews never run JavaScript.
-// The copies use the same files as the English pages through <base href="../">; app.js does the rest of the
-// translation as usual. Every page also gets hreflang links to its other languages.
-//
-//   node .github/scripts/build-langs.mjs --site _site
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -35,7 +29,7 @@ for (const page of PAGES) {
   const alts = ['en', ...LANGS].map(l => `<link rel="alternate" hreflang="${l}" href="${href(l)}">`).join('\n')
     + `\n<link rel="alternate" hreflang="x-default" href="${href('en')}">\n<meta name="ats-lang-dirs" content="1">\n`;
   const titleKey = (/data-title-key="([^"]+)"/.exec(en) || [])[1];
-  const descKey = (/content:([\w.-]+meta\.description)/.exec(en) || [])[1];
+  const descKey = (/<meta name="description"[^>]*\bdata-i18n-attr="content:([\w.-]+)"/.exec(en) || [])[1];
   const img = (/<meta property="og:image" content="([^"]+)"/.exec(en) || [])[1];
 
   for (const lang of LANGS) {
@@ -52,10 +46,11 @@ for (const page of PAGES) {
     }
     h = meta(h, 'property', 'og:url', href(lang)).replace(/<link rel="canonical" href="[^"]*">/, `<link rel="canonical" href="${href(lang)}">`);
     if (img) {
-      const local = img.slice(root.length).replace(/\.jpg$/, '-' + lang + '.jpg');
+      const local = img.slice(root.length).split(/[?#]/)[0].replace(/\.jpg$/, '-' + lang + '.jpg');
       if (fs.existsSync(path.join(site, local))) {
-        h = meta(h, 'property', 'og:image', root + local);
-        h = meta(h, 'name', 'twitter:image', root + local);
+        const localized = img.replace(/\.jpg(?=[?#]|$)/, '-' + lang + '.jpg');
+        h = meta(h, 'property', 'og:image', localized);
+        h = meta(h, 'name', 'twitter:image', localized);
         if (titleKey && d[titleKey]) h = meta(h, 'property', 'og:image:alt', strip(d[titleKey]));
       }
     }

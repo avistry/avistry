@@ -1,5 +1,3 @@
-// Usage: node changelog-section.mjs <version> [CHANGELOG.md]
-// Prints the body of the "## [<version>]" section (Keep a Changelog format) to stdout. Exits 1 if missing or empty.
 import fs from 'node:fs';
 
 const [version, file = 'CHANGELOG.md'] = process.argv.slice(2);

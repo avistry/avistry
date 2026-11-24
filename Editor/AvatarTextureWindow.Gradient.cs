@@ -4,61 +4,32 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Gradient tool (CLIP STUDIO PAINT-style): drag on the texture to draw a gradient. Each drag makes an editable
-    /// gradient layer (start/end points, linear / circle / ellipse, edge process, dithering). With a gradient layer
-    /// selected, its start and end dots can be dragged to adjust it, or the middle square to move it.
-    /// </summary>
     partial class AvatarTextureWindow
     {
         [SerializeField] GradientToolSettings _grad = new GradientToolSettings();
 
         enum GradHandle { None = -1, Start = 0, End = 1, Move = 2 }
 
-        DrawnGradientLayer _gradDrag;
+        DrawnGradientLayer _gradDrag, _gradOriginal;
+        System.Func<bool> _gradTargetMatches;
+        Layer _gradInsertAbove;
+        int _gradInsertAt, _gradDragControl;
         GradHandle _gradHandle = GradHandle.None;
-        bool _gradCreated;
-        int _gradUndoGroup;
+        bool _gradPreviewActive, _gradOriginalView;
+        Color? _gradRecentColour;
         Vector2 _gradGrabUV, _gradGrabStart, _gradGrabEnd;
-        static Texture2D s_gradientIcon;
+        bool _revealSelectedGradient;
+        static readonly GradientColours[] GradientColourSources = (GradientColours[])System.Enum.GetValues(typeof(GradientColours));
 
         bool GradientToolActive => _tool == Tool.Paint && _brush.gradientTool && _brush.mode == BrushMode.Paint && !MaskEditing;
         DrawnGradientLayer SelectedGradient => ActiveLayer as DrawnGradientLayer;
 
-        static void DestroyGradientIcon()
-        {
-            AssemblyReloadEvents.beforeAssemblyReload -= DestroyGradientIcon;
-            if (s_gradientIcon != null) Object.DestroyImmediate(s_gradientIcon);
-            s_gradientIcon = null;
-        }
-
-        static GUIContent GradientToolContent(string text, string tip)
-        {
-            if (s_gradientIcon == null)
-            {
-                AssemblyReloadEvents.beforeAssemblyReload -= DestroyGradientIcon;
-                AssemblyReloadEvents.beforeAssemblyReload += DestroyGradientIcon;
-                s_gradientIcon = new Texture2D(16, 16, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Point };
-                var px = new Color32[256];
-                for (int y = 0; y < 16; y++)
-                for (int x = 0; x < 16; x++)
-                {
-                    bool border = x == 1 || x == 14 || y == 2 || y == 13;
-                    bool inside = x > 1 && x < 14 && y > 2 && y < 13;
-                    byte v = (byte)(40 + x * 13);
-                    px[y * 16 + x] = border && x >= 1 && x <= 14 && y >= 2 && y <= 13 ? new Color32(200, 200, 200, 255)
-                                    : inside ? new Color32(v, v, v, 255) : new Color32(0, 0, 0, 0);
-                }
-                s_gradientIcon.SetPixels32(px);
-                s_gradientIcon.Apply(false);
-            }
-            return new GUIContent(text, s_gradientIcon, tip);
-        }
-
-        /// <summary>Switches the Paint tab's tool: 0 brush, 1 eraser, 2 fill, 3 gradient, 4 blend (blur / smudge).</summary>
         void SetPaintTool(int t)
         {
-            if (_gradDrag != null) EndGradientDrag();
+            SetPickForPaint(false);
+            CancelSceneGradient();
+            CancelGradientDrag();
+            CancelImageDrag();
             _brush.mode = t == 1 ? BrushMode.Erase : BrushMode.Paint;
             _brush.fillTool = t == 2;
             _brush.gradientTool = t == 3;
@@ -76,8 +47,8 @@ namespace Avistry.Textures
 
         GradHandle GradientHandleAt(Vector2 local)
         {
-            var g = SelectedGradient;
-            if (g == null || !g.enabled || _comp == null) return GradHandle.None;
+            var g = TextureGradientForHandles;
+            if (g == null || _comp == null) return GradHandle.None;
             Vector2 a = UVToCanvas(g.start), b = UVToCanvas(g.end);
             if (Vector2.Distance(local, b) <= 9f) return GradHandle.End;
             if (Vector2.Distance(local, a) <= 9f) return GradHandle.Start;
@@ -85,43 +56,42 @@ namespace Avistry.Textures
             return GradHandle.None;
         }
 
-        /// <summary>Mouse down with the Gradient tool: grab a handle of the selected gradient, or start drawing a new one.</summary>
-        bool BeginGradientDrag(Vector2 local)
+        bool BeginGradientDrag(Vector2 local) => BeginTextureGradient(local, allowAdjustment: true);
+
+        bool BeginTextureGradient(Vector2 local, bool allowAdjustment)
         {
             if (!CanPaint(out var why)) { Toast(why, MessageType.Warning); return false; }
+            CancelSceneGradient();
+            CancelGradientDrag();
+            CancelImageDrag();
             EndStroke();
-            ShowEditsIfBeforeOn();
+            var targetMatches = CaptureSavedEditContext(_recipe, CurrentSlot);
+            if (!targetMatches())
+            {
+                if (_needsRebuild) _preview.Clear();
+                Toast(Loc.T("Edit changed. Redraw gradient."), MessageType.Warning);
+                return false;
+            }
+            _gradTargetMatches = targetMatches;
             var uv = CanvasToUV(local);
-            Undo.IncrementCurrentGroup();
-            _gradUndoGroup = Undo.GetCurrentGroup();
-            var handle = GradientHandleAt(local);
+            _gradOriginalView = _showOriginal;
+            var handle = allowAdjustment ? GradientHandleAt(local) : GradHandle.None;
             if (handle != GradHandle.None)
             {
-                _gradDrag = SelectedGradient;
+                _gradOriginal = SelectedGradient;
+                _gradDrag = _gradOriginal.CopyPlacement();
                 _gradHandle = handle;
-                _gradCreated = false;
-                if (!_gradDrag.enabled) _gradDrag.enabled = true;
             }
             else
             {
-                var layer = new DrawnGradientLayer
-                {
-                    name = $"Gradient ({_grad.shape.ToString().ToLowerInvariant()})",
-                    gradient = _grad.Build(_brush.color, _brush.subColor),
-                    shape = _grad.shape,
-                    edge = _grad.edge,
-                    flatness = _grad.flatness,
-                    dither = _grad.dither,
-                    blend = _grad.blend,
-                    opacity = _brush.opacity,
-                    start = uv,
-                    end = uv,
-                };
-                InsertLayer(layer, "Draw gradient");
-                if (_grad.colours != GradientColours.Custom) RememberColour(_brush.color);
+                var layer = NewDrawnGradientLayer();
+                layer.start = layer.end = uv;
+                CaptureGradientPieces(layer);
                 _gradDrag = layer;
+                _gradInsertAbove = ActiveLayer;
+                _gradInsertAt = _recipe.layers.Count;
+                _gradRecentColour = _grad.colours == GradientColours.Custom ? (Color?)null : _brush.color;
                 _gradHandle = GradHandle.End;
-                _gradCreated = true;
             }
             _gradGrabUV = uv;
             _gradGrabStart = _gradDrag.start;
@@ -129,25 +99,60 @@ namespace Avistry.Textures
             return true;
         }
 
+        void CaptureGradientPieces(DrawnGradientLayer layer)
+        {
+            if (CaptureFaceSelection(layer)) return;
+            foreach (int piece in _selection)
+                if (IsCurrentPiece(piece)) layer.islands.Add(piece);
+            if (layer.islands.Count > 0) layer.maskMode = MaskMode.SelectedIslands;
+        }
+
+        DrawnGradientLayer NewDrawnGradientLayer() => new DrawnGradientLayer
+        {
+            name = _grad.shape switch
+            {
+                GradientShape.Circle => Loc.T("Gradient (circle)"),
+                GradientShape.Ellipse => Loc.T("Gradient (ellipse)"),
+                _ => Loc.T("Gradient (linear)"),
+            },
+            gradient = NewGradientRamp(_grad.colours),
+            shape = _grad.shape,
+            edge = _grad.edge,
+            flatness = _grad.flatness,
+            dither = _grad.dither,
+            blend = _grad.blend,
+            opacity = _brush.opacity,
+        };
+
         void UpdateGradientDrag(Vector2 local, bool snap)
         {
             if (_gradDrag == null || _comp == null) return;
-            var uv = CanvasToUV(local);
+            var d = CanvasToUV(local) - _gradGrabUV;
             switch (_gradHandle)
             {
-                case GradHandle.Start: _gradDrag.start = snap ? Snap45(_gradDrag.end, uv) : uv; break;
-                case GradHandle.End: _gradDrag.end = snap ? Snap45(_gradDrag.start, uv) : uv; break;
+                case GradHandle.Start:
+                    var start = _gradGrabStart + d;
+                    _gradDrag.start = d != Vector2.zero ? ConstrainTextureGradient(_gradGrabEnd, start, snap) : start;
+                    break;
+                case GradHandle.End:
+                    var end = _gradGrabEnd + d;
+                    _gradDrag.end = d != Vector2.zero ? ConstrainTextureGradient(_gradGrabStart, end, snap) : end;
+                    break;
                 case GradHandle.Move:
-                    var d = uv - _gradGrabUV;
                     _gradDrag.start = _gradGrabStart + d;
                     _gradDrag.end = _gradGrabEnd + d;
                     break;
+            }
+            if (!_gradPreviewActive)
+            {
+                if (!GradientDragChanged()) return;
+                _gradPreviewActive = true;
+                ShowEditsIfBeforeOn();
             }
             ComposeNow();
             Repaint();
         }
 
-        /// <summary>Shift: snap the direction to 45° steps, measured in texture pixels (so it also works on non-square textures).</summary>
         Vector2 Snap45(Vector2 anchor, Vector2 uv)
         {
             var scale = new Vector2(_comp.Width, _comp.Height);
@@ -158,41 +163,115 @@ namespace Avistry.Textures
             return anchor + new Vector2(s.x / scale.x, s.y / scale.y);
         }
 
-        void EndGradientDrag()
+        bool GradientDragChanged()
         {
-            if (_gradDrag == null) return;
-            var g = _gradDrag;
-            _gradDrag = null;
-            Vector2 s = g.start, e = g.end;
-            float lengthPx = _comp != null ? Vector2.Scale(e - s, new Vector2(_comp.Width, _comp.Height)).magnitude : 0f;
-            if (_gradCreated && lengthPx < 3f)
-            {
-                // A click, not a drag: take the empty layer away again and explain.
-                Undo.RevertAllDownToGroup(_gradUndoGroup);
-                Toast(Loc.T("Drag across the texture to draw a gradient: it starts where you press and ends where you let go. Shift snaps to 45°."), MessageType.Info, 5f);
-                ComposeNow();
-                return;
-            }
-            if (!_gradCreated && (s - _gradGrabStart).sqrMagnitude < 1e-12f && (e - _gradGrabEnd).sqrMagnitude < 1e-12f) { Repaint(); return; }
-
-            // Record the whole drag as one undo step (the layer was edited live while dragging).
-            g.start = _gradGrabStart;
-            g.end = _gradGrabEnd;
-            string undoName = _gradCreated ? "Draw gradient" : "Adjust gradient";
-            Undo.RecordObject(_recipe, undoName);
-            g.start = s;
-            g.end = e;
-            Undo.SetCurrentGroupName(undoName);
-            Undo.CollapseUndoOperations(_gradUndoGroup);
-            MarkEdited();
-            ComposeNow();
+            if (_gradDrag == null || _comp == null) return false;
+            if (_gradOriginal == null)
+                return Vector2.Scale(_gradDrag.end - _gradDrag.start, new Vector2(_comp.Width, _comp.Height)).sqrMagnitude >= 9f;
+            return (_gradDrag.start - _gradGrabStart).sqrMagnitude >= 1e-12f ||
+                   (_gradDrag.end - _gradGrabEnd).sqrMagnitude >= 1e-12f;
         }
 
-        /// <summary>The selected gradient's line, ends and outline, drawn over the texture (canvas-local coordinates).</summary>
+        int GradientPlacementIndex()
+        {
+            if (_gradOriginal != null) return _recipe.layers.IndexOf(_gradOriginal);
+            if (_gradInsertAbove == null) return Mathf.Min(_gradInsertAt, _recipe.layers.Count);
+            int above = _recipe.layers.IndexOf(_gradInsertAbove);
+            return above < 0 ? -1 : above + 1;
+        }
+
+        bool EndGradientDrag()
+        {
+            var draft = _gradDrag;
+            if (draft == null) return false;
+            var original = _gradOriginal;
+            var recent = _gradRecentColour;
+            if (!TextureGradientTargetStillMatches())
+            {
+                AbandonTextureGradient(targetChanged: true);
+                return false;
+            }
+            if (!GradientDragChanged())
+            {
+                CancelGradientDrag();
+                if (original == null)
+                    Toast(Loc.T("Drag across the texture to draw a gradient: it starts where you press and ends where you let go. Shift snaps to 45°."), MessageType.Info, 5f);
+                return false;
+            }
+
+            Undo.FlushUndoRecordObjects();
+            if (_gradDrag != draft) return false;
+            if (!TextureGradientTargetStillMatches())
+            {
+                AbandonTextureGradient(targetChanged: true);
+                return false;
+            }
+            int index = GradientPlacementIndex();
+            CancelGradientDrag(restoreComparison: false);
+            Undo.IncrementCurrentGroup();
+            string undoName = original == null ? "Draw gradient" : "Adjust gradient";
+            Undo.SetCurrentGroupName(undoName);
+            if (original == null)
+            {
+                InsertLayer(draft, undoName, captureSelection: false, insertionIndex: index);
+                if (recent.HasValue) RememberColour(recent.Value);
+            }
+            else
+            {
+                Undo.RecordObject(_recipe, undoName);
+                original.start = draft.start;
+                original.end = draft.end;
+                MarkEdited();
+            }
+            Undo.FlushUndoRecordObjects();
+            Undo.IncrementCurrentGroup();
+            ComposeNow();
+            return true;
+        }
+
+        bool TextureGradientTargetStillMatches() =>
+            GradientToolActive && _gradTargetMatches?.Invoke() == true && GradientPlacementIndex() >= 0;
+
+        void AbandonTextureGradient(bool targetChanged)
+        {
+            CancelGradientDrag();
+            if (_needsRebuild) _preview.Clear();
+            else if (_dirty) ComposeNow();
+            if (targetChanged) Toast(Loc.T("Edit changed. Redraw gradient."), MessageType.Warning);
+        }
+
+        void CancelGradientDrag(bool restoreComparison = true)
+        {
+            if (_gradDrag == null) return;
+            _gradDrag = _gradOriginal = null;
+            _gradTargetMatches = null;
+            _gradInsertAbove = null;
+            _gradRecentColour = null;
+            _placementPreview.Clear();
+            if (_gradPreviewActive)
+            {
+                if (restoreComparison) _showOriginal = _gradOriginalView;
+                _dirty = true;
+                SceneView.RepaintAll();
+            }
+            _gradPreviewActive = false;
+            Repaint();
+        }
+
+        void ReleaseGradientDragControl()
+        {
+            if (_gradDragControl == 0) return;
+            bool ownsPointer = GUIUtility.hotControl == _gradDragControl;
+            if (_gradDrag != null && ownsPointer) return;
+            if (ownsPointer) GUIUtility.hotControl = 0;
+            _gradDragControl = 0;
+            if (_gradDrag != null) AbandonTextureGradient(targetChanged: !TextureGradientTargetStillMatches());
+        }
+
         void DrawGradientOverlay()
         {
-            var g = SelectedGradient;
-            if (g == null || !g.enabled || _comp == null || Event.current.type != EventType.Repaint) return;
+            var g = _gradDrag ?? TextureGradientForHandles;
+            if (g == null || g.sceneProjection || !g.enabled || _comp == null || Event.current.type != EventType.Repaint) return;
             Vector3 a = UVToCanvas(g.start), b = UVToCanvas(g.end);
             float len = Vector2.Distance(a, b);
 
@@ -212,7 +291,6 @@ namespace Avistry.Textures
             }
             else if (len > 1f)
             {
-                // Linear: lines across the start and end, where the gradient begins and finishes.
                 var dir = (b - a) / len;
                 var perp = new Vector3(-dir.y, dir.x, 0) * 2000f;
                 Handles.DrawDottedLine(a - perp, a + perp, 3f);
@@ -246,102 +324,283 @@ namespace Avistry.Textures
             GUI.Label(new Rect(r.x + 2, r.y - 1, size.x, 16), label, style);
         }
 
-        void DrawGradientSettings()
+        static Gradient CopyRamp(Gradient ramp)
         {
-            EditorGUI.BeginChangeCheck();
+            var copy = GradientToolSettings.Clone(ramp);
+            if (ramp != null) copy.colorSpace = ramp.colorSpace;
+            return copy;
+        }
+
+        Gradient NewGradientRamp(GradientColours colours) => colours == GradientColours.Custom
+            ? CopyRamp(_grad.custom)
+            : GradientToolSettings.FromColour(_brush.color, colours, _brush.subColor);
+
+        Gradient DrawGradientRamp(Gradient workingCopy, bool forNew, System.Action<Gradient> chooseSet)
+        {
+            bool before = GUI.changed;
+            bool changed;
+            Gradient ramp;
             using (new EditorGUILayout.HorizontalScope())
             {
-                StudioGUI.Count("paint.gradientColours");
-                _grad.colours = (GradientColours)EditorGUILayout.EnumPopup(new GUIContent(Loc.T("Colours"), Loc.T("Where the gradient's colours come from. Editing the bar below makes it a custom gradient.")), _grad.colours);
-                StudioGUI.Info("gradient-map");
-            }
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                StudioGUI.Count("paint.gradientBar");
-                var shown = _grad.colours == GradientColours.Custom ? _grad.custom : _grad.Build(_brush.color, _brush.subColor);
                 EditorGUI.BeginChangeCheck();
-                var edited = EditorGUILayout.GradientField(GUIContent.none, shown);
-                if (EditorGUI.EndChangeCheck() && edited != null)
-                {
-                    _grad.custom = GradientToolSettings.Clone(edited);
-                    _grad.colours = GradientColours.Custom;
-                }
-                StudioGUI.Count("paint.gradientSets");
-                if (GUILayout.Button(new GUIContent(Loc.T("Sets"), Loc.T("Ready-made gradient sets")), EditorStyles.miniPullDown, GUILayout.Width(46)))
+                ramp = EditorGUILayout.GradientField(new GUIContent(Loc.T("Colour ramp"),
+                    Loc.T("Click to edit colour and transparency stops. Left is the start, right is the end.")), workingCopy);
+                changed = EditorGUI.EndChangeCheck();
+                if (forNew) StudioGUI.Count("paint.gradientBar", GUILayoutUtility.GetLastRect());
+                if (forNew) StudioGUI.Count("paint.gradientSets");
+                if (GUILayout.Button(new GUIContent(Loc.T("Sets"), Loc.T("Choose a ready-made colour ramp")), EditorStyles.miniPullDown))
                 {
                     var menu = new GenericMenu();
                     foreach (var (name, make) in GradientToolSettings.Sets)
                     {
-                        var mk = make;
-                        menu.AddItem(new GUIContent(name), false, () => { _grad.custom = mk(); _grad.colours = GradientColours.Custom; Repaint(); });
+                        var preset = make;
+                        menu.AddItem(new GUIContent(name), false, () => { if (this != null) chooseSet(preset()); });
                     }
                     menu.ShowAsContext();
                 }
             }
-
-            StudioGUI.Count("paint.gradientShape");
-            var sr = EditorGUI.PrefixLabel(EditorGUILayout.GetControlRect(), new GUIContent(Loc.T("Shape"), Loc.T("Linear: a straight blend. Circle and Ellipse: from the centre (start point) outwards.")));
-            _grad.shape = (GradientShape)GUI.Toolbar(sr, (int)_grad.shape, new[] { Loc.T("Linear"), Loc.T("Circle"), Loc.T("Ellipse") }, EditorStyles.miniButton);
-            if (_grad.shape == GradientShape.Ellipse)
-            {
-                StudioGUI.Count("paint.gradientFlatness");
-                _grad.flatness = EditorGUILayout.Slider(new GUIContent(Loc.T("Flatness"), Loc.T("1 = circle, lower = flatter across the drag direction")), _grad.flatness, 0.05f, 1f);
-            }
-            if (Advanced)
-            {
-                StudioGUI.Count("paint.gradientEdge");
-                _grad.edge = (GradientEdge)EditorGUILayout.EnumPopup(new GUIContent(Loc.T("Edge process"), Loc.T("What happens past the start and end points")), _grad.edge);
-            }
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                StudioGUI.Count("paint.gradientBlend");
-                _grad.blend = (BlendMode)EditorGUILayout.EnumPopup(new GUIContent(Loc.T("Blend"), Loc.T("How the gradient mixes with the texture. Normal paints it on; Multiply shades; Color tints but keeps shading.")), _grad.blend);
-                StudioGUI.Info("blend-mode");
-            }
-            if (Advanced)
-            {
-                StudioGUI.Count("paint.gradientDither");
-                _grad.dither = EditorGUILayout.ToggleLeft(new GUIContent(Loc.T("Dithering (no banding)"), Loc.T("Adds invisible noise so smooth gradients don't show steps after saving")), _grad.dither);
-            }
-            if (EditorGUI.EndChangeCheck()) Repaint();
-
-            var sel = SelectedGradient;
-            if (sel != null)
-            {
-                if (Advanced)
-                {
-                StudioGUI.Count("paint.gradientApply");
-                if (GUILayout.Button(new GUIContent(Loc.F("Use these settings on “{0}”", sel.name), Loc.T("Apply the colours, shape, edge process, blend, dithering and opacity above to the selected gradient layer")), EditorStyles.miniButton))
-                {
-                    Undo.RecordObject(_recipe, "Gradient settings");
-                    sel.gradient = _grad.Build(_brush.color, _brush.subColor);
-                    sel.shape = _grad.shape;
-                    sel.edge = _grad.edge;
-                    sel.flatness = _grad.flatness;
-                    sel.dither = _grad.dither;
-                    sel.blend = _grad.blend;
-                    sel.opacity = _brush.opacity;
-                    MarkEdited();
-                }
-                }
-                GUILayout.Label(Loc.T("Drag across the texture for a new gradient layer. Drag the start / end dots to adjust the selected one, the middle square to move it. Shift snaps to 45°."), StudioGUI.Hint);
-            }
-            else GUILayout.Label(Loc.T("Drag across the texture: the gradient starts where you press and ends where you let go. Shift snaps to 45°. Each gradient is its own layer you can adjust later."), StudioGUI.Hint);
+            changed |= DrawGradientStops(ramp, forNew);
+            GUI.changed = before || changed;
+            return changed ? ramp : null;
         }
 
-        /// <summary>"Where the paint goes" for the Gradient tool.</summary>
+        static string GradientChoiceHint(string purpose) =>
+            purpose + "\n" + Loc.T("Click a choice, then use arrow keys or Shift+scroll to switch.");
+
+        static readonly GradientEdge[] GradientEdges =
+            { GradientEdge.NotRepeat, GradientEdge.Repeat, GradientEdge.ReverseRepeat, GradientEdge.DontDraw };
+
+        static GradientEdge DrawGradientEdgeChoice(GradientEdge edge, string controlId, float width)
+        {
+            var names = new[] { Loc.T("Extend ends"), Loc.T("Repeat"), Loc.T("Reverse repeat"), Loc.T("Stop at ends") };
+            var label = new GUIContent(Loc.T("Beyond the ends"), Loc.T("What happens past the start and end points"));
+            float previousLabelWidth = EditorGUIUtility.labelWidth;
+            if (width >= StackedChoiceWidth)
+                EditorGUIUtility.labelWidth = Mathf.Max(previousLabelWidth,
+                    Mathf.Min(width * .55f, EditorStyles.label.CalcSize(label).x + 6f));
+            try
+            {
+                edge = SteppedChoice(label, edge, GradientEdges,
+                    (field, value) => (GradientEdge)EditorGUI.Popup(field, (int)value, names), width);
+            }
+            finally { EditorGUIUtility.labelWidth = previousLabelWidth; }
+            var rect = GUILayoutUtility.GetLastRect();
+            if (width > 0f) rect.width = Mathf.Min(rect.width, width);
+            StudioGUI.Count(controlId, rect);
+            return edge;
+        }
+
+        (GradientShape shape, GradientEdge edge, float flatness, bool dither) DrawGradientShapeAndEdge(
+            GradientShape shape, GradientEdge edge, float flatness, bool dither, bool forNew)
+        {
+            shape = (GradientShape)ToolPalette((int)shape, GradientShapeGlyphs, PaintLabels.gradientShape, PanelContentWidth, scene: false);
+            StudioGUI.Count(forNew ? "paint.gradientShape" : "layers.fields", GUILayoutUtility.GetLastRect());
+            if (shape == GradientShape.Ellipse)
+            {
+                if (forNew) StudioGUI.Count("paint.gradientFlatness");
+                flatness = EditorGUILayout.Slider(new GUIContent(Loc.T("Flatness"),
+                    Loc.T("1 = circle, lower = flatter across the drag direction")), flatness, 0.05f, 1f);
+            }
+            if (!forNew || Advanced)
+            {
+                edge = DrawGradientEdgeChoice(edge, forNew ? "paint.gradientEdge" : "layers.gradientEdge", PanelContentWidth);
+                if (forNew) StudioGUI.Count("paint.gradientDither");
+                dither = EditorGUILayout.ToggleLeft(new GUIContent(Loc.T("Dithering (no banding)"),
+                    Loc.T("Adds invisible noise so smooth gradients don't show steps after saving")), dither);
+            }
+            return (shape, edge, flatness, dither);
+        }
+
+        GradientColours DrawGradientColourChoice(GUIContent label, float width = -1f)
+        {
+            var choices = width > 0f && width < StackedChoiceWidth
+                ? new[] { Loc.T("To transparent"), Loc.T("To white"), Loc.T("To black"), Loc.T("Custom"), Loc.T("To second") }
+                : new[] { Loc.T("Main to transparent"), Loc.T("Main to white"), Loc.T("Main to black"),
+                    Loc.T("Custom gradient"), Loc.T("Main to second colour") };
+            return SteppedChoice(label, _grad.colours, GradientColourSources,
+                (rect, current) => (GradientColours)EditorGUI.Popup(rect, (int)current, choices), width);
+        }
+
+        void DrawGradientSettings()
+        {
+            if (SelectedGradient != null && GUILayout.Button(Loc.T("Edit selected gradient"), EditorStyles.miniButton))
+                RevealSelectedGradient();
+            GUILayout.Label(Loc.T("New gradient defaults"), StudioGUI.GroupTitle);
+            EditorGUI.BeginChangeCheck();
+            StudioGUI.Count("paint.gradientColours");
+            var colours = DrawGradientColourChoice(new GUIContent(Loc.T("Colours"),
+                Loc.T("Where new gradients get their colours. Edit the ramp to make your own.")));
+            var ramp = DrawGradientRamp(NewGradientRamp(colours), true, SetNewGradientRamp);
+            var appearance = DrawGradientShapeAndEdge(_grad.shape, _grad.edge, _grad.flatness, _grad.dither, true);
+            var blend = _grad.blend;
+            InfoRow("paint.gradientBlend", "blend-mode", () => blend = SteppedChoice(new GUIContent(Loc.T("Blend mode")), blend,
+                AllBlendModes, (rect, current) => (BlendMode)EditorGUI.EnumPopup(rect, current)));
+            float opacity = _brush.opacity;
+            InfoRow("paint.strength", "opacity", () => opacity = EditorGUILayout.Slider(new GUIContent(Loc.T("Shared opacity"),
+                Loc.T("Sets opacity for new gradients and paint strength for the other paint tools.")), opacity, 0f, 1f));
+            if (EditorGUI.EndChangeCheck())
+            {
+                bool shapeChanged = appearance.shape != _grad.shape;
+                if (shapeChanged)
+                {
+                    Undo.FlushUndoRecordObjects();
+                    Undo.IncrementCurrentGroup();
+                }
+                Undo.RecordObject(this, "Edit new gradient settings");
+                _grad.colours = ramp != null ? GradientColours.Custom : colours;
+                if (ramp != null) _grad.custom = CopyRamp(ramp);
+                (_grad.shape, _grad.edge, _grad.flatness, _grad.dither) = appearance;
+                _grad.blend = blend;
+                if (_brush.opacity != opacity) { _brush.opacity = opacity; MarkBrushEdited(); }
+                if (shapeChanged)
+                {
+                    Undo.FlushUndoRecordObjects();
+                    Undo.IncrementCurrentGroup();
+                }
+                Repaint();
+            }
+
+            DrawGradientDirection();
+            if (_gradientDirection == GradientDirection.Free)
+                GUILayout.Label(Loc.T("Drag for a new layer. On the texture, hold Shift to snap the angle to 45°."), StudioGUI.Hint);
+        }
+
+        void RevealSelectedGradient()
+        {
+            _openLayerSettings = true;
+            _revealSelectedGradient = true;
+            Repaint();
+        }
+
+        void SetNewGradientRamp(Gradient ramp)
+        {
+            Undo.RecordObject(this, "Choose new gradient ramp");
+            StoreCustomGradientRamp(ramp);
+            Repaint();
+        }
+
+        void StoreCustomGradientRamp(Gradient ramp)
+        {
+            _grad.custom = CopyRamp(ramp);
+            _grad.colours = GradientColours.Custom;
+        }
+
+        void DrawSelectedGradientSettings(DrawnGradientLayer layer)
+        {
+            EditorGUI.BeginChangeCheck();
+            var ramp = DrawGradientRamp(CopyRamp(layer.gradient), false,
+                preset => EditGradientLayer(layer, l => l.gradient = CopyRamp(preset)));
+            var appearance = DrawGradientShapeAndEdge(layer.shape, layer.edge, layer.flatness, layer.dither, false);
+            var start = layer.start;
+            var end = layer.end;
+            if (!layer.sceneProjection)
+            {
+                start = EditorGUILayout.Vector2Field(Loc.T("Start on texture"), start);
+                end = EditorGUILayout.Vector2Field(Loc.T("End on texture"), end);
+            }
+            if (EditorGUI.EndChangeCheck()) EditGradientLayer(layer, l =>
+            {
+                if (ramp != null) l.gradient = CopyRamp(ramp);
+                (l.shape, l.edge, l.flatness, l.dither) = appearance;
+                if (!l.sceneProjection) { l.start = start; l.end = end; }
+            }, isolateUndo: appearance.shape != layer.shape);
+
+            if (Advanced)
+            {
+                StudioGUI.Count("paint.gradientApply");
+                if (GUILayout.Button(new GUIContent(Loc.T("Copy defaults to this layer"),
+                    Loc.T("Use the new ramp, shape, edges, dithering, blend mode and opacity on this layer."))))
+                    ApplyGradientDefaults(layer);
+            }
+            GUILayout.Label(layer.sceneProjection
+                ? Loc.T("Use the Gradient tool in the Scene view. Adjust the end dots or drag the middle square to move the gradient.")
+                : Loc.T("Use the Gradient tool to drag the endpoints or middle handle on the texture."), StudioGUI.Hint);
+        }
+
+        bool EditGradientLayer(DrawnGradientLayer layer, System.Action<DrawnGradientLayer> edit, bool isolateUndo = false)
+        {
+            if (_recipe == null || !_recipe.layers.Contains(layer)) return false;
+            if (isolateUndo)
+            {
+                if (CurrentSlot is not TextureSlot slot) return false;
+                var sameTarget = CaptureSavedEditContext(_recipe, slot);
+                Undo.FlushUndoRecordObjects();
+                if (!sameTarget() || SelectedGradient != layer || !_recipe.layers.Contains(layer)) return false;
+            }
+            var candidate = layer.CopyPlacement();
+            edit(candidate);
+            if (!ValidatePlacedGradientAppearance(layer, candidate)) return false;
+            if (isolateUndo) Undo.IncrementCurrentGroup();
+            Undo.RecordObject(_recipe, "Edit gradient settings");
+            layer.gradient = candidate.gradient;
+            layer.shape = candidate.shape;
+            layer.edge = candidate.edge;
+            layer.flatness = candidate.flatness;
+            layer.dither = candidate.dither;
+            layer.start = candidate.start;
+            layer.end = candidate.end;
+            layer.blend = candidate.blend;
+            layer.opacity = candidate.opacity;
+            MarkEdited();
+            if (isolateUndo)
+            {
+                Undo.FlushUndoRecordObjects();
+                Undo.IncrementCurrentGroup();
+            }
+            SceneView.RepaintAll();
+            return true;
+        }
+
+        void ApplyGradientDefaults(DrawnGradientLayer layer) => EditGradientLayer(layer, l =>
+        {
+            l.gradient = NewGradientRamp(_grad.colours);
+            l.shape = _grad.shape;
+            l.edge = _grad.edge;
+            l.flatness = _grad.flatness;
+            l.dither = _grad.dither;
+            l.blend = _grad.blend;
+            l.opacity = _brush.opacity;
+        });
+
         void DrawGradientTargetGroup()
         {
-            StudioGUI.BeginGroup(Loc.T("Where the gradient goes"), null, "mask");
             var sel = SelectedGradient;
-            if (sel != null) GUILayout.Label(Loc.F("Selected: “{0}”. Its dots are shown on the texture.", sel.name), StudioGUI.CheckLabel);
-            GUILayout.Label(_selection.Count > 0
-                ? Loc.F("A new drag adds a gradient layer above the selected layer, limited to the {0} selected piece(s).", _selection.Count)
-                : Loc.T("A new drag adds a gradient layer above the selected layer, over the whole texture. Select pieces in 3 · Limit to limit it."), StudioGUI.CheckLabel);
+            if (!StudioGUI.BeginFoldGroup(ref _openPaintOptions, Loc.T("Where the gradient goes"), sel?.name, infoId: "mask"))
+            {
+                StudioGUI.EndGroup();
+                return;
+            }
+            if (sel is { sceneProjection: true })
+                GUILayout.Label(Loc.F("Selected: “{0}”. Drag its handles in the Scene view.", sel.name), StudioGUI.CheckLabel);
+            else if (TextureGradientForHandles != null)
+                GUILayout.Label(Loc.F("Selected: “{0}”. Its dots are shown on the texture.", sel.name), StudioGUI.CheckLabel);
+            string newScope = HasFaceSelection
+                ? Loc.F("A new gradient is limited to the {0} selected face(s).", SelectedElementCount)
+                : _selection.Count > 0
+                    ? Loc.F("A new drag adds a gradient layer above the selected layer, limited to the {0} selected piece(s).", _selection.Count)
+                    : Loc.T("A new drag adds a gradient layer above the selected layer. Use Limit to keep it on chosen pieces.");
+            GUILayout.Label(newScope, StudioGUI.CheckLabel);
             if (sel != null && sel.maskMode == MaskMode.SelectedIslands)
                 StudioGUI.CheckRow(StudioGUI.Check.Note, sel.invertMask ? Loc.F("“{0}” is limited to {1} piece{2} (inverted).", sel.name, sel.islands.Count, (sel.islands.Count == 1 ? "" : "s")) : Loc.F("“{0}” is limited to {1} piece{2}.", sel.name, sel.islands.Count, (sel.islands.Count == 1 ? "" : "s")));
             if (sel != null && sel.opacity <= 0.001f) StudioGUI.CheckRow(StudioGUI.Check.Problem, Loc.T("The selected gradient is at 0% opacity, so it won't show."));
-            GUILayout.Label(Loc.T("Gradients are drawn on the texture view (left), not on the model."), StudioGUI.Hint);
+            using (new EditorGUI.DisabledScope(_uv == null))
+            {
+                bool paintInScene = _paintInScene;
+                InfoRow("paint.onAvatar", "scene-view", () => paintInScene = EditorGUILayout.ToggleLeft(new GUIContent(
+                    Loc.T("Paint directly on the model (Scene view)"),
+                    Loc.T("Start the gradient on the model. The other end can extend past it.")), _paintInScene));
+                if (paintInScene != _paintInScene)
+                {
+                    Undo.RecordObject(this, "Paint on the model");
+                    _paintInScene = paintInScene;
+                    if (!_paintInScene) CancelSceneGradient();
+                    SceneView.RepaintAll();
+                    Repaint();
+                }
+            }
+            if (_paintInScene && _uv != null)
+                GUILayout.Label(Loc.T("Drag in the Scene view. The gradient can reach the back of selected pieces. " +
+                    "Pieces that share texture space share the colour."), StudioGUI.Hint);
             StudioGUI.EndGroup();
         }
     }

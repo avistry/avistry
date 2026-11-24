@@ -1,10 +1,5 @@
 name: Discord
 
-# Posts to the Avistry Discord through two channel webhooks, stored as repository secrets:
-#   DISCORD_WEBHOOK_COMMITS   every push to the dev branch -> #dev-commits
-#   DISCORD_WEBHOOK_RELEASES  a release -> #announcements (release.yml calls the same script; run this by hand to
-#                             post an earlier release again)
-# A missing secret only skips the post.
 on:
   push:
     branches: [dev]

@@ -12,13 +12,13 @@
 <meta property="og:title" content="Download Avistry">
 <meta property="og:url" content="https://avistry.github.io/avistry/download.html">
 <meta property="og:description" content="Download Avistry for free: VCC, .unitypackage or Git URL, every version with its checksum and download count.">
-<meta property="og:image" content="https://avistry.github.io/avistry/media/og-download.jpg">
+<meta property="og:image" content="https://avistry.github.io/avistry/media/og-download.jpg?v=030-release-1">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:type" content="image/jpeg">
-<meta property="og:image:alt" content="Download Avistry: free and open source, every download scanned and checksummed.">
+<meta property="og:image:alt" content="Download Avistry for Unity through VCC or as a Unity package.">
 <meta property="og:site_name" content="Avistry">
-<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-download.jpg">
+<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-download.jpg?v=030-release-1">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://avistry.github.io/avistry/download.html">
 <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
@@ -34,8 +34,6 @@
   try {
     var theme = localStorage.getItem('ats-theme');
     root.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
-    /* Performance mode by itself: on weak devices, with data saver, or after this tab crashed or ran short of memory
-       (app.js keeps ats-alive set while the page is on screen); never just for being a phone on strong hardware */
     var perf = localStorage.getItem('ats-perf'), nav = navigator, mem = nav.deviceMemory, cores = nav.hardwareConcurrency, con = nav.connection || {};
     var ss = sessionStorage, sick = ss.getItem('ats-sick') === '1' || ss.getItem('ats-alive') === '1';
     if (sick) ss.setItem('ats-sick', '1');
@@ -64,7 +62,7 @@
 })();
 </script>
 <style>html{background:#141218}html[data-theme="light"]{background:#F3F1F6}html.i18n-wait body{visibility:hidden}</style>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=030-release-1">
 </head>
 <body class="v4 sub-page">
 
@@ -155,20 +153,26 @@
 
 <main id="main">
 <section class="page-head" data-hero aria-labelledby="page-title">
-  <span class="stk stk-corner" data-stk="saved" aria-hidden="true"></span>
   <div class="wrap">
-    <h1 class="h-display" id="page-title" data-i18n="dl.title" data-emo="ship_it_go">Get Avistry.</h1>
+    <div class="sticker-heading">
+      <h1 class="h-display" id="page-title" data-i18n="dl.title" data-emo="ship_it_go">Get Avistry.</h1>
+      <span class="stk stk-placed" data-stk="saved" aria-hidden="true"></span>
+    </div>
     <p class="lead" data-i18n="dl.lead">Free and open source. VCC is the easiest way, and it keeps Avistry up to date.</p>
   </div>
 </section>
 
-<!-- 1. THE LATEST VERSION AND HOW TO INSTALL IT -->
 <section class="sec install dl-latest" id="install" aria-labelledby="dl-latest-title" data-fx>
   <div class="wrap">
     <h2 class="sr-only" id="dl-latest-title" data-i18n="dl.latest">Latest version</h2>
-    <a class="dl-banner" data-banner="0.2.0" href="https://github.com/avistry/avistry/releases/tag/v0.2.0">
-      <img src="media/release/0.2.0/banner.jpg" width="1600" height="640" alt="Avistry 0.2.0, the first public release" data-i18n-attr="alt:dl.banner.alt" decoding="async">
-      <span class="dl-banner-go"><span data-i18n="dl.banner.go">What's new</span><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span>
+    <a class="dl-banner" data-banner="0.2.0" data-next-banner="0.3.0" href="https://github.com/avistry/avistry/releases/tag/v0.2.0">
+      <picture data-compact-banner="0.3.0">
+        <img src="media/release/0.2.0/banner.jpg" width="1600" height="640" alt="Avistry 0.2.0, the first public release" data-i18n-attr="alt:dl.banner.alt" loading="lazy" decoding="async">
+      </picture>
+      <span class="dl-banner-foot">
+        <span class="dl-banner-edition"><span data-i18n="dl.latest">Latest version</span> <b class="dl-banner-version tnum">v0.2.0</b></span>
+        <span class="dl-banner-go"><span data-i18n="dl.banner.go">What's new</span><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></span>
+      </span>
     </a>
     <div class="dl-board">
       <div class="dl-stat" id="dl-ver-stat" hidden><span class="dl-k" data-i18n="dl.latest">Latest version</span><b class="dl-v tnum" id="dl-ver">&#8211;</b><span class="dl-s tnum" id="dl-date"></span></div>
@@ -233,7 +237,6 @@
   </div>
 </section>
 
-<!-- 2. EVERY VERSION -->
 <section class="sec" id="versions" aria-labelledby="dl-history-title" data-fx>
   <div class="wrap">
     <h2 id="dl-history-title" data-i18n="dl.history">Every version.</h2>
@@ -245,10 +248,12 @@
   </div>
 </section>
 
-<!-- 3. BUILD IT WITH US -->
 <section class="sec band dl-dev" id="develop" aria-labelledby="dl-dev-title" data-fx>
   <div class="wrap">
-    <h2 id="dl-dev-title"><span data-i18n="dl.dev">Build it with us.</span><i class="emo" data-emo="typing" aria-hidden="true"></i></h2>
+    <div class="sticker-heading">
+      <h2 id="dl-dev-title"><span data-i18n="dl.dev">Build it with us.</span><i class="emo" data-emo="typing" aria-hidden="true"></i></h2>
+      <span class="stk stk-placed" data-stk="ship_it" data-stk-pool="ship_it lgtm" aria-hidden="true"></span>
+    </div>
     <p class="lead" data-i18n="dl.dev.lead2">Missing a tool? Build it with your AI assistant and share it with everyone.</p>
     <ul class="dl-dev-links" role="list">
       <li><a href="https://github.com/avistry/avistry" rel="noopener"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-gh"/></svg><span data-i18n="dl.dev.repo">The code on GitHub</span></a></li>
@@ -282,7 +287,6 @@
   </div>
 </section>
 
-<!-- 4. WHAT YOU NEED -->
 <section class="sec" id="need" aria-labelledby="dl-need-title" data-fx="soft">
   <div class="wrap">
     <h2 id="dl-need-title"><span data-i18n="dl.need">What you need.</span><i class="emo" data-emo="e_vcc_package" aria-hidden="true"></i></h2>
@@ -346,8 +350,9 @@
 
 <p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
 
-<script src="tour.js" defer></script>
-<script src="paint.js" defer></script>
-<script src="app.js" defer></script>
+<script src="tour.js?v=030-paper-3" defer></script>
+<script src="ink-effects.js?v=030-paper-3" defer></script>
+<script src="paint.js?v=030-paper-3" defer></script>
+<script src="app.js?v=030-release-1" defer></script>
 </body>
 </html>

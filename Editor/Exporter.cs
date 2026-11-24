@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEditor;
@@ -9,17 +11,19 @@ namespace Avistry.Textures
 {
     public enum OutputMode
     {
-        DuplicateMaterial = 0,   // new PNG + copy of the material using it, assigned to this avatar (default, safest)
-        UpdateOriginalMaterial = 1, // new PNG, original material re-pointed to it
-        PngOnly = 2,             // just write the PNG
+        DuplicateMaterial = 0,
+        UpdateOriginalMaterial = 1,
+        PngOnly = 2,
     }
 
     public static class Exporter
     {
         const string FallbackFolder = "Assets/AvatarTextureStudio Output";
+        const string ProjectFolder = "Assets/Avistry";
         static readonly string[] Platforms = { "Standalone", "Android", "iPhone", "WebGL" };
+        internal const float WritingProgress = 0.8f;
+        const float AssignmentProgress = 0.9f;
 
-        /// <summary>Harness toggle (no UI): pad texture seams after rendering.</summary>
         internal static bool PadSeams = true;
 
         public struct Result
@@ -27,18 +31,17 @@ namespace Avistry.Textures
             public string pngPath;
             public string materialPath;
             public string recipePath;
-            public List<string> alsoMaterialPaths; // materials of included meshes (other materials showing the same texture)
-            public string paddingWarning; // null, or one plain line
+            public List<string> alsoMaterialPaths;
+            public string paddingWarning;
+            internal bool editChanged;
         }
 
-        /// <summary>The file names Bake would write right now (nothing is created).</summary>
         public static Result PredictPaths(TextureSlot slot, Material material, OutputMode mode)
         {
             var r = new Result();
             if (slot == null) return r;
-            string dir = WritableFolder(slot.assetPath, false);
-            string baseName = StripAts(Path.GetFileNameWithoutExtension(slot.assetPath));
-            if (string.IsNullOrEmpty(baseName)) baseName = slot.texture != null ? StripAts(slot.texture.name) : "Texture";
+            string dir = SaveFolder("Output", false);
+            string baseName = TextureOutputName(slot);
             string tag = PickTag(baseName, (dir, ".png"), (dir, "_recipe.asset"));
             r.pngPath = $"{dir}/{baseName}{tag}.png";
             r.recipePath = $"{dir}/{baseName}{tag}_recipe.asset";
@@ -47,7 +50,6 @@ namespace Avistry.Textures
             return r;
         }
 
-        /// <summary>Renders the layer stack to a new texture (size 0 = source resolution); the caller destroys it.</summary>
         internal static Texture2D RenderRecipe(TextureSlot slot, IList<Layer> layers, MeshUV uv, bool dither,
                                                bool padSeams, out string paddingWarning, int size = 0)
         {
@@ -62,7 +64,6 @@ namespace Avistry.Textures
             return tex;
         }
 
-        // Matcaps, panospheres and tiled, scrolling or world-mapped textures aren't laid out by the part's UVs: padding would paint over texels they show.
         static bool FollowsPartUVs(TextureSlot slot)
         {
             if (slot.uvProblems.Count > 0) return false;
@@ -76,92 +77,200 @@ namespace Avistry.Textures
                                   TextureRecipe recipe, MeshUV uv, OutputMode mode, bool dither,
                                   List<TargetResolver.TextureUser> also = null, System.Func<string, float, bool> progress = null)
         {
-            bool Cancelled(string step, float f) => progress != null && progress(step, f);
-            var result = new Result { alsoMaterialPaths = new List<string>() };
-            also ??= new List<TargetResolver.TextureUser>();
-            // A material on Poiyomi's in-memory section shader must go back to its real shader first:
-            // a copy saved with CreateAsset would otherwise point at a shader that doesn't exist on disk (pink).
-            MaterialWriter.EnsureEditable(new[] { material }.Concat(also.Select(a => a.material)).Distinct().ToArray());
-            if (Cancelled(Loc.T("Rendering at full resolution…"), 0.1f)) return default;
-            byte[] png;
-            var tex = RenderRecipe(slot, recipe.layers, uv, dither, PadSeams, out result.paddingWarning);
-            if (Cancelled(Loc.T("Encoding PNG…"), 0.5f)) { Object.DestroyImmediate(tex); return default; }
-            png = tex.EncodeToPNG();
-            Object.DestroyImmediate(tex);
-            if (Cancelled(Loc.T("Writing files…"), 0.7f)) return default;
+            var result = Bake(slot, material, users, recipe, uv, mode, dither, also, progress, null, null);
+            if (result.pngPath != null) AssetDatabase.SaveAssets();
+            return result;
+        }
 
-            string dir = WritableFolder(slot.assetPath);
-            string baseName = StripAts(Path.GetFileNameWithoutExtension(slot.assetPath));
+        internal static Result Bake(TextureSlot slot, Material material, List<TargetResolver.SlotRef> users,
+                                    TextureRecipe recipe, MeshUV uv, OutputMode mode, bool dither, List<TargetResolver.TextureUser> also,
+                                    System.Func<string, float, bool> progress, System.Func<bool> targetMatches, System.Action beginApply,
+                                    StylePack.Entry savedTarget = null, TextureRecipe.IncludedLayout includedLayout = null)
+        {
+            bool Cancelled(string step, float f) => progress != null && progress(step, f);
+            if (Cancelled(Loc.T("Rendering at full resolution…"), .1f)) return default;
+            var copy = SnapshotRecipe(recipe, savedTarget, includedLayout);
+            try
+            {
+                var pixels = CapturePixels(slot, copy, uv, dither);
+                if (Cancelled(Loc.T("Encoding PNG…"), .5f)) return default;
+                var png = pixels.Encode(default, null);
+                if (Cancelled(Loc.T("Writing files…"), .7f)) return default;
+                return WriteBake(slot, material, users, copy, mode, also, png, pixels.Warning, progress, targetMatches, beginApply);
+            }
+            finally { ReleaseSnapshot(copy); }
+        }
+
+        internal static TextureRecipe SnapshotRecipe(TextureRecipe recipe, StylePack.Entry savedTarget, TextureRecipe.IncludedLayout includedLayout)
+        {
+            var copy = Object.Instantiate(recipe);
+            if (savedTarget != null) copy.draftTarget = StylePackTargets.Snapshot(savedTarget);
+            if (includedLayout != null) copy.includedLayout = includedLayout;
+            return copy;
+        }
+
+        internal static void ReleaseSnapshot(TextureRecipe copy)
+        {
+            if (copy != null && !EditorUtility.IsPersistent(copy)) Object.DestroyImmediate(copy);
+        }
+
+        internal static BakePixels CapturePixels(TextureSlot slot, TextureRecipe copy, MeshUV uv, bool dither)
+        {
+            var texture = RenderRecipe(slot, copy.layers, uv, dither, false, out _);
+            try
+            {
+                return new BakePixels(texture.GetPixels32(), texture.width, texture.height, PaddingSnapshot(slot, uv));
+            }
+            finally { Object.DestroyImmediate(texture); }
+        }
+
+        static MeshUV PaddingSnapshot(TextureSlot slot, MeshUV uv) =>
+            PadSeams && slot.role == TextureRole.Color && uv != null && FollowsPartUVs(slot) ? uv.CopyIslandRasterInput() : null;
+
+        internal static Task<Color32[]> CapturePixelsAsync(TextureSlot slot, TextureRecipe copy, MeshUV uv, bool dither,
+            CancellationToken cancel, out BakePixels bake)
+        {
+            using var comp = new Compositor(slot, 0);
+            comp.Compose(copy.layers, uv);
+            bake = new BakePixels(null, comp.Width, comp.Height, PaddingSnapshot(slot, uv));
+            return comp.ReadResultPixelsAsync(dither, cancel);
+        }
+
+        internal sealed class BakePixels
+        {
+            readonly Color32[] _pixels;
+            readonly MeshUV _raster;
+            readonly int _width, _height;
+            bool _closePieces;
+            internal string Warning => _closePieces ? SeamPadding.CloseWarning : null;
+
+            internal BakePixels(Color32[] pixels, int width, int height, MeshUV raster)
+            {
+                _pixels = pixels;
+                _width = width;
+                _height = height;
+                _raster = raster;
+            }
+
+            internal byte[] Encode(CancellationToken cancel, System.Func<float, bool> progress) => EncodePixels(_pixels, cancel, progress);
+
+            internal byte[] EncodePixels(Color32[] rgba, CancellationToken cancel, System.Func<float, bool> progress)
+            {
+                cancel.ThrowIfCancellationRequested();
+                progress?.Invoke(.1f);
+                if (_raster != null) _closePieces = SeamPadding.ApplyPixels(rgba, _raster, _width, _height, cancel);
+                progress?.Invoke(.75f);
+                cancel.ThrowIfCancellationRequested();
+                var png = MapPixels.EncodeRgba(rgba, _width, _height);
+                cancel.ThrowIfCancellationRequested();
+                if (png == null || png.Length == 0) throw new IOException("Could not encode the edited PNG.");
+                return png;
+            }
+        }
+
+        internal static Result WriteBake(TextureSlot slot, Material material, List<TargetResolver.SlotRef> users, TextureRecipe recipeCopy,
+            OutputMode mode, List<TargetResolver.TextureUser> also, byte[] png, string warning, System.Func<string, float, bool> progress,
+            System.Func<bool> targetMatches, System.Action beginApply)
+        {
+            bool TargetMatches() => targetMatches == null || targetMatches();
+            var result = new Result { alsoMaterialPaths = new List<string>(), paddingWarning = warning };
+            also ??= new List<TargetResolver.TextureUser>();
+            if (targetMatches != null) progress?.Invoke(Loc.T("Writing files…"), WritingProgress);
+            if (!TargetMatches()) return new Result { editChanged = true };
+
+            string dir = SaveFolder("Output");
+            if (!TargetMatches()) return new Result { editChanged = true };
+            string baseName = TextureOutputName(slot);
             string tag = PickTag(baseName, (dir, ".png"), (dir, "_recipe.asset"));
             result.pngPath = $"{dir}/{baseName}{tag}.png";
+            result.recipePath = $"{dir}/{baseName}{tag}_recipe.asset";
             File.WriteAllBytes(result.pngPath, png);
             AssetDatabase.ImportAsset(result.pngPath, ImportAssetOptions.ForceUpdate);
             CopyImporterSettings(slot.assetPath, result.pngPath);
             var newTex = AssetDatabase.LoadAssetAtPath<Texture2D>(result.pngPath);
+            if (newTex == null) throw new IOException($"Unity could not import {result.pngPath}.");
+            if (mode == OutputMode.PngOnly)
+                progress?.Invoke(Loc.T("Saving the edit…"), AssignmentProgress);
 
-            progress?.Invoke(Loc.T("Assigning to the avatar…"), 0.9f); // files exist now: no more cancelling
-
-            // Keep the edit re-editable.
-            var recipeCopy = Object.Instantiate(recipe);
             recipeCopy.hideFlags = HideFlags.None;
             recipeCopy.name = baseName + tag + "_recipe";
-            recipeCopy.bakedTexture = newTex; // lets the tool recognise this PNG as a baked copy later
-            result.recipePath = $"{dir}/{baseName}{tag}_recipe.asset";
+            recipeCopy.bakedTexture = newTex;
+            recipeCopy.bakedMaterial = material;
             AssetDatabase.CreateAsset(recipeCopy, result.recipePath);
+            if (!EditorUtility.IsPersistent(recipeCopy)) throw new IOException($"Unity could not create {result.recipePath}.");
 
-            switch (mode)
-            {
-                case OutputMode.DuplicateMaterial:
-                {
-                    string newMatPath = FreeMaterialPath(material);
-                    var newMat = new Material(material) { name = Path.GetFileNameWithoutExtension(newMatPath) };
-                    result.materialPath = newMatPath;
-                    AssetDatabase.CreateAsset(newMat, result.materialPath);
-                    foreach (var p in slot.properties) newMat.SetTexture(p, newTex);
-                    DecalReader.TurnOffFlattened(newMat, recipe.layers); // flattened decals are now in the texture
-                    EditorUtility.SetDirty(newMat);
-
-                    AssignMaterial(users, newMat, "Assign edited material");
-                    recipeCopy.sourceMaterial = material;
-                    break;
-                }
-                case OutputMode.UpdateOriginalMaterial:
-                    Undo.RecordObject(material, "Point material at edited texture");
-                    foreach (var p in slot.properties) material.SetTexture(p, newTex);
-                    DecalReader.TurnOffFlattened(material, recipe.layers);
-                    EditorUtility.SetDirty(material);
-                    result.materialPath = AssetDatabase.GetAssetPath(material);
-                    break;
-            }
-
-            // Included meshes with their own material: the same treatment, one material (copy) per material.
             if (mode != OutputMode.PngOnly)
+                progress?.Invoke(Loc.T("Assigning to the avatar…"), AssignmentProgress);
+            if (!TargetMatches())
             {
-                foreach (var group in also.Where(a => a.material != null && a.material != material).GroupBy(a => a.material))
+                result.editChanged = true;
+                return result;
+            }
+
+            var included = also.Where(a => a.material != null && a.material != material).GroupBy(a => a.material);
+            if (mode == OutputMode.DuplicateMaterial)
+            {
+                string path = FreeMaterialPath(material);
+                var copy = CreateMaterialCopy(material, path);
+                SetBakedTexture(copy, slot.properties, recipeCopy.layers);
+                var copies = new List<(Material original, Material copy, IEnumerable<TargetResolver.SlotRef> users)>();
+                foreach (var group in included)
                 {
-                    var m = group.Key;
-                    var props = group.SelectMany(a => a.properties).Distinct().ToList();
-                    if (mode == OutputMode.DuplicateMaterial)
-                    {
-                        string path = FreeMaterialPath(m);
-                        var copy = new Material(m) { name = Path.GetFileNameWithoutExtension(path) };
-                        AssetDatabase.CreateAsset(copy, path);
-                        foreach (var p in props) copy.SetTexture(p, newTex);
-                        EditorUtility.SetDirty(copy);
-                        AssignMaterial(group.Select(a => a.slot), copy, "Assign edited material");
-                        result.alsoMaterialPaths.Add(path);
-                    }
-                    else
-                    {
-                        Undo.RecordObject(m, "Point material at edited texture");
-                        foreach (var p in props) m.SetTexture(p, newTex);
-                        EditorUtility.SetDirty(m);
-                        result.alsoMaterialPaths.Add(AssetDatabase.GetAssetPath(m));
-                    }
+                    string includedPath = FreeMaterialPath(group.Key);
+                    var includedCopy = CreateMaterialCopy(group.Key, includedPath);
+                    SetBakedTexture(includedCopy, group.SelectMany(a => a.properties).Distinct());
+                    copies.Add((group.Key, includedCopy, group.Select(a => a.slot)));
+                    result.alsoMaterialPaths.Add(includedPath);
+                }
+                beginApply?.Invoke();
+                if (!TargetMatches())
+                {
+                    result.editChanged = true;
+                    return result;
+                }
+                result.materialPath = path;
+                recipeCopy.bakedMaterial = copy;
+                recipeCopy.sourceMaterial = material;
+                var assignments = users.Select(user => (user, copy))
+                    .Concat(copies.SelectMany(entry => entry.users.Select(user => (user, entry.copy))));
+                AssignMaterials(assignments, "Assign edited material");
+                foreach (var entry in copies) RememberIncludedCopy(entry.original, entry.copy);
+            }
+            else if (mode == OutputMode.UpdateOriginalMaterial)
+            {
+                beginApply?.Invoke();
+                if (!TargetMatches()) { result.editChanged = true; return result; }
+                UpdateMaterial(material, slot.properties, recipeCopy.layers);
+                result.materialPath = AssetDatabase.GetAssetPath(material);
+                foreach (var group in included)
+                {
+                    RememberIncludedCopy(group.Key, group.Key);
+                    UpdateMaterial(group.Key, group.SelectMany(a => a.properties).Distinct());
+                    result.alsoMaterialPaths.Add(AssetDatabase.GetAssetPath(group.Key));
                 }
             }
 
-            // Follow each shader's own rules after a scripted change (lilToon mirrors/settings, Poiyomi keywords).
+            void RememberIncludedCopy(Material original, Material baked)
+            {
+                if (recipeCopy.includedLayout == null) return;
+                foreach (var part in recipeCopy.includedLayout.included)
+                    if (part.sourceMaterial == original) part.bakedMaterial = baked;
+            }
+
+            void SetBakedTexture(Material target, IEnumerable<string> properties, List<Layer> layers = null)
+            {
+                foreach (var p in properties) target.SetTexture(p, newTex);
+                if (layers != null) DecalReader.TurnOffFlattened(target, layers);
+                EditorUtility.SetDirty(target);
+            }
+
+            void UpdateMaterial(Material target, IEnumerable<string> properties, List<Layer> layers = null)
+            {
+                Undo.RecordObject(target, "Point material at edited texture");
+                MaterialWriter.EnsureEditable(new[] { target });
+                SetBakedTexture(target, properties, layers);
+            }
+
             var changedPaths = new List<string>(result.alsoMaterialPaths);
             if (!string.IsNullOrEmpty(result.materialPath)) changedPaths.Insert(0, result.materialPath);
             var changed = changedPaths.Select(AssetDatabase.LoadAssetAtPath<Material>).Where(x => x != null).ToArray();
@@ -172,50 +281,102 @@ namespace Avistry.Textures
             }
 
             EditorUtility.SetDirty(recipeCopy);
-            AssetDatabase.SaveAssets();
             return result;
         }
 
-        /// <summary>Puts <paramref name="material"/> into each slot (one Undo record per renderer).</summary>
-        static void AssignMaterial(IEnumerable<TargetResolver.SlotRef> slots, Material material, string undoName)
+        static void AssignMaterials(IEnumerable<(TargetResolver.SlotRef slot, Material material)> assignments, string undoName)
         {
-            foreach (var u in slots)
+            foreach (var group in assignments.Where(a => a.slot.renderer != null).GroupBy(a => a.slot.renderer))
             {
-                if (u.renderer == null) continue;
-                Undo.RecordObject(u.renderer, undoName);
-                var mats = u.renderer.sharedMaterials;
-                if (u.materialIndex < mats.Length) mats[u.materialIndex] = material;
-                u.renderer.sharedMaterials = mats;
-                PrefabUtility.RecordPrefabInstancePropertyModifications(u.renderer);
+                var renderer = group.Key;
+                var mats = renderer.sharedMaterials;
+                bool changed = false;
+                foreach (var (slot, material) in group)
+                {
+                    int index = slot.materialIndex;
+                    if (index < 0 || index >= mats.Length || mats[index] == material) continue;
+                    mats[index] = material;
+                    changed = true;
+                }
+                if (!changed) continue;
+                Undo.RecordObject(renderer, undoName);
+                renderer.sharedMaterials = mats;
+                PrefabUtility.RecordPrefabInstancePropertyModifications(renderer);
             }
         }
 
-        /// <summary>
-        /// Makes a copy of <paramref name="m"/> next to it (the same naming as a save: White_ats, White_ats_2…) and puts it on
-        /// every slot in <paramref name="users"/>, as one Undo step. The original is untouched; the copy asset stays after Undo.
-        /// Returns the copy's path, or null when nothing was made.
-        /// </summary>
-        internal static string CopyMaterial(Material m, List<TargetResolver.SlotRef> users)
+        internal static string CopyMaterial(Material m, List<TargetResolver.SlotRef> users, System.Func<bool> canAssign,
+                                            System.Action<Material> prepareCopy = null, System.Action afterAssign = null,
+                                            System.Func<Material, bool> validatePreparedCopy = null)
         {
-            if (m == null) return null;
-            Undo.RecordObject(m, "Make editable material copy"); // so a shader swap on the original is undone too
-            MaterialWriter.EnsureEditable(new[] { m }); // an in-memory section-locked shader would save as a pink copy
-            string path = FreeMaterialPath(m);
-            var copy = new Material(m) { name = Path.GetFileNameWithoutExtension(path) };
-            AssetDatabase.CreateAsset(copy, path);
-            Undo.IncrementCurrentGroup();
-            int group = Undo.GetCurrentGroup();
-            AssignMaterial(users, copy, "Make editable material copy");
-            Undo.SetCurrentGroupName("Make editable material copy");
-            Undo.CollapseUndoOperations(group);
-            AssetDatabase.SaveAssets();
-            return path;
+            if (m == null || !canAssign()) return null;
+            string path;
+            try { path = FreeMaterialPath(m); }
+            catch (IOException) { return null; }
+            int expectedCopy = 0;
+            System.Action<Material> recordCopy = validatePreparedCopy == null ? null : staged => expectedCopy = staged.ComputeCRC();
+            var copy = CreateMaterialCopy(m, path, recordCopy);
+            bool keepCopy = false;
+            try
+            {
+                bool SameCopy() => copy != null && AssetDatabase.LoadAssetAtPath<Material>(path) == copy && AssetDatabase.GetAssetPath(copy) == path;
+                if (!SameCopy() || validatePreparedCopy != null && copy.ComputeCRC() != expectedCopy) return null;
+                Undo.FlushUndoRecordObjects();
+                if (!canAssign()) return null;
+                if (prepareCopy != null)
+                {
+                    prepareCopy(copy);
+                    Undo.FlushUndoRecordObjects();
+                    if (!canAssign()) return null;
+                }
+                if (validatePreparedCopy != null)
+                {
+                    if (!validatePreparedCopy(copy)) return null;
+                    expectedCopy = copy.ComputeCRC();
+                    AssetDatabase.SaveAssetIfDirty(copy);
+                    if (!SameCopy() || copy.ComputeCRC() != expectedCopy || !validatePreparedCopy(copy) || !canAssign()) return null;
+                }
+                Undo.IncrementCurrentGroup();
+                int group = Undo.GetCurrentGroup();
+                keepCopy = true;
+                AssignMaterials(users.Select(user => (user, copy)), "Make editable material copy");
+                afterAssign?.Invoke();
+                Undo.SetCurrentGroupName("Make editable material copy");
+                Undo.FlushUndoRecordObjects();
+                Undo.CollapseUndoOperations(group);
+                Undo.IncrementCurrentGroup();
+                if (validatePreparedCopy == null) AssetDatabase.SaveAssetIfDirty(copy);
+                return path;
+            }
+            finally
+            {
+                if (!keepCopy && copy != null)
+                {
+                    if (!EditorUtility.IsPersistent(copy)) Object.DestroyImmediate(copy);
+                    else if (AssetDatabase.LoadAssetAtPath<Material>(path) == copy && AssetDatabase.GetAssetPath(copy) == path)
+                        AssetDatabase.DeleteAsset(path);
+                }
+            }
         }
 
-        /// <summary>
-        /// True for a material this tool saved (name ends in _ats or _ats_2…) under Assets/. Quick material only writes to these, so a
-        /// user's own material is never changed. It goes by name only, so a hand-made material ending in _ats counts as a copy. The open edit's recipe always names the open material as its source, so that is no test.
-        /// </summary>
+        static Material CreateMaterialCopy(Material source, string path, System.Action<Material> beforeCreate = null)
+        {
+            var copy = new Material(source) { name = Path.GetFileNameWithoutExtension(path) };
+            MaterialWriter.EnsureEditable(new[] { copy });
+            beforeCreate?.Invoke(copy);
+            AssetDatabase.CreateAsset(copy, path);
+            if (copy != null && AssetDatabase.IsMainAsset(copy) && AssetDatabase.GetAssetPath(copy) == path &&
+                ShaderProfiles.Detect(copy.shader) == ShaderFamily.Poiyomi)
+                AssetDatabase.SetLabels(copy, new[] { PoiyomiCopyLabel });
+            return copy;
+        }
+
+        const string PoiyomiCopyLabel = "AvistryMaterialCopy";
+
+        internal static bool IsVerifiedPoiyomiCopy(Material material) => material != null &&
+            AssetDatabase.IsMainAsset(material) && AssetDatabase.GetAssetPath(material).StartsWith("Assets/", System.StringComparison.Ordinal) &&
+            AssetDatabase.GetLabels(material).Contains(PoiyomiCopyLabel);
+
         internal static bool IsToolCopy(Material m)
         {
             if (m == null) return false;
@@ -223,12 +384,25 @@ namespace Avistry.Textures
             return !string.IsNullOrEmpty(path) && path.StartsWith("Assets/") && Regex.IsMatch(m.name, @"_ats(_\d+)?$");
         }
 
-        /// <summary>"White_ats" and "White_ats_2" both give "White": a new save reuses the base name instead of stacking suffixes (White_ats_ats).</summary>
         internal static string StripAts(string name) => string.IsNullOrEmpty(name) ? name : Regex.Replace(name, @"_ats(_\d+)?$", "");
+
+        static string TextureOutputName(TextureSlot slot)
+        {
+            string name = StripAts(Path.GetFileNameWithoutExtension(slot.assetPath));
+            if (!string.IsNullOrEmpty(name)) return name;
+            return SafeOutputName(slot.texture != null ? slot.texture.name : null, "Texture");
+        }
+
+        static string SafeOutputName(string rawName, string fallback)
+        {
+            string name = StripAts(rawName) ?? "";
+            const string invalid = "<>:\"/\\|?*";
+            name = string.Concat(name.Select(c => invalid.Contains(c) || char.IsControl(c) ? '_' : c)).Trim(' ', '.');
+            return name.Length != 0 ? name : fallback;
+        }
 
         static bool PathTaken(string path) => File.Exists(path) || !string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(path));
 
-        /// <summary>"_ats" if every file this save writes is free, otherwise "_ats_2", "_ats_3"…</summary>
         static string PickTag(string baseName, params (string dir, string ext)[] files)
         {
             for (int n = 1; n < 10000; n++)
@@ -239,15 +413,34 @@ namespace Avistry.Textures
             return "_ats_" + System.Guid.NewGuid().ToString("N").Substring(0, 6);
         }
 
-        /// <summary>Where the edited copy of a material goes: next to the original, named like the texture copy.</summary>
         internal static string FreeMaterialPath(Material m, bool createFolder = true)
         {
-            string dir = WritableFolder(AssetDatabase.GetAssetPath(m), createFolder);
-            string baseName = StripAts(m.name);
+            string dir = SaveFolder("Output", createFolder);
+            string baseName = SafeOutputName(m.name, "Material");
             return $"{dir}/{baseName}{PickTag(baseName, (dir, ".mat"))}.mat";
         }
 
-        /// <summary>Same folder as the source when it's under Assets/, otherwise a fallback folder (Packages are read-only).</summary>
+        internal static string SaveFolder(string name, bool createFolder = true)
+        {
+            if (string.IsNullOrEmpty(name) || name == "." || name == ".." || name.IndexOfAny(new[] { '/', '\\' }) >= 0)
+                throw new IOException("Invalid Avistry save folder.");
+            string folder = $"{ProjectFolder}/{name}";
+            if (createFolder)
+            {
+                EnsureProjectFolder("Assets", "Avistry", ProjectFolder);
+                EnsureProjectFolder(ProjectFolder, name, folder);
+            }
+            return folder;
+        }
+
+        static void EnsureProjectFolder(string parent, string name, string path)
+        {
+            if (AssetDatabase.IsValidFolder(path)) return;
+            if (File.Exists(path) || Directory.Exists(path) ||
+                AssetDatabase.GUIDToAssetPath(AssetDatabase.CreateFolder(parent, name)) != path)
+                throw new IOException("Unity could not create the Avistry save folder.");
+        }
+
         internal static string WritableFolder(string assetPath, bool createFolder = true)
         {
             string dir = string.IsNullOrEmpty(assetPath) ? null : Path.GetDirectoryName(assetPath)?.Replace('\\', '/');
@@ -256,8 +449,7 @@ namespace Avistry.Textures
             return FallbackFolder;
         }
 
-        /// <summary>Copies every import setting (sRGB, type, mips, streaming, size, compression, platform overrides).</summary>
-        static void CopyImporterSettings(string srcPath, string dstPath)
+        internal static void CopyImporterSettings(string srcPath, string dstPath)
         {
             var src = AssetImporter.GetAtPath(srcPath) as TextureImporter;
             var dst = AssetImporter.GetAtPath(dstPath) as TextureImporter;
@@ -281,10 +473,9 @@ namespace Avistry.Textures
                 dst.SetPlatformTextureSettings(ps);
                 changed = true;
             }
-            if (changed) dst.SaveAndReimport(); // the PNG was already imported with default settings
+            if (changed) dst.SaveAndReimport();
         }
 
-        /// <summary>True when every readable+writable public property of two importer settings objects is equal.</summary>
         static bool SameProps(object a, object b)
         {
             foreach (var pi in a.GetType().GetProperties())

@@ -136,7 +136,7 @@
 - **보조 맵 굽기.** 앰비언트 오클루전, 텍스처로 만든 노멀 맵, 애니메 스타일 얼굴용 페이스 섀도우 맵을 구워 줍니다.
 - **머티리얼 점검.** 핑크색으로 깨진 셰이더, 빈 슬롯, 빠진 텍스처, 잘못된 임포트 설정을 쉬운 말로 설명해 주고,
   안전하게 고칠 수 있는 건 버튼 하나로 고칠 수 있습니다.
-- **쓰면서 배우기.** Simple과 Advanced 모드, 정보 아이콘, 용어 41개의 용어집, Unity 입문자를 위한 스킬 트리가 있습니다.
+- **쓰면서 배우기.** Simple과 Advanced 모드, 정보 아이콘, 용어 65개의 용어집, Unity 입문자를 위한 스킬 트리가 있습니다.
 - **내 언어로.** 도구 전체가 영어, 일본어, 한국어, 중국어 간체로 되어 있고, 기본적으로 Unity 에디터의 언어를 따릅니다.
 
 모든 기능은 [기능 페이지](https://avistry.github.io/avistry/features.html)에 정리되어 있습니다.
@@ -159,22 +159,22 @@
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/learn.html?lang=ko"><img alt="배우기: 도구 안의 짧은 강좌, 모든 용어를 담은 용어집, 각 도구가 작동하는 모습." src="../../Website~/media/og-learn-ko.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/learn.html?lang=ko"><b>배우기</b></a> · <sub>도구 안의 짧은 강좌, 모든 용어를 담은 용어집, 각 도구가 작동하는 모습.</sub>
+      <a href="https://avistry.github.io/avistry/learn.html?lang=ko"><img alt="배우기: Unity에서 칠한 뒤 VRChat에서 아바타를 테스트해 보세요. 스킬 트리에서 실습을 열고 작업 중에 용어를 찾아볼 수 있어요." src="../../Website~/media/og-learn-ko.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/learn.html?lang=ko"><b>배우기</b></a> · <sub>Unity에서 칠한 뒤 VRChat에서 아바타를 테스트해 보세요. 스킬 트리에서 실습을 열고 작업 중에 용어를 찾아볼 수 있어요.</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/skills.html?lang=ko"><img alt="스킬 트리: Hierarchy 찾기부터 맵 베이크까지, 6단계로 나눈 40개의 짧은 스킬." src="../../Website~/media/og-skills-ko.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/skills.html?lang=ko"><b>스킬 트리</b></a> · <sub>Hierarchy 찾기부터 맵 베이크까지, 6단계로 나눈 40개의 짧은 스킬.</sub>
+      <a href="https://avistry.github.io/avistry/skills.html?lang=ko"><img alt="스킬 트리: 첫 붓질부터 아바타 토글 테스트까지, 64가지 스킬을 직접 익혀 보세요." src="../../Website~/media/og-skills-ko.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/skills.html?lang=ko"><b>스킬 트리</b></a> · <sub>첫 붓질부터 아바타 토글 테스트까지, 64가지 스킬을 직접 익혀 보세요.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/glossary.html?lang=ko"><img alt="용어집: Unity, 텍스처, VRChat 아바타 용어 41개와 각각 찾는 위치." src="../../Website~/media/og-glossary-ko.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/glossary.html?lang=ko"><b>용어집</b></a> · <sub>Unity, 텍스처, VRChat 아바타 용어 41개와 각각 찾는 위치.</sub>
+      <a href="https://avistry.github.io/avistry/glossary.html?lang=ko"><img alt="용어집: 작업할 때 만나는 Unity, 셰이더, VRChat 용어를 찾아보세요." src="../../Website~/media/og-glossary-ko.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/glossary.html?lang=ko"><b>용어집</b></a> · <sub>작업할 때 만나는 Unity, 셰이더, VRChat 용어를 찾아보세요.</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/about.html?lang=ko"><img alt="소개: 할 수 있는 것과 없는 것, 다운로드를 직접 확인하는 방법, 그리고 돕는 방법." src="../../Website~/media/og-about-ko.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/about.html?lang=ko"><b>소개</b></a> · <sub>할 수 있는 것과 없는 것, 다운로드를 직접 확인하는 방법, 그리고 돕는 방법.</sub>
+      <a href="https://avistry.github.io/avistry/about.html?lang=ko"><img alt="소개: Avistry의 기능과 범위, 다운로드한 파일을 직접 확인하는 방법, 프로젝트에 기여하는 방법." src="../../Website~/media/og-about-ko.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/about.html?lang=ko"><b>소개</b></a> · <sub>Avistry의 기능과 범위, 다운로드한 파일을 직접 확인하는 방법, 프로젝트에 기여하는 방법.</sub>
     </td>
   </tr>
   <tr>
@@ -183,8 +183,8 @@
       <br><a href="https://avistry.github.io/avistry/download.html?lang=ko"><b>다운로드</b></a> · <sub>VCC가 가장 쉬운 방법이고, Avistry를 최신으로 유지해 줍니다.</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/?lang=ko"><img alt="홈: 부위 색을 바꾸고, 레이어에 칠하고, 새 PNG로 저장하세요. 원본 파일은 바뀌지 않습니다." src="../../Website~/media/og-ko.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/?lang=ko"><b>홈</b></a> · <sub>부위 색을 바꾸고, 레이어에 칠하고, 새 PNG로 저장하세요. 원본 파일은 바뀌지 않습니다.</sub>
+      <a href="https://avistry.github.io/avistry/?lang=ko"><img alt="홈: 부위별로 색을 바꾸고 레이어에 칠한 뒤 새 PNG로 저장하세요. 원본 텍스처는 그대로 남습니다." src="../../Website~/media/og-ko.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/?lang=ko"><b>홈</b></a> · <sub>부위별로 색을 바꾸고 레이어에 칠한 뒤 새 PNG로 저장하세요. 원본 텍스처는 그대로 남습니다.</sub>
     </td>
   </tr>
 </table>
@@ -205,8 +205,8 @@
 
 <!-- release-banner:start -->
 <p align="center">
-  <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0"><img alt="Avistry 0.2.0" src="../../Website~/media/release/0.2.0/banner-ko.jpg" width="880"></a>
-  <br><sub>최신 버전 0.2.0 · <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0">릴리스 노트 읽기</a></sub>
+  <a href="https://github.com/avistry/avistry/releases/tag/v0.3.0"><img alt="Avistry 0.3.0 Surface Studio. 이어컵에 벚꽃을 그린 갈색 헤드폰." src="../../Website~/media/release/0.3.0/banner-ko.jpg" width="880"></a>
+  <br><sub>최신 버전 0.3.0 · Surface Studio · <a href="https://github.com/avistry/avistry/releases/tag/v0.3.0">릴리스 노트 읽기</a></sub>
 </p>
 <!-- release-banner:end -->
 
@@ -239,8 +239,8 @@ VCC의 *Settings › Packages › Add Repository*에 `https://avistry.github.io/
 
 - 코드는 전부 이 저장소에 있고 [MIT 라이선스](../../LICENSE)입니다. 에디터 전용이라서 업로드에 들어가거나 VRChat 안에서
   실행되는 것은 없습니다.
-- 릴리스 파일은 하나하나 VirusTotal로 검사하고, SHA-256을 `SHA256SUMS.txt`에 적어 둡니다. 내려받은 파일은 PowerShell에서
-  `Get-FileHash <파일> -Algorithm SHA256`로 확인해 보세요.
+- 각 파일의 SHA-256 체크섬은 `SHA256SUMS.txt`에 있습니다. PowerShell에서
+  `Get-FileHash <파일> -Algorithm SHA256`을 실행해 값을 비교하세요. VirusTotal 검사 결과가 있으면 릴리스 노트에서 확인할 수 있습니다.
 - 텔레메트리는 없습니다. 네트워크를 쓰는 건 선택 기능인 업데이트 확인(도움말(?) 아이콘 › 업데이트를 자동으로 확인) 하나뿐입니다.
   켜기 전에는 꺼져 있고, 하루에 한 번 GitHub 공개 API에 최신 버전을 물어보며, 사용자에 대한 정보는 보내지 않습니다.
 - 새 도구를 써 보기 전에는 프로젝트를 백업해 두세요. 이 도구도 마찬가지입니다.

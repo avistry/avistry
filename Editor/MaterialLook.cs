@@ -4,25 +4,18 @@ using UnityEngine.Rendering;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// A material's main texture as the material colours it, before lighting: lilToon's Main Color, HSV / Gamma,
-    /// adjust mask, gradation map and 2nd / 3rd layers, or Poiyomi's Color and colour adjust (hue shift, saturation,
-    /// brightness, gamma). It runs each shader's own texture baker (shipped with lilToon and Poiyomi), so it matches
-    /// them exactly. Other shaders: texture × _Color. Cached per material until its settings change.
-    /// </summary>
     public static class MaterialLook
     {
         const string LilBaker = "Hidden/ltsother_baker";
         const string PoiBaker = "Hidden/Poi/ColorAdjustBaker";
+        static readonly int LegacyTint = Shader.PropertyToID("_Color");
 
         struct Entry { public uint crc; public int size; public Color[] px; }
         static readonly Dictionary<int, Entry> s_cache = new Dictionary<int, Entry>();
 
-        /// <summary>The main texture as the material shows it, size×size gamma colours (null without a main texture).</summary>
         public static Color[] Pixels(Material m, int size)
         {
-            if (m == null || !m.HasProperty("_MainTex")) return null;
-            var tex = m.GetTexture("_MainTex");
+            var tex = MainTexture(m);
             if (tex == null) return null;
             uint crc = unchecked((uint)m.ComputeCRC() ^ (uint)tex.GetInstanceID() ^ (uint)tex.imageContentsHash.GetHashCode());
             if (s_cache.TryGetValue(m.GetInstanceID(), out var e) && e.crc == crc && e.size == size) return e.px;
@@ -31,13 +24,13 @@ namespace Avistry.Textures
             return px;
         }
 
-        /// <summary>The colour at a mesh UV as the material shows it (its main texture tiling applied). Gamma.</summary>
         public static Color Texel(Material m, Vector2 meshUV, int size = 256)
         {
             var px = Pixels(m, size);
             if (px == null || px.Length < size * size) return Tint(m);
-            var s = m.GetTextureScale("_MainTex");
-            var o = m.GetTextureOffset("_MainTex");
+            bool legacy = UsesLegacyTexture(m);
+            var s = legacy ? m.GetTextureScale("_MainTex") : m.mainTextureScale;
+            var o = legacy ? m.GetTextureOffset("_MainTex") : m.mainTextureOffset;
             float u = Mathf.Repeat(meshUV.x * s.x + o.x, 1f), v = Mathf.Repeat(meshUV.y * s.y + o.y, 1f);
             int x = Mathf.Clamp(Mathf.FloorToInt(u * size), 0, size - 1), y = Mathf.Clamp(Mathf.FloorToInt(v * size), 0, size - 1);
             var c = px[y * size + x];
@@ -45,7 +38,6 @@ namespace Avistry.Textures
             return c;
         }
 
-        /// <summary>What the material does to its texture's colours beyond a white tint, in words (null if nothing).</summary>
         public static string Describe(Material m)
         {
             if (m == null) return null;
@@ -69,14 +61,36 @@ namespace Avistry.Textures
 
         public static void Forget(Material m) { if (m != null) s_cache.Remove(m.GetInstanceID()); }
 
-        static Color Tint(Material m)
+        static bool UsesLegacyTexture(Material m) => m.HasProperty("_MainTex") && ShaderProfiles.Detect(m.shader) != ShaderFamily.Other;
+
+        internal static Texture MainTexture(Material m)
         {
-            var c = m != null && m.HasProperty("_Color") ? m.GetColor("_Color") : Color.white;
+            if (m == null) return null;
+            var texture = UsesLegacyTexture(m) ? m.GetTexture("_MainTex") : m.mainTexture;
+            return texture != null && texture.dimension == TextureDimension.Tex2D ? texture : null;
+        }
+
+        internal static Color Tint(Material m)
+        {
+            if (m == null || m.shader == null) return Color.white;
+            int property = LegacyTint;
+            var shader = m.shader;
+            if (ShaderProfiles.Detect(shader) == ShaderFamily.Other || !m.HasColor(property))
+            {
+                int count = shader.GetPropertyCount();
+                for (int i = 0; i < count; i++)
+                {
+                    if ((shader.GetPropertyFlags(i) & ShaderPropertyFlags.MainColor) == 0 ||
+                        shader.GetPropertyType(i) != ShaderPropertyType.Color) continue;
+                    property = shader.GetPropertyNameId(i);
+                    break;
+                }
+            }
+            var c = m.HasColor(property) ? m.GetColor(property) : Color.white;
             c.a = 1f;
             return c;
         }
 
-        /// <summary>Runs the shader's own baker over the main texture. Null when there is none for this shader.</summary>
         static Color[] Bake(Material m, Texture tex, int size)
         {
             string bakerName = null;
@@ -98,7 +112,7 @@ namespace Avistry.Textures
             {
                 CopyMatchingProperties(m, baker);
                 baker.SetTexture("_MainTex", tex);
-                baker.SetTextureScale("_MainTex", Vector2.one);  // bake the whole texture; tiling is applied when sampling
+                baker.SetTextureScale("_MainTex", Vector2.one);
                 baker.SetTextureOffset("_MainTex", Vector2.zero);
                 Graphics.Blit(tex, rt, baker);
                 RenderTexture.active = rt;
@@ -117,7 +131,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>Every property the baker has that the material also has, by name (values, textures and tiling).</summary>
         static void CopyMatchingProperties(Material from, Material to)
         {
             var sh = to.shader;

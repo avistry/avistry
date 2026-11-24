@@ -1,7 +1,5 @@
 name: Release
 
-# Push a tag such as v0.2.0 (it must match package.json "version") to publish a release.
-# Manual run: dry_run=true only builds and checks; dry_run=false publishes v<package.json version>.
 on:
   push:
     tags: ['v*.*.*']
@@ -24,8 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      contents: write # create the release and upload assets
-      actions: write  # start the Pages workflow afterwards
+      contents: write
+      actions: write
     env:
       GH_TOKEN: ${{ github.token }}
       VT_API_KEY: ${{ secrets.VT_API_KEY }}
@@ -81,7 +79,7 @@ jobs:
         run: |
           unzip -Z1 "dist/${ZIP}" | sort | tee zip-files.txt
           grep -qx 'package.json' zip-files.txt || { echo "::error::package.json is not at the zip root"; exit 1; }
-          if grep -E '^(\.|Documentation~|Website~|\.github|dist|_site)' zip-files.txt; then
+          if grep -Ev '^(Editor/.+|Editor\.meta|(package\.json|README\.md|CHANGELOG\.md|LICENSE|Third Party Notices\.md)(\.meta)?)$' zip-files.txt; then
             echo "::error::Non-package files in the zip"; exit 1
           fi
           tar -tzf "dist/${UNITYPACKAGE}" | grep -c '/pathname$'
@@ -96,8 +94,11 @@ jobs:
 
       - name: Write release notes from CHANGELOG
         run: |
+          RELEASE_TITLE=$(node .github/scripts/release-notes.mjs "${VERSION}" --title)
+          echo "RELEASE_TITLE=${RELEASE_TITLE}" >> "$GITHUB_ENV"
           node .github/scripts/release-notes.mjs "${NOTES_SECTION:-${VERSION}}" CHANGELOG.md > notes.md
           VT=https://www.virustotal.com/gui/file
+          ASSETS="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
           {
             echo
             echo '---'
@@ -106,8 +107,10 @@ jobs:
             echo
             echo "| File | SHA-256 | VirusTotal |"
             echo "| --- | --- | --- |"
-            echo "| \`${ZIP}\` (VCC / Package Manager) | \`${ZIP_SHA}\` | [report](${VT}/${ZIP_SHA}) |"
-            echo "| \`${UNITYPACKAGE}\` (drag into Unity) | \`${UPK_SHA}\` | [report](${VT}/${UPK_SHA}) |"
+            echo "| [${ZIP}](${ASSETS}/${ZIP}) (VCC / Package Manager) | \`${ZIP_SHA}\` | [Look up hash](${VT}/${ZIP_SHA}) |"
+            echo "| [${UNITYPACKAGE}](${ASSETS}/${UNITYPACKAGE}) (drag into Unity) | \`${UPK_SHA}\` | [Look up hash](${VT}/${UPK_SHA}) |"
+            echo
+            echo "[Download SHA256SUMS.txt](${ASSETS}/SHA256SUMS.txt)"
           } >> notes.md
           cat notes.md
 
@@ -116,7 +119,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ env.TAG }}
-          name: Avistry ${{ env.VERSION }}
+          name: ${{ env.RELEASE_TITLE }}
           body_path: notes.md
           prerelease: ${{ env.PRERELEASE }}
           make_latest: ${{ env.PRERELEASE == 'false' }}
@@ -129,11 +132,11 @@ jobs:
       - name: VirusTotal scan
         id: vt
         if: env.PUBLISH == 'true' && env.VT_API_KEY != ''
-        continue-on-error: true # the release already exists; a scan failure must not undo it
+        continue-on-error: true
         uses: crazy-max/ghaction-virustotal@v5
         with:
           vt_api_key: ${{ env.VT_API_KEY }}
-          update_release_body: true # only takes effect on release events; see the next step
+          update_release_body: true
           request_rate: 4
           files: |
             dist/*.zip
@@ -185,7 +188,7 @@ jobs:
 
       - name: Announce on Discord
         if: env.PUBLISH == 'true' && env.PRERELEASE == 'false'
-        continue-on-error: true # the release is out; a Discord hiccup must not mark it failed
+        continue-on-error: true
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
         run: node .github/scripts/discord.mjs release "${VERSION}"

@@ -3,7 +3,6 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>Getters and hooks the AI helper facade (Editor/Agent) and the tests use. Nothing here is called by the window itself.</summary>
     partial class AvatarTextureWindow
     {
         internal string AutoTab => _tab.ToString();
@@ -14,21 +13,19 @@ namespace Avistry.Textures
         internal OutputMode AutoOutputMode => _outputMode;
         internal (string png, string material, string recipe) AutoLastSave => (_lastBakePng, _lastBakeMaterial, _lastBakeRecipe);
 
-        /// <summary>The asset path of the last ambient occlusion image, or null when the last bake made none.</summary>
         internal string AutoLastAoPath => _lastAo.texture != null ? _lastAo.path : null;
 
         internal (Color colour, float size, float hardness, float opacity, bool eraser) AutoBrushInfo =>
             (_brush.color, _brush.size, _brush.shape.hardness, _brush.opacity, _brush.mode == BrushMode.Erase);
 
-        /// <summary>Why the person must not be interrupted right now, or null.</summary>
         internal string AutoBusyReason()
         {
             if (_saving) return "A save is running.";
-            if (_liveStroke != null || _gradDrag != null) return "The person is painting.";
+            if (_liveStroke != null || _gradDrag != null || _sceneGradientDraft != null) return "The person is painting.";
+            if (_imgDrag != null) return "The person is placing an image.";
             return null;
         }
 
-        /// <summary>The avatar the helper may look at: the current part's, or the one selected in the Hierarchy.</summary>
         internal Transform AutoAvatarRoot()
         {
             if (_renderer != null) return TargetResolver.AvatarRoot(_renderer);
@@ -38,7 +35,6 @@ namespace Avistry.Textures
             return r != null ? TargetResolver.AvatarRoot(r) : sel.transform.root;
         }
 
-        /// <summary>The Paint tab's brush settings, as its controls would set them.</summary>
         internal void AutoBrush(Color? colour, float? size, float? hardness, float? opacity, string mode)
         {
             Undo.RecordObject(this, "AI: Change brush");
@@ -50,7 +46,6 @@ namespace Avistry.Textures
             MarkBrushEdited();
         }
 
-        /// <summary>Keeps the AI helper's access level, allowances, open request and activity in memory, starting from Off. Returns "sandbox=on" or "sandbox=off".</summary>
         internal string AutoAgentSandbox(bool on)
         {
             AgentAccess.Sandbox = on;
@@ -58,10 +53,6 @@ namespace Avistry.Textures
             return "sandbox=" + (on ? "on" : "off");
         }
 
-        /// <summary>
-        /// Answers the open request like the person's click on Allow or Deny. Returns "answered=allow", "answered=deny" or
-        /// "no open request". The bonus skill is only marked inside the skill sandbox, so a test never touches real progress.
-        /// </summary>
         internal string AutoAgentAnswer(bool allow)
         {
             bool answered = AgentApi.Answer(allow, false, false, Learn.Sandbox);

@@ -36,7 +36,7 @@
  "install.vcc.s2": "VCCでアバターのプロジェクトを開き、<strong>Manage Project</strong>でAvistryの横にある<strong>+</strong>を押します。",
  "install.open": "Unityで<span class=\"path\">Tools &gt; Avistry &gt; Textures</span>を開きます。",
  "install.listing": "リポジトリURL",
- "install.unity.s1": "上のボタン、またはGitHubのReleasesから<code>.unitypackage</code>をダウンロードします。",
+ "install.unity.s1": "上のボタン、またはGitHub Releasesから<code>.unitypackage</code>をダウンロードします。",
  "install.unity.s2": "プロジェクトを開いた状態で、ファイルをProjectウィンドウにドラッグするか、<span class=\"path\">Assets &gt; Import Package &gt; Custom Package</span>を選びます。続けて<strong>Import</strong>をクリックします。",
  "install.git.s1": "Unityで<span class=\"path\">Window &gt; Package Manager</span>を開きます。",
  "install.git.s2": "<strong>+</strong>から<strong>Add package from git URL</strong>を選び、下のURLを貼り付けます。",
@@ -57,5 +57,6 @@
  "dl.dev.3.b2": "プルリクエストを送ってください。すべてテストし、通常のバージョンでリリースします。",
  "dl.dev.pr": "プルリクエストを送る",
  "dl.banner.go": "新機能を見る",
- "dl.banner.alt": "Avistry 0.2.0、はじめての公開リリース"
+ "dl.banner.alt": "Avistry 0.2.0、はじめての公開リリース",
+ "dl.banner.alt.0.3.0": "Avistry 0.3.0「Surface Studio」。イヤーカップに桜の花を描いた茶色のヘッドホン。"
 }

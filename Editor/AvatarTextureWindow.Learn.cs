@@ -4,13 +4,8 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// The window's side of the skill tree: deferred hook calls, the "Skill done" toasts and "Show me".
-    /// The hooks themselves are one-line <c>Learn.Did(...)</c> calls where an action is committed.
-    /// </summary>
     partial class AvatarTextureWindow
     {
-        /// <summary>Whether skill toasts show. EditorPrefs <c>Avistry.Learn.Toasts</c>: -1 Auto (on in Simple, off in Advanced), 0 off, 1 on.</summary>
         internal static class LearnToastPrefs
         {
             internal const string Key = "Avistry.Learn.Toasts";
@@ -28,10 +23,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>
-        /// The outline that "Show me" draws round a control. The control reports itself from <c>StudioGUI.Count</c>
-        /// through <see cref="Probe"/>, so the outline is drawn in the control's own scroll and clip space.
-        /// </summary>
         internal static class LearnPulse
         {
             internal const double Seconds = 1.6;
@@ -39,6 +30,7 @@ namespace Avistry.Textures
             static string s_id;
             static double s_until;
             static bool s_latched;
+            internal static System.Action<string, Rect> PanelControlDrawn;
 
             internal static string Id => s_id;
             internal static bool Active => s_id != null && EditorApplication.timeSinceStartup < s_until;
@@ -47,7 +39,6 @@ namespace Avistry.Textures
             {
                 s_id = controlId;
                 s_until = EditorApplication.timeSinceStartup + Seconds;
-                // Controls that report a rect are outlined by StudioGUI.Track instead of the probe.
                 StudioGUI.Pulse = controlId;
             }
 
@@ -57,21 +48,17 @@ namespace Avistry.Textures
                 StudioGUI.Pulse = null;
             }
 
-            /// <summary>
-            /// Decides once per frame, on Layout, whether the probe adds its zero-size layout element, so Layout and Repaint
-            /// always agree on how many controls there are even when the pulse ends between them.
-            /// </summary>
             internal static void Latch()
             {
                 if (Event.current.type == EventType.Layout) s_latched = Active;
             }
 
-            /// <summary>Call from <c>StudioGUI.Count</c> before the control is drawn. Costs one bool test when no pulse is running.</summary>
             internal static void Probe(string controlId)
             {
                 if (!s_latched || controlId != s_id) return;
                 var r = GUILayoutUtility.GetRect(0f, 0f, GUILayout.ExpandWidth(true));
                 if (Event.current.type != EventType.Repaint) return;
+                PanelControlDrawn?.Invoke(controlId, r);
                 var box = new Rect(r.x - 2f, r.y - 2f, r.width + 4f, EditorGUIUtility.singleLineHeight + 4f);
                 float left = (float)(s_until - EditorApplication.timeSinceStartup);
                 float pulse = 0.55f + 0.45f * Mathf.Sin((float)EditorApplication.timeSinceStartup * 9f);
@@ -81,10 +68,7 @@ namespace Avistry.Textures
             }
         }
 
-        // ---------------------------------------------------------------- hooks at commit points
 
-        // Changes made while a slider is dragged count once, when the mouse is released. Anything the AI helper does is skipped
-        // here, because the call may be settled after its Suppress scope has ended.
         readonly List<string> _learnPending = new List<string>(4);
 
         void LearnLater(string learnEvent)
@@ -100,7 +84,6 @@ namespace Avistry.Textures
             _learnPending.Clear();
         }
 
-        // Set when a part is chosen: the next texture that loads is the first one picked for it.
         bool _learnFirstTexture;
 
         void LearnTargetPicked(Renderer r)
@@ -131,7 +114,6 @@ namespace Avistry.Textures
             Learn.Did(LearnEvents.AssetPinged);
         }
 
-        // ---------------------------------------------------------------- toasts
 
         const double ToastFadeIn = 0.12, ToastHold = 3.5, ToastFadeOut = 0.3;
         enum LearnToastKind { None, Skill, Medal, Graduate }
@@ -153,7 +135,6 @@ namespace Avistry.Textures
             catch (System.Exception ex) { Debug.LogWarning("[Avistry] The skill toast could not be built (" + ex.Message + ")."); }
         }
 
-        // In the test sandbox the toast is built (so a test can read it) but never drawn and never ticks.
         void BuildLearnToast(string conceptId)
         {
             var entry = Glossary.Get(conceptId);
@@ -187,7 +168,6 @@ namespace Avistry.Textures
 
             if (kind == LearnToastKind.Skill && live && _lnKind == LearnToastKind.Skill)
             {
-                // At most one toast every 4 s: the next ones merge into "+N more skills".
                 _lnMore++;
                 _lnEnd = System.Math.Max(_lnEnd, now + 1.5);
                 _lnLine2 = SkillLine2(_lnTier, total);
@@ -195,7 +175,6 @@ namespace Avistry.Textures
             }
             if (kind == LearnToastKind.Skill && live)
             {
-                // A medal is already showing: it stays, and the skill is only counted.
                 _lnMore++;
                 return;
             }
@@ -242,7 +221,6 @@ namespace Avistry.Textures
             double now = EditorApplication.timeSinceStartup;
             double dt = now - _lnTickLast;
             _lnTickLast = now;
-            // Hover pauses the toast: push the end back by the time spent hovering.
             if (_lnHover && now < _lnEnd) _lnEnd += dt;
             if (now >= _lnEnd)
             {
@@ -256,7 +234,6 @@ namespace Avistry.Textures
             if (fading && now - _lnRepaintLast > 0.03) { _lnRepaintLast = now; Repaint(); }
         }
 
-        // Runs before the canvas sees the event, with last frame's rect, so only a click on the toast itself is taken.
         void LearnToastInput(Event e)
         {
             if (_lnKind == LearnToastKind.None || Learn.Sandbox || !LearnToastLive) return;
@@ -303,7 +280,6 @@ namespace Avistry.Textures
 
         static Color Faded(Color c, float a) { c.a *= a; return c; }
 
-        /// <summary>Draws over the bottom right of the canvas, above its status line. Never modal, never takes focus.</summary>
         void DrawLearnToast(Rect area)
         {
             if (_lnKind == LearnToastKind.None || Learn.Sandbox || !LearnToastLive || Event.current.type != EventType.Repaint) return;
@@ -313,7 +289,6 @@ namespace Avistry.Textures
             float w = Mathf.Min(medal ? 320f : 280f, area.width - 24f), h = medal ? 68f : 56f;
             if (w < 120f) return;
             var box = new Rect(area.xMax - 12f - w, area.yMax - StatusHeight - 12f - h, w, h);
-            // The status toast sits at the top of the canvas; on a very short canvas, stay out from under it.
             if (!string.IsNullOrEmpty(_toastText) && now <= _toastUntil && box.Overlaps(_toastRect)) box.y = _toastRect.yMax + 6f;
             _lnRect = box;
 
@@ -338,16 +313,22 @@ namespace Avistry.Textures
             EditorGUIUtility.AddCursorRect(box, MouseCursor.Link);
         }
 
-        // ---------------------------------------------------------------- Show me
 
         static readonly string[] s_windowTargets = { "hierarchy", "scene", "inspector", "project" };
         static readonly string[] s_windowMenus = { "Window/General/Hierarchy", "Window/General/Scene", "Window/General/Inspector", "Window/General/Project" };
         static readonly string[] s_windowEvents = { LearnEvents.WindowHierarchy, LearnEvents.WindowScene, LearnEvents.WindowInspector, LearnEvents.WindowProject };
+        string _revealLearnControl;
+        float _learnViewportHeight;
 
-        /// <summary>
-        /// The card's Show me button: opens this window if needed, switches to the card's tab and outlines its control.
-        /// Returns what it did, for tests and logs. Never changes the recipe, a material or an asset, so it needs no Undo.
-        /// </summary>
+        void RevealLearnControl(string id, Rect rect)
+        {
+            if (_revealLearnControl != id || Event.current.type != EventType.Repaint) return;
+            _revealLearnControl = null;
+            if (rect.yMin >= _panelScroll.y && rect.yMax + 20f <= _panelScroll.y + _learnViewportHeight) return;
+            _panelScroll.y = Mathf.Max(0f, rect.yMin - 12f);
+            Repaint();
+        }
+
         [InitializeOnLoadMethod]
         static void HookShowMe() => ConceptCard.ShowMeHandler = id => ShowMe(id);
 
@@ -381,57 +362,123 @@ namespace Avistry.Textures
             if (string.IsNullOrEmpty(entry.tryTab) && string.IsNullOrEmpty(control)) return "nothing to show";
 
             if (!System.Enum.TryParse(entry.tryTab, true, out Tab tab)) tab = _tab;
-            if (!TabAvailable(tab, out _))
+            if (tab == Tab.Layers) tab = Tab.Paint;
+            string hint = null;
+            if (!TabAvailable(tab, out var why))
             {
-                _tab = Tab.Target;
-                Toast(Loc.T("Pick a part first, then press Show me again."), MessageType.Info, 5f);
-                Repaint();
-                return "tab=Target needsPart";
+                tab = Tab.Target;
+                control = _renderer == null || CurrentSlot == null ? "pick.partList" : "pick.image";
+                hint = why;
             }
 
             var copy = string.IsNullOrEmpty(control) ? null : Glossary.Control(control);
-            if (copy != null && !copy.simple && !Advanced)
+            if (!Advanced && copy != null && !copy.simple)
             {
                 SetTab(tab);
-                Toast(Loc.F("“{0}” is in Advanced mode.", StudioGUI.Label(control, control)), MessageType.Info, 6f, Loc.T("Switch to Advanced"), () => SetAdvanced(true));
+                Toast(Loc.F("“{0}” is in Advanced mode.", StudioGUI.Label(control, control)),
+                    MessageType.Info, 6f, Loc.T("Switch to Advanced"), () =>
+                    {
+                        SetAdvanced(true);
+                        ShowMeHere(conceptId, false);
+                    });
                 return "tab=" + tab + " advancedOnly";
+            }
+
+            bool wholeColour = Recolour.Supports(_material);
+            if (control == "colour.cover" && !wholeColour && !CanRecolourPieces && TabAvailable(Tab.Paint, out _))
+            {
+                tab = Tab.Paint;
+                control = "layers.toolbar";
+                hint = Loc.T("Use layers in Paint to recolour this texture.");
+            }
+            if (control == "colour.cover" && (!ByPart || CurrentPart == null))
+            {
+                control = ByPart ? "colour.parts" : wholeColour ? "colour.scope" : "colour.recolourPieces";
+                hint = wholeColour ? Loc.T("Choose Pieces, then pick the part you want to colour.")
+                    : Loc.T("Choose Recolour pieces, then pick the piece you want to colour.");
+            }
+            if (tab == Tab.Target)
+            {
+                if (control == "audit.check") _foldAudit = true;
+                if (control == "masks.rows" || control == "masks.add") _foldMaskBuilder = true;
+            }
+            if (tab == Tab.Paint)
+            {
+                if (control == "paint.smoothJoins")
+                {
+                    SetPickForPaint(false);
+                    _openPaintOptions = true;
+                    if (GradientToolActive)
+                    {
+                        _openBrush = true;
+                        control = "paint.tools";
+                        hint = Loc.T("Choose Brush, then turn on Smooth across joins.");
+                    }
+                    else if (!_paintInScene)
+                    {
+                        control = "paint.onAvatar";
+                        hint = Loc.T("Turn on Paint directly on the model to see Smooth across joins.");
+                    }
+                }
+                if (control == "paint.gradientMap" && _recipe.layers.Count > 0)
+                {
+                    control = "layers.toolbar";
+                    hint = Loc.T("Open Add layer and choose Gradient Map.");
+                }
+                if (control == "paint.gradientMap" || control == "masks.channels" ||
+                    (control != null && control.StartsWith("layers.", System.StringComparison.Ordinal)))
+                {
+                    _openLayers = true;
+                    if (control != "layers.toolbar" && control != "paint.gradientMap")
+                    {
+                        if (ActiveLayer == null)
+                        {
+                            control = "layers.toolbar";
+                            hint = Loc.T("Add or choose a layer in the Layers list first.");
+                        }
+                        else if (control != "layers.hideMask") _openLayerSettings = _foldLayerWhere = true;
+                    }
+                }
+            }
+            if (tab == Tab.Target && control != null && control.StartsWith("maps.", System.StringComparison.Ordinal))
+                control = RevealMapTool(control);
+            if (tab == Tab.Save && control == "save.save")
+            {
+                if (_recipe.layers.Count == 0) control = CurrentSaveState == SaveState.Saved ? "save.continueEditing" : "save.goToPaint";
+                else if (!_recipe.layers.Exists(IsVisibleForSave)) control = "save.reviewLayers";
             }
 
             SetTab(tab);
             if (string.IsNullOrEmpty(control)) return "tab=" + tab;
+            RevealPanelGroup(control);
 
-            if (tab == Tab.Layers && control.StartsWith("layers.")) _openLayerSettings = true; // closed by default
+            if (hint != null) Toast(hint, MessageType.Info, 5f);
+            _revealLearnControl = control;
             LearnPulse.Start(control);
-            if (sync) return FinishShowMe(tab, control);
-            // Whether the control is on screen is only known after a repaint, so look once this click has finished.
-            EditorApplication.delayCall += () => { if (this != null) FinishShowMe(tab, control); };
+            if (sync) return FinishShowMe(tab, control, hint);
+            EditorApplication.delayCall += () => { if (this != null && _tab == tab) FinishShowMe(tab, control, hint); };
             return "tab=" + tab + " pulse=" + control;
         }
 
-        string FinishShowMe(Tab tab, string control)
+        string FinishShowMe(Tab tab, string control, string hint)
         {
-            var ids = AutoVisibleControlIds(tab.ToString());
-            if (ids != null && ids.Contains(control))
+            CountDrawnControls();
+            if (StudioGUI.VisibleControlIds.Contains(control))
             {
                 LearnPulse.Start(control);
                 Repaint();
                 return "tab=" + tab + " pulse=" + control;
             }
             LearnPulse.Clear();
+            _revealLearnControl = null;
             string label = StudioGUI.Label(control, control);
-            Toast(Loc.F("Look for “{0}” on this tab.", label), MessageType.Info, 6f);
+            Toast(hint ?? Loc.F("Look for “{0}” on this tab.", label), MessageType.Info, 6f);
             return "tab=" + tab + " look=" + label;
         }
 
-        // ---------------------------------------------------------------- hooks for tests
 
-        /// <summary>Shows a concept's card action in the window, like the Show me button. Returns for example "tab=Select pulse=limit.clickAvatar", "tab=Select look=…" or "window=hierarchy".</summary>
         internal string AutoShowMe(string conceptId) => ShowMeHere(conceptId, true);
 
-        /// <summary>
-        /// The newest skill toast: "line 1 | line 2 | done: titles that merged into it | shown=N". "none" when there is none.
-        /// <c>shown</c> counts toasts that started from an idle state since the window opened; a medal replaces a toast that is showing.
-        /// </summary>
         internal string AutoLearnToast()
         {
             if (_lnKind == LearnToastKind.None) return "none";

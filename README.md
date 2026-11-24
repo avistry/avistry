@@ -137,7 +137,7 @@ Also in the box:
 - **Bake helper maps.** Ambient occlusion, a normal map from the texture and a face shadow map for anime-style faces.
 - **Check your materials.** Pink shaders, empty slots, missing textures and wrong import settings, explained in plain
   words, with a one-click fix where it is safe.
-- **Learn as you go.** Simple and Advanced modes, info icons, a 41-word glossary and a skill tree for Unity beginners.
+- **Learn as you go.** Simple and Advanced modes, info icons, a 65-word glossary and a skill tree for Unity beginners.
 - **Your language.** The whole tool is in English, Japanese, Korean and Simplified Chinese, and follows the Unity
   Editor's language by default.
 
@@ -161,18 +161,18 @@ Every page has its own picture. Click one to open it.
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/learn.html"><img alt="Learn: A short course inside the tool, a glossary of every word and each tool at work." src="Website~/media/og-learn.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/learn.html"><b>Learn</b></a> · <sub>A short course inside the tool, a glossary of every word and each tool at work.</sub>
+      <a href="https://avistry.github.io/avistry/learn.html"><img alt="Learn: Follow a brush stroke from Unity to a tested avatar. Open a lesson in the skill tree or look up a term as you work." src="Website~/media/og-learn.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/learn.html"><b>Learn</b></a> · <sub>Follow a brush stroke from Unity to a tested avatar. Open a lesson in the skill tree or look up a term as you work.</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/skills.html"><img alt="Skill tree: 40 short skills in 6 tiers, from finding the Hierarchy to baking maps." src="Website~/media/og-skills.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/skills.html"><b>Skill tree</b></a> · <sub>40 short skills in 6 tiers, from finding the Hierarchy to baking maps.</sub>
+      <a href="https://avistry.github.io/avistry/skills.html"><img alt="Skill tree: 64 hands-on skills, from your first brush stroke to testing an avatar toggle." src="Website~/media/og-skills.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/skills.html"><b>Skill tree</b></a> · <sub>64 hands-on skills, from your first brush stroke to testing an avatar toggle.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/glossary.html"><img alt="Glossary: 41 words from Unity, textures and VRChat avatars, with where to find each one." src="Website~/media/og-glossary.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/glossary.html"><b>Glossary</b></a> · <sub>41 words from Unity, textures and VRChat avatars, with where to find each one.</sub>
+      <a href="https://avistry.github.io/avistry/glossary.html"><img alt="Glossary: Find the Unity, shader and VRChat terms behind the controls you use." src="Website~/media/og-glossary.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/glossary.html"><b>Glossary</b></a> · <sub>Find the Unity, shader and VRChat terms behind the controls you use.</sub>
     </td>
     <td width="50%" valign="top">
       <a href="https://avistry.github.io/avistry/about.html"><img alt="About: What it is and is not, how to check a download yourself, and how to help." src="Website~/media/og-about.jpg" width="100%"></a>
@@ -185,8 +185,8 @@ Every page has its own picture. Click one to open it.
       <br><a href="https://avistry.github.io/avistry/download.html"><b>Download</b></a> · <sub>VCC is the easiest way, and it keeps Avistry up to date.</sub>
     </td>
     <td width="50%" valign="top">
-      <a href="https://avistry.github.io/avistry/"><img alt="Home: Recolour parts, paint on layers and save a new PNG. Your original files never change." src="Website~/media/og.jpg" width="100%"></a>
-      <br><a href="https://avistry.github.io/avistry/"><b>Home</b></a> · <sub>Recolour parts, paint on layers and save a new PNG. Your original files never change.</sub>
+      <a href="https://avistry.github.io/avistry/"><img alt="Home: Recolour parts, paint on layers and save a new PNG. Keep the original texture." src="Website~/media/og.jpg" width="100%"></a>
+      <br><a href="https://avistry.github.io/avistry/"><b>Home</b></a> · <sub>Recolour parts, paint on layers and save a new PNG. Keep the original texture.</sub>
     </td>
   </tr>
 </table>
@@ -210,8 +210,8 @@ solve a real creator's problem, in plain words, and feel finished before it ship
 
 <!-- release-banner:start -->
 <p align="center">
-  <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0"><img alt="Avistry 0.2.0" src="Website~/media/release/0.2.0/banner.jpg" width="880"></a>
-  <br><sub>What's new in 0.2.0 · <a href="https://github.com/avistry/avistry/releases/tag/v0.2.0">Read the release notes</a></sub>
+  <a href="https://github.com/avistry/avistry/releases/tag/v0.3.0"><img alt="Avistry 0.3.0, Surface Studio. Brown headphones with painted cherry blossoms on the earcup." src="Website~/media/release/0.3.0/banner.jpg" width="880"></a>
+  <br><sub>What's new in 0.3.0 · Surface Studio · <a href="https://github.com/avistry/avistry/releases/tag/v0.3.0">Read the release notes</a></sub>
 </p>
 <!-- release-banner:end -->
 
@@ -230,7 +230,10 @@ it into the Project window. The tool goes into `Packages/com.avistry.toolkit`, n
 `https://github.com/avistry/avistry.git`.
 
 No other packages are needed. If Poiyomi or lilToon is installed, the Colour tab gets extra options for it.
-If you tried the very first test build, delete `Assets/AvatarTextureStudio` first (VCC does this for you).
+If you used the early AvatarTextureStudio test build, close Unity and move `Assets/AvatarTextureStudio` outside
+the project before installing Avistry. Keep the folder as a backup in case it contains saved edits. The old build
+looks for `Hidden/ATS/Layer`. If you see that shader name in an error after installing Avistry, check for old test
+build files under Assets and open the current tool from **Tools › Avistry › Textures**.
 
 ## Quick start
 
@@ -244,8 +247,8 @@ Nothing is written until you save. Ctrl+Z undoes every edit, and closing with un
 
 - All the code is here, under the [MIT license](LICENSE). It is editor-only: nothing goes into your upload or runs in
   VRChat.
-- Each release file is scanned on VirusTotal and listed with its SHA-256 in `SHA256SUMS.txt`. Check a download with
-  `Get-FileHash <file> -Algorithm SHA256` in PowerShell.
+- Each download has a SHA-256 checksum in `SHA256SUMS.txt`. Compare it with
+  `Get-FileHash <file> -Algorithm SHA256` in PowerShell. The release notes link to VirusTotal results when available.
 - No telemetry. The only network call is an optional update check (Help › Check for updates automatically). It is off
   until you turn it on, asks GitHub's public API once a day for the latest version and sends nothing about you.
 - Back up your project before trying any new tool, this one included.

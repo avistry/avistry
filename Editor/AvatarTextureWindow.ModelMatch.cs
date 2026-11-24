@@ -5,21 +5,16 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Colour Match › "Match on the model": click a point on the mesh being edited and a point on the part to match,
-    /// then the pair nearest that colour is adjusted until the two look the same in the Scene, lighting, glow and
-    /// material settings included (see ModelMatch). One undo step.
-    /// </summary>
     partial class AvatarTextureWindow
     {
         class ModelMatchState
         {
             public ModelMatch.View source, target;
             public ModelMatch.Result result;
+            public MeshUV sourceGeometry;
         }
 
         readonly Dictionary<string, ModelMatchState> _modelMatch = new Dictionary<string, ModelMatchState>();
-        internal static bool s_debugModelMatch;
 
         ModelMatchState ModelMatchOf(ColourMatchLayer cm)
         {
@@ -27,7 +22,6 @@ namespace Avistry.Textures
             return s;
         }
 
-        /// <summary>The nearest surface along a ray on any mesh in the open scenes (renderer, material slot, hit).</summary>
         bool RaycastAnyMesh(Ray ray, out Renderer best, out int bestIdx, out MeshUV.SurfaceHit bestHit)
         {
             best = null; bestIdx = -1; bestHit = new MeshUV.SurfaceHit();
@@ -51,7 +45,6 @@ namespace Avistry.Textures
             return best != null;
         }
 
-        /// <summary>Picks a "Match on the model" point along a ray seen from cam. Returns null or why it didn't work.</summary>
         string PickModelPoint(ColourMatchLayer cm, bool source, Ray ray, Camera cam)
         {
             if (_uv == null || _comp == null) return Loc.T("Choose what to edit first.");
@@ -59,15 +52,19 @@ namespace Avistry.Textures
             bool anyHit = RaycastAnyMesh(ray, out var r, out int idx, out var hit);
             if (source)
             {
-                if (_uv.PoseChanged()) _uv.RefreshPose();
-                if (!_uv.Raycast(ray, out var th))
+                if (!RaycastVisibleWithUvStatus(ray, out var th, out var covered, out var changedUv))
+                {
+                    if (changedUv) return IncludedUvChangedHint;
+                    if (covered != null) return CoveredMessage(covered);
                     return _renderer != null ? Loc.F("Click on {0} itself.", _renderer.name) : Loc.T("Click on the mesh you're editing itself.");
+                }
                 float dt = Vector3.Distance(ray.origin, th.point);
                 if (anyHit && !IsEditedSlot(r, idx) && Vector3.Distance(ray.origin, hit.point) < dt - 0.002f)
                     return Loc.F("Something is in front of that point ({0}). Click a spot you can see.", r.name);
                 var texel = _comp.Sample(Compositor.PickSource.Original, th.uv, 1, null, _uv, out _);
                 var part = _uv.PartOfTriangle(th.triangle);
-                st.source = ModelMatch.View.From(cam, th.point, part?.renderer ?? _renderer, part != null ? part.submesh : _materialIndex, th.uv, texel);
+                st.source = ModelMatch.View.From(cam, th.point, part?.renderer ?? _renderer, part != null ? part.materialSlot : _materialIndex, th.uv, texel);
+                st.sourceGeometry = _uv;
             }
             else
             {
@@ -90,38 +87,44 @@ namespace Avistry.Textures
             if (err != null) { Toast(err, MessageType.Info, 5f); return; }
             var st = ModelMatchOf(layer);
             CancelMatchPick();
-            if (source && !st.target.valid) { StartMatchPick(layer, MatchPick.ModelTarget); return; } // straight on to step 2
+            if (source && !st.target.valid) { StartMatchPick(layer, MatchPick.ModelTarget); return; }
             Toast(source ? Loc.T("Point on this part picked.") : Loc.F("Target point picked on “{0}”.", st.target.renderer.name), MessageType.Info, 3f);
             Repaint();
         }
 
-        /// <summary>
-        /// Adjusts the pair nearest the clicked colour until the two points look the same. Adds a pair when there is
-        /// none. Returns null or why it couldn't run.
-        /// </summary>
-        string RunModelMatch(ColourMatchLayer cm)
+        string RunModelMatch(ColourMatchLayer cm, System.Func<string, float, bool> cancelProgress = null)
         {
-            var st = ModelMatchOf(cm);
             if (_comp == null || _recipe == null) return Loc.T("Choose what to edit first.");
+            if (cm == null || !_recipe.layers.Contains(cm)) return Loc.T("Pick a Colour Match layer to edit first.");
+            if (!cm.enabled) return Loc.T("Show this Colour Match layer before matching on the model.");
+            if (cm.opacity <= 0f) return Loc.T("Raise this layer’s opacity above 0% before matching on the model.");
+            var st = ModelMatchOf(cm);
             if (!st.source.valid || !st.target.valid) return Loc.T("Pick both points first.");
-            if (!IsEditedSlot(st.source.renderer, st.source.submesh)) return Loc.T("The part being edited changed. Pick the point on this part again.");
+            bool SourceStillMatches() => !_needsRebuild && st.sourceGeometry == _uv &&
+                IsEditedSlot(st.source.renderer, st.source.submesh) && SceneSlotUsesCurrentUv(st.source.renderer, st.source.submesh);
+            var changed = Loc.T("The part being edited changed. Pick the point on this part again.");
+            if (!SourceStillMatches()) return changed;
             if (st.target.renderer == null) return Loc.T("The target is gone. Pick it again.");
+            if (IsEditedSlot(st.target.renderer, st.target.submesh))
+                return Loc.F("“{0}” is included in this edit (1 · Pick › Parts on this texture), so it would change along with it. Pick a part that isn't being edited.", st.target.renderer.name);
             if (CurrentSlot == null || CurrentSlot.role != TextureRole.Color)
                 return Loc.T("This works on colour textures (the main texture or a glow texture).");
 
-            bool previewWas = _previewOnAvatar;
-            _previewOnAvatar = true; // the measurement has to see the edit on the model
-            EditorUtility.DisplayProgressBar(Loc.T("Avistry"), Loc.T("Comparing the colours on the model…"), 0f);
+            bool previewWas = _previewOnAvatar, originalWas = _showOriginal;
+            bool committed = false;
+            Color[] originalFrom = null, originalTo = null;
+            Undo.FlushUndoRecordObjects();
+            if (!SourceStillMatches()) return changed;
             try
             {
-                if (_dirty) ComposeNow();
+                _previewOnAvatar = true;
+                _showOriginal = false;
+                EditorUtility.DisplayProgressBar(Loc.T("Avistry"), Loc.T("Comparing the colours on the model…"), 0f);
+                ComposeNow();
                 if (!ModelMatch.Measure(st.target, out var goal, out var why)) return why + " " + Loc.T("Pick the target again.");
 
-                // Measured before touching the recipe, so a failure here leaves it unchanged (a new pair starts as identity).
                 if (!ModelMatch.Measure(st.source, out var now, out why)) return why + " " + Loc.T("Pick the point on this part again.");
 
-                Undo.RecordObject(_recipe, "Match on the model");
-                // The pair to adjust: the one whose colour is closest to the clicked texture colour; a new one if none.
                 var clicked = Recolour.ToOklab(st.source.texel);
                 int k = -1;
                 float bestD = float.MaxValue;
@@ -130,19 +133,19 @@ namespace Avistry.Textures
                     float d = Vector3.Distance(Recolour.ToOklab(cm.from[i]), clicked);
                     if (d < bestD) { bestD = d; k = i; }
                 }
-                bool added = false;
-                if (k < 0 || bestD > 0.12f)
+                bool added = k < 0 || bestD > 0.12f;
+                if (added && cm.from.Count >= 8)
+                    return Loc.T("This layer already has 8 pairs and none is close to the clicked colour. Remove one, or click a colour that's already in a pair.");
+                originalFrom = cm.from.ToArray();
+                originalTo = cm.to.ToArray();
+                if (added)
                 {
-                    if (cm.from.Count >= 8) return Loc.T("This layer already has 8 pairs and none is close to the clicked colour. Remove one, or click a colour that's already in a pair.");
                     while (cm.to.Count < cm.from.Count) cm.to.Add(cm.from[cm.to.Count]);
                     cm.from.Add(new Color(st.source.texel.r, st.source.texel.g, st.source.texel.b, 1f));
                     cm.to.Add(cm.from[cm.from.Count - 1]);
                     k = cm.from.Count - 1;
-                    added = true;
                 }
 
-                // Search in OKLab, the space the Colour Match layer works in: lighting mostly scales lightness, glow
-                // lifts it, and the three components barely affect each other, so each one is solved on its own.
                 var g = Recolour.ToOklab(goal);
                 var t = Recolour.ToOklab(cm.to[k]);
                 ComposeNow();
@@ -155,26 +158,40 @@ namespace Avistry.Textures
                 int stuck = 0;
                 for (int it = 0; it < MaxTries && bestDiff > ModelMatch.GoodEnough * 0.5f; it++)
                 {
-                    if (EditorUtility.DisplayCancelableProgressBar(Loc.T("Avistry"), Loc.F("Matching the colours on the model… (difference {0:0.0})", bestDiff), (it + 1f) / MaxTries)) break;
+                    string progress = Loc.F("Matching the colours on the model… (difference {0:0.0})", bestDiff);
+                    float fraction = (it + 1f) / MaxTries;
+                    if (cancelProgress?.Invoke(progress, fraction) ?? EditorUtility.DisplayCancelableProgressBar(Loc.T("Avistry"), progress, fraction))
+                        return Loc.T("Match cancelled. Your colours stayed as they were.");
                     var want = ModelMatch.Step(t, rcur, g, ref slope);
-                    var colour = Recolour.FromOklab(want, 1f);                       // what a texture can actually hold
+                    var colour = Recolour.FromOklab(want, 1f);
                     colour = new Color(Mathf.Clamp01(colour.r), Mathf.Clamp01(colour.g), Mathf.Clamp01(colour.b), 1f);
                     var next = Recolour.ToOklab(colour);
-                    if ((next - t).sqrMagnitude < 1e-8f) { if (++stuck >= 2) break; continue; } // at the edge of what the texture can do
+                    if ((next - t).sqrMagnitude < 1e-8f) { if (++stuck >= 2) break; continue; }
                     stuck = 0;
                     cm.to[k] = colour;
                     ComposeNow();
-                    if (!ModelMatch.Measure(st.source, out var m, out why)) break;
+                    if (!ModelMatch.Measure(st.source, out var m, out why)) return why + " " + Loc.T("Pick the point on this part again.");
                     var rn = Recolour.ToOklab(m);
                     ModelMatch.Learn(ref slope, t, rcur, next, rn);
                     t = next; rcur = rn;
                     float diff = ModelMatch.Difference(goal, m);
                     if (diff < bestDiff) { bestDiff = diff; bestT = colour; bestR = m; }
-                    if (s_debugModelMatch) Debug.Log($"[ModelMatch] {it}: want {want:F3} to #{ColorUtility.ToHtmlStringRGB(colour)} rendered {rn:F3} goal {g:F3} slope {slope:F2} diff {diff:0.0}");
                 }
                 cm.to[k] = bestT;
+                var matchedFrom = cm.from.ToArray();
+                var matchedTo = cm.to.ToArray();
+                SetModelMatchPairs(cm, originalFrom, originalTo);
+                _previewOnAvatar = previewWas;
+                _showOriginal = originalWas;
+                Undo.IncrementCurrentGroup();
+                string undoName = Loc.T("Match on the model");
+                Undo.SetCurrentGroupName(undoName);
+                Undo.RecordObjects(new Object[] { this, _recipe }, undoName);
+                SetModelMatchPairs(cm, matchedFrom, matchedTo);
                 MarkEdited();
-                ComposeNow();
+                committed = true;
+                Undo.FlushUndoRecordObjects();
+                Undo.IncrementCurrentGroup();
 
                 bool reached = bestDiff <= ModelMatch.GoodEnough;
                 string note = reached ? null : WhyNotReached(goal, bestR);
@@ -188,17 +205,30 @@ namespace Avistry.Textures
             finally
             {
                 EditorUtility.ClearProgressBar();
-                if (!previewWas) { _previewOnAvatar = false; ComposeNow(); }
+                if (!committed)
+                {
+                    if (originalFrom != null) SetModelMatchPairs(cm, originalFrom, originalTo);
+                    _showOriginal = originalWas;
+                }
+                _previewOnAvatar = previewWas;
+                ComposeNow();
             }
         }
 
-        /// <summary>A plain reason the match can't get there, from how the result falls short.</summary>
+        static void SetModelMatchPairs(ColourMatchLayer layer, Color[] from, Color[] to)
+        {
+            layer.from.Clear();
+            layer.from.AddRange(from);
+            layer.to.Clear();
+            layer.to.AddRange(to);
+        }
+
         string WhyNotReached(Color goal, Color got)
         {
             var g = Recolour.ToOklab(goal);
             var r = Recolour.ToOklab(got);
             LookCheck.Forget(_material);
-            bool glow = LookCheck.StrongEmissions(_material, 0.05f).Count > 0; // even a faint glow lifts dark colours
+            bool glow = LookCheck.StrongEmissions(_material, 0.05f).Count > 0;
             if (r.x > g.x + 0.03f)
                 return glow ? Loc.T("The glow (Emission) on this material makes it brighter than the target, whatever the texture says. Lower or switch off its Emission, or match the emission texture instead.")
                             : Loc.T("It can't get as dark as the target: the lighting or material settings on this part brighten it.");
@@ -229,6 +259,7 @@ namespace Avistry.Textures
                     var layer = cm;
                     EditorApplication.delayCall += () =>
                     {
+                        if (this == null) return;
                         string err = RunModelMatch(layer);
                         if (err != null) Toast(err, MessageType.Warning, 6f);
                         Repaint();

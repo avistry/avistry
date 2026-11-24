@@ -4,7 +4,6 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>Shared styles, colours, icons and section headers for the Avistry window.</summary>
     static partial class StudioGUI
     {
         static bool Pro => EditorGUIUtility.isProSkin;
@@ -45,8 +44,7 @@ namespace Avistry.Textures
         static GUIStyle _group;
         static GUIStyle GroupStyle => _group ??= new GUIStyle { padding = new RectOffset(8, 8, 6, 8), margin = new RectOffset(0, 0, 0, 6) };
 
-        /// <summary>A titled box (law of common region): related controls share one background.</summary>
-        public static Rect BeginGroup(string title, string badge = null, string infoId = null) // infoId: drawn by StudioGUI.Info.cs
+        public static Rect BeginGroup(string title, string badge = null, string infoId = null)
         {
             var r = EditorGUILayout.BeginVertical(GroupStyle);
             if (Event.current.type == EventType.Repaint)
@@ -68,15 +66,10 @@ namespace Avistry.Textures
 
         public static void EndGroup() => EditorGUILayout.EndVertical();
 
-        static GUIStyle _foldTitle;
-        static GUIStyle FoldTitle => _foldTitle ??= new GUIStyle(GroupTitle) { clipping = TextClipping.Clip };
+        static readonly Vector3[] FoldChevron = new Vector3[3];
+        static readonly GUIContent FoldLabel = new GUIContent();
 
-        /// <summary>
-        /// Same box as BeginGroup, with a clickable header that folds the group. When folded, <paramref name="summary"/> (the
-        /// key value) is shown after the title; when open, <paramref name="badge"/> sits on the right as usual.
-        /// Always call EndGroup. Returns whether the content should be drawn.
-        /// </summary>
-        public static bool BeginFoldGroup(ref bool open, string title, string summary = null, string badge = null, string tooltip = null, string infoId = null) // infoId: drawn by StudioGUI.Info.cs
+        public static bool BeginFoldGroup(ref bool open, string title, string summary = null, string badge = null, string tooltip = null, string infoId = null)
         {
             var r = EditorGUILayout.BeginVertical(GroupStyle);
             var e = Event.current;
@@ -85,21 +78,162 @@ namespace Avistry.Textures
                 EditorGUI.DrawRect(r, GroupBg);
                 EditorGUI.DrawRect(new Rect(r.x, r.y, r.width, 1), HeaderLine);
             }
-            var tr = GUILayoutUtility.GetRect(0, 16, GUILayout.ExpandWidth(true));
+            var tr = GUILayoutUtility.GetRect(0, 24f, GUILayout.ExpandWidth(true));
+            open = FoldoutWithDetail(tr, open, title, open ? badge : summary, tooltip, infoId);
+            return open;
+        }
+
+        public static bool Foldout(bool open, GUIContent title, string detail = null)
+        {
+            return Foldout(EditorGUILayout.GetControlRect(false, 22f), open, title, detail);
+        }
+
+        public static bool Foldout(Rect row, bool open, GUIContent title, string detail = null)
+        {
+            return FoldoutWithDetail(row, open, title.text, detail, title.tooltip);
+        }
+
+        static bool FoldoutWithDetail(Rect row, bool open, string title, string detail, string tooltip, string infoId = null)
+        {
             bool info = HasInfo(infoId);
-            var lr = info ? new Rect(tr.x, tr.y, tr.width - InfoHit - 2, tr.height) : tr;
-            string text = (open ? "▾ " : "▸ ") + title.ToUpperInvariant() + (!open && !string.IsNullOrEmpty(summary) ? "  ·  " + summary : "");
-            GUI.Label(lr, new GUIContent(text, string.IsNullOrEmpty(tooltip) ? (open ? Loc.T("Click to fold this section") : Loc.T("Click to open this section")) : tooltip), FoldTitle);
-            if (open && !string.IsNullOrEmpty(badge)) GUI.Label(lr, badge, Badge);
-            // Before the fold click so a click on the icon is used here and does not fold the group.
-            if (info) DrawInfo(new Rect(tr.xMax - InfoHit, tr.center.y - InfoHit * 0.5f, InfoHit, InfoHit), infoId);
-            if (e.type == EventType.MouseDown && e.button == 0 && tr.Contains(e.mousePosition))
+            var hit = row;
+            if (info) hit.width = Mathf.Max(0f, hit.width - InfoHit - 2f);
+            int id = GUIUtility.GetControlID(FocusType.Keyboard, hit);
+            open = DisclosureInput(hit, open, id, out bool focused, out bool hover);
+            if (Event.current.type == EventType.Repaint)
+                DrawFoldHeader(hit, open, hover, focused, title, detail, tooltip);
+            if (info) DrawInfo(new Rect(row.xMax - InfoHit, row.center.y - InfoHit * 0.5f, InfoHit, InfoHit), infoId);
+            return open;
+        }
+
+        internal static bool KeyboardButton(Rect r, int hint, out bool hover, out bool focus)
+        {
+            int id = GUIUtility.GetControlID(hint, FocusType.Keyboard, r);
+            var e = Event.current;
+            hover = GUI.enabled && r.Contains(e.mousePosition);
+            focus = GUIUtility.keyboardControl == id;
+            bool click = false;
+            switch (e.GetTypeForControl(id))
             {
-                open = !open;
-                e.Use();
-                GUI.changed = true;
+                case EventType.MouseDown:
+                    if (e.button == 0 && hover)
+                    {
+                        GUIUtility.hotControl = id;
+                        GUIUtility.keyboardControl = id;
+                        e.Use();
+                    }
+                    break;
+                case EventType.MouseUp:
+                    if (GUIUtility.hotControl == id)
+                    {
+                        GUIUtility.hotControl = 0;
+                        e.Use();
+                        click = hover;
+                    }
+                    break;
+                case EventType.KeyDown:
+                    if (GUI.enabled && focus && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter || e.keyCode == KeyCode.Space))
+                    {
+                        e.Use();
+                        click = true;
+                    }
+                    break;
+                case EventType.Repaint:
+                    if (GUI.enabled) EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
+                    break;
+            }
+            return click;
+        }
+
+        static bool DisclosureInput(Rect hit, bool open, int id, out bool focused, out bool hover)
+        {
+            var e = Event.current;
+            focused = GUIUtility.keyboardControl == id;
+            hover = GUI.enabled && hit.Contains(e.mousePosition);
+            bool next = open;
+            switch (e.GetTypeForControl(id))
+            {
+                case EventType.MouseDown when hover && e.button == 0:
+                    GUIUtility.keyboardControl = id;
+                    next = !open;
+                    e.Use();
+                    break;
+                case EventType.KeyDown when focused && GUI.enabled && !e.alt && !e.control && !e.command && !e.shift:
+                    switch (e.keyCode)
+                    {
+                        case KeyCode.LeftArrow: next = false; e.Use(); break;
+                        case KeyCode.RightArrow: next = true; e.Use(); break;
+                        case KeyCode.Return:
+                        case KeyCode.KeypadEnter:
+                        case KeyCode.Space: next = !open; e.Use(); break;
+                    }
+                    break;
+            }
+            if (next != open) GUI.changed = true;
+            return next;
+        }
+
+        internal static bool FoldoutMarker(Rect hit, Rect chip, bool open, int id)
+        {
+            open = DisclosureInput(hit, open, id, out bool focused, out bool hover);
+            if (Event.current.type == EventType.Repaint)
+            {
+                DrawDisclosureChip(chip, open, hover || focused);
+                if (focused) DrawRoundedBorder(hit, CardAccent, 4f);
+                if (GUI.enabled) EditorGUIUtility.AddCursorRect(hit, MouseCursor.Link);
             }
             return open;
+        }
+
+        static void DrawDisclosureChip(Rect chip, bool open, bool highlighted)
+        {
+            Color accent = CardAccent;
+            DrawRounded(chip, open ? accent : CardTryFill, 4f);
+            if (!open) DrawRoundedBorder(chip, highlighted ? accent : Color.Lerp(CardTryFill, accent, .55f), 4f);
+            Vector3 c = chip.center;
+            Vector3 along = open ? Vector3.right : Vector3.down;
+            Vector3 tip = open ? Vector3.up : Vector3.right;
+            FoldChevron[0] = c - along * 4f - tip * 2f;
+            FoldChevron[1] = c + tip * 2f;
+            FoldChevron[2] = c + along * 4f - tip * 2f;
+            using (new Handles.DrawingScope(open ? CardBg : accent))
+                Handles.DrawAAPolyLine(2.5f, FoldChevron);
+        }
+
+        static void DrawFoldHeader(Rect row, bool open, bool hover, bool focused, string title, string detail, string tooltip)
+        {
+            Color accent = CardAccent;
+            DrawRounded(row, hover ? Color.Lerp(HeaderBg, accent, .12f) : HeaderBg, 4f);
+            if (focused) DrawRoundedBorder(row, accent, 4f);
+            float size = Mathf.Clamp(row.height - 4f, 10f, 18f);
+            var chip = new Rect(row.x + 3f, row.center.y - size * .5f, size, size);
+            DrawDisclosureChip(chip, open, hover || focused);
+
+            var label = Rect.MinMaxRect(chip.xMax + 5f, row.y, Mathf.Max(chip.xMax + 5f, row.xMax - 5f), row.yMax);
+            FoldLabel.text = title;
+            FoldLabel.tooltip = null;
+            var style = EditorStyles.boldLabel;
+            float titleWidth = style.CalcSize(FoldLabel).x;
+            GUI.Label(label, FoldLabel, style);
+            bool clipped = titleWidth > label.width;
+            if (!string.IsNullOrEmpty(detail))
+            {
+                FoldLabel.text = detail;
+                float remaining = label.width - titleWidth - 6f;
+                if (remaining >= Badge.CalcSize(FoldLabel).x)
+                    GUI.Label(new Rect(label.xMax - remaining, row.y, remaining, row.height), FoldLabel, Badge);
+                else clipped = true;
+            }
+            if (GUI.enabled) EditorGUIUtility.AddCursorRect(row, MouseCursor.Link);
+            if (hover)
+            {
+                FoldLabel.text = "";
+                string action = open ? Loc.T("Click to fold this section") : Loc.T("Click to open this section");
+                FoldLabel.tooltip = string.IsNullOrEmpty(tooltip) ? action : action + "\n" + tooltip;
+                if (clipped)
+                    FoldLabel.tooltip = (string.IsNullOrEmpty(detail) ? title : title + " · " + detail) + "\n" + FoldLabel.tooltip;
+                GUI.Label(row, FoldLabel, GUIStyle.none);
+            }
         }
 
         static GUIStyle _primary;
@@ -111,7 +245,6 @@ namespace Avistry.Textures
             return _primary;
         }
 
-        /// <summary>The one highlighted action of a tab (Von Restorff): tinted, taller, full width.</summary>
         public static bool PrimaryButton(GUIContent content, Color tint, float height = 30f)
         {
             var old = GUI.backgroundColor;
@@ -121,7 +254,6 @@ namespace Avistry.Textures
             return clicked;
         }
 
-        /// <summary>A destructive button: red tint so it never looks like the safe actions next to it (law of similarity).</summary>
         public static bool DangerButton(GUIContent content, GUIStyle style, params GUILayoutOption[] options)
         {
             var old = GUI.backgroundColor;
@@ -133,7 +265,6 @@ namespace Avistry.Textures
 
         public enum Check { Ok, Problem, Note }
 
-        /// <summary>Checklist line with a coloured mark (not colour alone: the mark differs too).</summary>
         public static void CheckRow(Check state, string text, string tooltip = null)
         {
             string mark = state == Check.Ok ? "✓" : state == Check.Problem ? "✕" : "!";
@@ -148,7 +279,6 @@ namespace Avistry.Textures
             }
         }
 
-        // The styles below carry skin colours; Unity can switch skins without reloading scripts, so drop them when it does.
         static bool _stylesPro;
         static void SkinCheck()
         {
@@ -157,19 +287,17 @@ namespace Avistry.Textures
             _hint = _rowLabelDisabled = _badge = _groupTitle = null;
         }
 
-        static GUIStyle _headerFoldout, _body, _mini, _miniRight, _hint, _rowLabel, _rowLabelDisabled, _status, _overlay, _bigButton, _badge;
+        static GUIStyle _body, _mini, _miniRight, _hint, _rowLabel, _rowLabelDisabled, _status, _overlay, _bigButton, _badge;
 
-        public static GUIStyle HeaderFoldout => _headerFoldout ??= new GUIStyle(EditorStyles.foldout) { fontStyle = FontStyle.Bold };
         public static GUIStyle Body => _body ??= new GUIStyle { padding = new RectOffset(8, 8, 6, 8) };
         public static GUIStyle Mini => _mini ??= new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
         public static GUIStyle MiniRight => _miniRight ??= new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleRight };
         public static GUIStyle Hint { get { SkinCheck(); return _hint ??= HintStyle(); } }
 
-        /// <summary>Cuts <paramref name="text"/> to fit <paramref name="width"/> pixels in <paramref name="style"/> and ends it with an ellipsis.</summary>
         public static string Ellipsize(string text, GUIStyle style, float width)
         {
             if (string.IsNullOrEmpty(text) || style.CalcSize(new GUIContent(text)).x <= width) return text;
-            int lo = 0, hi = text.Length; // longest prefix that fits with the ellipsis
+            int lo = 0, hi = text.Length;
             while (lo < hi)
             {
                 int mid = (lo + hi + 1) / 2;
@@ -181,13 +309,18 @@ namespace Avistry.Textures
         public static GUIStyle RowLabel => _rowLabel ??= new GUIStyle(EditorStyles.label) { alignment = TextAnchor.MiddleLeft, clipping = TextClipping.Clip };
         public static GUIStyle RowLabelDisabled { get { SkinCheck(); return _rowLabelDisabled ??= new GUIStyle(RowLabel) { normal = { textColor = Pro ? new Color(0.5f, 0.5f, 0.5f) : new Color(0.55f, 0.55f, 0.55f) } }; } }
         public static GUIStyle Status => _status ??= new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleLeft, clipping = TextClipping.Clip, padding = new RectOffset(6, 6, 0, 0) };
-        public static GUIStyle Overlay => _overlay ??= new GUIStyle(EditorStyles.whiteMiniLabel) { alignment = TextAnchor.MiddleLeft, padding = new RectOffset(8, 8, 3, 3), richText = true };
+        public static GUIStyle Overlay => _overlay ??= new GUIStyle(EditorStyles.whiteMiniLabel)
+        {
+            alignment = TextAnchor.MiddleLeft,
+            padding = new RectOffset(8, 8, 3, 3),
+            richText = true,
+            wordWrap = true,
+        };
         public static GUIStyle BigButton => _bigButton ??= new GUIStyle(GUI.skin.button) { fontStyle = FontStyle.Bold, fixedHeight = 30 };
         public static GUIStyle Badge { get { SkinCheck(); return _badge ??= new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleRight, normal = { textColor = Pro ? new Color(0.65f, 0.65f, 0.65f) : new Color(0.3f, 0.3f, 0.3f) } }; } }
 
         static readonly Dictionary<string, Texture> IconCache = new Dictionary<string, Texture>();
 
-        /// <summary>Built-in editor icon (dark/light variant) with a text fallback; never logs an error if missing.</summary>
         public static GUIContent Icon(string name, string text, string tooltip = null)
         {
             if (!IconCache.TryGetValue(name, out var tex))
@@ -199,21 +332,10 @@ namespace Avistry.Textures
             return tex != null ? new GUIContent(text, tex, tooltip) : new GUIContent(string.IsNullOrEmpty(text) ? name : text, tooltip);
         }
 
-        /// <summary>A full-width foldout header bar. Returns whether the section is open.</summary>
-        public static bool Section(ref bool open, string title, string badge = null, string infoId = null) // infoId: drawn by StudioGUI.Info.cs
+        public static bool Section(ref bool open, string title, string badge = null, string infoId = null, string tooltip = null)
         {
-            var r = GUILayoutUtility.GetRect(0, 22, GUILayout.ExpandWidth(true));
-            if (Event.current.type == EventType.Repaint)
-            {
-                EditorGUI.DrawRect(r, HeaderBg);
-                EditorGUI.DrawRect(new Rect(r.x, r.y, r.width, 1), HeaderLine);
-            }
-            bool info = HasInfo(infoId);
-            float reserve = info ? InfoHit + 2 : 0;
-            if (!string.IsNullOrEmpty(badge))
-                GUI.Label(new Rect(r.x + 120, r.y + 2, r.width - 128 - reserve, 18), badge, Badge);
-            open = EditorGUI.Foldout(new Rect(r.x + 8, r.y + 2, r.width - 16 - reserve, 18), open, title, true, HeaderFoldout);
-            if (info) DrawInfo(new Rect(r.xMax - InfoHit - 4, r.center.y - InfoHit * 0.5f, InfoHit, InfoHit), infoId);
+            var r = GUILayoutUtility.GetRect(0, 22f, GUILayout.ExpandWidth(true));
+            open = FoldoutWithDetail(r, open, title, badge, tooltip, infoId);
             return open;
         }
 
@@ -225,7 +347,6 @@ namespace Avistry.Textures
             GUILayout.Space(space);
         }
 
-        /// <summary>Colour chip per layer type, shown in the layer list.</summary>
         public static Color LayerChip(Layer l) => l switch
         {
             PaintLayer _ => new Color(0.95f, 0.45f, 0.70f),
@@ -237,7 +358,6 @@ namespace Avistry.Textures
             _ => new Color(0.6f, 0.6f, 0.6f),
         };
 
-        /// <summary>Slider with logarithmic response (fine control for small brush sizes) and a number field.</summary>
         public static float LogSlider(GUIContent label, float value, float min, float max, string unit)
         {
             var r = EditorGUILayout.GetControlRect();

@@ -1,5 +1,3 @@
-// Usage: node build-zip.mjs <packageDir> <out.zip>
-// Builds the VPM/UPM package zip: package.json sits at the zip root, only package files are included.
 import fs from 'node:fs';
 import path from 'node:path';
 import { collectPackage, makeZip } from './lib.mjs';

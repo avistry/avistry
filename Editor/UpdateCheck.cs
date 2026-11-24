@@ -5,16 +5,12 @@ using UnityEngine.Networking;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// The one network call Avistry can make: an opt-in, anonymous GET of GitHub's "latest release" (public REST API).
-    /// Nothing is sent before the user turns it on; the request carries no user, machine or project data.
-    /// </summary>
     internal static class UpdateCheck
     {
         const string Endpoint = "https://api.github.com/repos/avistry/avistry/releases/latest";
         const string UrlPrefix = "https://github.com/avistry/avistry/";
-        const string ModeKey = "Avistry.UpdateCheck.Mode";      // 0 not asked, 1 on, 2 off
-        const string LastKey = "Avistry.UpdateCheck.LastUtc";   // unix seconds of the last check
+        const string ModeKey = "Avistry.UpdateCheck.Mode";
+        const string LastKey = "Avistry.UpdateCheck.LastUtc";
         const string EtagKey = "Avistry.UpdateCheck.Etag";
         const string TagKey = "Avistry.UpdateCheck.LatestTag";
         const string UrlKey = "Avistry.UpdateCheck.LatestUrl";
@@ -25,14 +21,12 @@ namespace Avistry.Textures
         internal static bool Enabled => EditorPrefs.GetInt(ModeKey, 0) == 1;
         internal static void SetEnabled(bool on) => EditorPrefs.SetInt(ModeKey, on ? 1 : 2);
 
-        /// <summary>Raised when a check finishes (any outcome) so the window can repaint.</summary>
         internal static event Action Changed;
 
         static UnityWebRequest s_req;
         static bool s_manual;
-        static bool s_shownByManual;  // a manual check was made this session, so its notice may show even when the automatic check is off
+        static bool s_shownByManual;
         static string s_installed;
-        // "ok" reached GitHub, "none" no release yet, "bad" answered in a way we cannot read, "" unreachable
         static string s_outcome = "";
 
         [InitializeOnLoadMethod]
@@ -49,14 +43,13 @@ namespace Avistry.Textures
 
         internal static bool Busy => s_req != null;
 
-        /// <summary>True when the last known release is newer than the installed one and was not skipped.</summary>
         internal static bool TryGetNotice(out string version, out string url)
         {
             version = null;
             url = EditorPrefs.GetString(UrlKey, "");
             string tag = EditorPrefs.GetString(TagKey, "");
             if (tag.Length == 0 || !IsOurUrl(url)) return false;
-            if (!Enabled && !s_shownByManual) return false; // No thanks / off means no banner either
+            if (!Enabled && !s_shownByManual) return false;
             string v = tag.TrimStart('v', 'V');
             if (v == EditorPrefs.GetString(SkipKey, "")) return false;
             if (CompareVersions(v, InstalledVersion()) <= 0) return false;
@@ -77,7 +70,6 @@ namespace Avistry.Textures
             if (IsOurUrl(url)) Application.OpenURL(url);
         }
 
-        /// <summary>Called when the window opens: checks at most once a day, and only when the user turned it on.</summary>
         internal static void MaybeCheckAutomatically()
         {
             if (!Enabled || Busy) return;
@@ -86,7 +78,6 @@ namespace Avistry.Textures
             Start(false);
         }
 
-        /// <summary>A manual check works even when the automatic one is off, and reports its result in a dialog.</summary>
         internal static void CheckNow()
         {
             if (Busy) return;
@@ -103,7 +94,6 @@ namespace Avistry.Textures
             req.SetRequestHeader("Accept", "application/vnd.github+json");
             req.SetRequestHeader("X-GitHub-Api-Version", "2022-11-28");
             req.SetRequestHeader("User-Agent", "Avistry-UpdateCheck");
-            // A 304 answer does not count against GitHub's rate limit.
             string etag = EditorPrefs.GetString(EtagKey, "");
             if (etag.Length > 0 && EditorPrefs.GetString(TagKey, "").Length > 0) req.SetRequestHeader("If-None-Match", etag);
             req.SendWebRequest();
@@ -111,7 +101,6 @@ namespace Avistry.Textures
             EditorApplication.update += Poll;
         }
 
-        // Polling keeps the editor responsive; the request is always disposed, whatever the outcome.
         static void Poll()
         {
             var req = s_req;
@@ -136,8 +125,7 @@ namespace Avistry.Textures
                         EditorPrefs.SetString(EtagKey, req.GetResponseHeader("ETag") ?? "");
                     }
                 }
-                else if (code == 404) { reached = true; s_outcome = "none"; } // no release published yet
-                // 403/429 (rate limit) and network errors: keep the last known state, say nothing.
+                else if (code == 404) { reached = true; s_outcome = "none"; }
             }
             catch (Exception e)
             {
@@ -146,7 +134,6 @@ namespace Avistry.Textures
             }
             finally { req.Dispose(); }
 
-            // Only a check that got an answer starts the 24 h wait; failures retry the next time the window opens.
             if (reached || s_outcome == "bad") EditorPrefs.SetString(LastKey, Now().ToString());
             bool manual = s_manual;
             s_manual = false;
@@ -184,16 +171,12 @@ namespace Avistry.Textures
         {
             string v = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(UpdateCheck).Assembly)?.version;
             if (!string.IsNullOrEmpty(v)) return v;
-            // Not installed as a package (copied into Assets): read this package's own package.json, one level above Editor/.
             try
             {
-                foreach (var g in AssetDatabase.FindAssets("UpdateCheck t:MonoScript"))
+                string path = AssetDatabase.GUIDToAssetPath("1edb04b6be5e7464bacfc5093dc8a3ed");
+                if (path.StartsWith("Assets/", StringComparison.Ordinal) && System.IO.File.Exists(path))
                 {
-                    string path = AssetDatabase.GUIDToAssetPath(g);
-                    if (!path.EndsWith("/Editor/UpdateCheck.cs", StringComparison.Ordinal)) continue;
-                    string pj = path.Substring(0, path.Length - "/Editor/UpdateCheck.cs".Length) + "/package.json";
-                    var asset = AssetDatabase.LoadAssetAtPath<TextAsset>(pj);
-                    var dto = asset != null ? JsonUtility.FromJson<PackageDto>(asset.text) : null;
+                    var dto = JsonUtility.FromJson<PackageDto>(System.IO.File.ReadAllText(path));
                     if (!string.IsNullOrEmpty(dto?.version)) return dto.version;
                 }
             }
@@ -218,7 +201,6 @@ namespace Avistry.Textures
             return true;
         }
 
-        /// <summary>Semver order: negative when a is older than b. A prerelease is lower than its release. Unparseable counts as 0.0.0.</summary>
         internal static int CompareVersions(string a, string b)
         {
             if (!TryParseVersion(a, out var ca, out var pa)) { ca = new int[3]; pa = ""; }

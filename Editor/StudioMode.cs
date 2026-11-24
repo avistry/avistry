@@ -2,10 +2,9 @@ using UnityEditor;
 
 namespace Avistry.Textures
 {
-    /// <summary>Simple or Advanced wording and controls; remembered between sessions.</summary>
     internal static class StudioMode
     {
-        public const string PrefKey = "AvatarTextureStudio.Advanced";             // default false = Simple
+        public const string PrefKey = "AvatarTextureStudio.Advanced";
         public const string NewToUnityKey = "AvatarTextureStudio.NewToUnityDismissed";
         static bool? s_adv;
 

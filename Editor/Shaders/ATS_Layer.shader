@@ -1,5 +1,3 @@
-// Avistry: one layer of the stack. All values are the raw texture values
-// (gamma/sRGB-encoded for colour textures), so adjustments behave like Photoshop / Clip Studio.
 // Formulas follow TextureCraft (MIT OR Apache-2.0): crates/core/src/blend.rs and crates/core/src/layer.rs.
 Shader "Hidden/Avistry/Layer"
 {
@@ -12,6 +10,7 @@ Shader "Hidden/Avistry/Layer"
         _PaintTex ("Paint", 2D) = "black" {}
         _ClipTex ("Clip base coverage", 2D) = "white" {}
         _HideTex ("Painted mask", 2D) = "black" {}
+        _ScenePositions ("Model positions", 2D) = "black" {}
     }
 
     CGINCLUDE
@@ -27,19 +26,21 @@ Shader "Hidden/Avistry/Layer"
     float4 _Color0;
     float _Opacity;
     float _Blend;
+    float4 _AdditionalBlendModes;
+    float4 _AdditionalBlendStrengths;
     float _InvertMask;
-    float _Aspect;              // texture width / height (drawn gradients)
+    float _Aspect;
     float4 _MainTex_TexelSize;
-    sampler2D _ClipTex;         // Clip to layer below: coverage of the base layer (white = not clipped)
-    sampler2D _HideTex;         // painted layer mask strokes (alpha = coverage)
-    float _HideMode;            // 0 = no painted mask, 1 = coverage hides, 2 = coverage reveals
-    float _CoverageOut;         // 1 = output this layer's coverage instead of the composite (for clipping)
-    sampler2D _ImageTex;        // Image layer: the picture
-    sampler2D _ImageMaskTex;    // Image layer: optional mask (sampled at the texture UV)
-    float4 _ImageST;            // the picture.s own tiling (xy) and offset (zw)
-    float _MaskConvert;         // 1 = the mask picture was decoded from sRGB by the GPU: encode it again (default 0 = as sampled)
-    float _ImageConvert;        // 1 = the picture was decoded from sRGB by the GPU: encode it again (raw file values)
-    float4 _ChannelMask;        // which channels this layer writes (1 = write); alpha takes the paint.s brightness
+    sampler2D _ClipTex;
+    sampler2D _HideTex;
+    float _HideMode;
+    float _CoverageOut;
+    sampler2D _ImageTex;
+    sampler2D _ImageMaskTex;
+    float4 _ImageST;
+    float _MaskConvert;
+    float _ImageConvert;
+    float4 _ChannelMask;
 
     float Lum(float3 c) { return dot(c, float3(0.3, 0.59, 0.11)); }
 
@@ -75,40 +76,45 @@ Shader "Hidden/Avistry/Layer"
 
     float3 BlendRGB(float3 a, float3 b, int mode)
     {
-        if (mode == 1) return a * b;                                         // Multiply
-        if (mode == 2) return 1 - (1 - a) * (1 - b);                         // Screen
+        if (mode == 1) return a * b;
+        if (mode == 2) return 1 - (1 - a) * (1 - b);
         if (mode == 3) return float3(Overlay1(a.r, b.r), Overlay1(a.g, b.g), Overlay1(a.b, b.b));
         if (mode == 4) return float3(SoftLight1(a.r, b.r), SoftLight1(a.g, b.g), SoftLight1(a.b, b.b));
-        if (mode == 5) return saturate(a + b);                               // Add
-        if (mode == 6) return saturate(a - b);                               // Subtract
-        if (mode == 7) return SetLum(b, Lum(a));                             // Color
-        if (mode == 8) return SetLum(SetSat(b, Sat(a)), Lum(a));             // Hue
-        if (mode == 9) return SetLum(SetSat(a, Sat(b)), Lum(a));             // Saturation
-        if (mode == 10) return SetLum(a, Lum(b));                            // Luminosity
-        if (mode == 11) return min(a, b);                                    // Darken
-        if (mode == 12) return max(a, b);                                    // Lighten
-        // CLIP STUDIO PAINT modes (CSP documents behaviour, not formulas; these are the standard per-channel ones).
-        if (mode == 13) return 1 - saturate((1 - a) / max(b, 1e-4));         // Color burn
-        if (mode == 14) return saturate(a + b - 1);                          // Linear burn
-        if (mode == 15) return saturate(a / max(1 - b, 1e-4));               // Color dodge
-        if (mode == 16) return saturate(a / max(1 - saturate(b * 1.25), 1e-4)); // Glow dodge (stronger dodge; approximation)
-        if (mode == 17) return saturate(a + b * 1.35);                       // Add (Glow) (stronger add; approximation)
-        if (mode == 18) return float3(Overlay1(b.r, a.r), Overlay1(b.g, a.g), Overlay1(b.b, a.b)); // Hard light = overlay with roles swapped
-        if (mode == 19)                                                      // Vivid light: burn below 0.5, dodge above
+        if (mode == 5) return saturate(a + b);
+        if (mode == 6) return saturate(a - b);
+        if (mode == 7) return SetLum(b, Lum(a));
+        if (mode == 8) return SetLum(SetSat(b, Sat(a)), Lum(a));
+        if (mode == 9) return SetLum(SetSat(a, Sat(b)), Lum(a));
+        if (mode == 10) return SetLum(a, Lum(b));
+        if (mode == 11) return min(a, b);
+        if (mode == 12) return max(a, b);
+        if (mode == 13) return 1 - saturate((1 - a) / max(b, 1e-4));
+        if (mode == 14) return saturate(a + b - 1);
+        if (mode == 15) return saturate(a / max(1 - b, 1e-4));
+        if (mode == 16) return saturate(a / max(1 - saturate(b * 1.25), 1e-4));
+        if (mode == 17) return saturate(a + b * 1.35);
+        if (mode == 18) return float3(Overlay1(b.r, a.r), Overlay1(b.g, a.g), Overlay1(b.b, a.b));
+        if (mode == 19)
         {
             float3 burn = 1 - saturate((1 - a) / max(2 * b, 1e-4));
             float3 dodge = saturate(a / max(1 - (2 * b - 1), 1e-4));
             return lerp(burn, dodge, step(0.5, b));
         }
-        if (mode == 20) return saturate(a + 2 * b - 1);                      // Linear light
-        if (mode == 21) return lerp(min(a, 2 * b), max(a, 2 * b - 1), step(0.5, b)); // Pin light
-        if (mode == 22) return step(1, a + b);                               // Hard mix
-        if (mode == 23) return abs(a - b);                                   // Difference
-        if (mode == 24) return a + b - 2 * a * b;                            // Exclusion
-        if (mode == 25) return saturate(a / max(b, 1e-4));                   // Divide
-        if (mode == 26) return Lum(a) <= Lum(b) ? a : b;                     // Darker color
-        if (mode == 27) return Lum(a) >= Lum(b) ? a : b;                     // Lighter color
-        return b;                                                            // Normal
+        if (mode == 20) return saturate(a + 2 * b - 1);
+        if (mode == 21) return lerp(min(a, 2 * b), max(a, 2 * b - 1), step(0.5, b));
+        if (mode == 22) return step(1, a + b);
+        if (mode == 23) return abs(a - b);
+        if (mode == 24) return a + b - 2 * a * b;
+        if (mode == 25) return saturate(a / max(b, 1e-4));
+        if (mode == 26) return Lum(a) <= Lum(b) ? a : b;
+        if (mode == 27) return Lum(a) >= Lum(b) ? a : b;
+        return b;
+    }
+
+    float3 ApplyAdditionalBlend(float3 previous, float3 layer, float mode, float strength)
+    {
+        if (strength <= 0) return previous;
+        return lerp(previous, BlendRGB(previous, layer, (int)round(mode)), strength);
     }
 
     float3 RGBtoHSL(float3 c)
@@ -147,7 +153,6 @@ Shader "Hidden/Avistry/Layer"
         return float3(Hue2RGB(p, q, h + 1.0 / 3), Hue2RGB(p, q, h), Hue2RGB(p, q, h - 1.0 / 3));
     }
 
-    // TextureCraft shift_unit: push toward 1 for positive amounts, toward 0 for negative.
     float ShiftUnit(float x, float a)
     {
         a = clamp(a, -1, 1);
@@ -160,7 +165,6 @@ Shader "Hidden/Avistry/Layer"
         return tex2D(_LUT, float2(t * (255.0 / 256.0) + 0.5 / 256.0, 0.5));
     }
 
-    // OKLab; colour values are gamma/sRGB.
     float3 MToLinear(float3 c) { c = saturate(c); return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4); }
     float3 MToGamma(float3 c) { c = saturate(c); return c <= 0.0031308 ? c * 12.92 : 1.055 * pow(c, 1.0 / 2.4) - 0.055; }
     float3 ToLab(float3 g)
@@ -174,7 +178,6 @@ Shader "Hidden/Avistry/Layer"
                       1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
                       0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s);
     }
-    // OKLab -> linear sRGB, not clamped (also used to test whether a colour is inside the sRGB gamut).
     float3 FromLabLinear(float3 lab)
     {
         float l = lab.x + 0.3963377774 * lab.y + 0.2158037573 * lab.z;
@@ -200,8 +203,13 @@ Shader "Hidden/Avistry/Layer"
         float w = saturate(_Opacity * m * layerAlpha);
         if (_CoverageOut > 0.5) return float4(w, w, w, 1);
         float3 a = saturate(src.rgb);
-        float3 blended = BlendRGB(a, saturate(layerRGB), (int)round(_Blend));
-        return float4(lerp(src.rgb, blended, w * _ChannelMask.rgb), lerp(src.a, Lum(saturate(layerRGB)), w * _ChannelMask.a));
+        float3 b = saturate(layerRGB);
+        float3 blended = BlendRGB(a, b, (int)round(_Blend));
+        blended = ApplyAdditionalBlend(blended, b, _AdditionalBlendModes.x, _AdditionalBlendStrengths.x);
+        blended = ApplyAdditionalBlend(blended, b, _AdditionalBlendModes.y, _AdditionalBlendStrengths.y);
+        blended = ApplyAdditionalBlend(blended, b, _AdditionalBlendModes.z, _AdditionalBlendStrengths.z);
+        blended = ApplyAdditionalBlend(blended, b, _AdditionalBlendModes.w, _AdditionalBlendStrengths.w);
+        return float4(lerp(src.rgb, blended, w * _ChannelMask.rgb), lerp(src.a, Lum(b), w * _ChannelMask.a));
     }
     ENDCG
 
@@ -209,7 +217,6 @@ Shader "Hidden/Avistry/Layer"
     {
         Cull Off ZWrite Off ZTest Always
 
-        // 0: Hue / Saturation / Lightness
         Pass
         {
             CGPROGRAM
@@ -227,8 +234,6 @@ Shader "Hidden/Avistry/Layer"
                     hsl.z = ShiftUnit(hsl.z, _Params0.z);
                     return Finish(i.uv, src, HSLtoRGB(hsl), 1);
                 }
-                // Add / Set colour (OKLCh): greys can be given a hue; the result is kept inside the sRGB gamut.
-                // _Params1 = (mode 1 add / 2 set, chroma, colour hue 0..1, use the hue for every pixel)
                 float3 lab = ToLab(src.rgb);
                 float C = length(lab.yz);
                 float h = atan2(lab.z, lab.y);
@@ -248,7 +253,7 @@ Shader "Hidden/Avistry/Layer"
                 for (int k = 0; k < 10; k++)
                 {
                     float3 t = FromLabLinear(float3(L, hd * hi));
-                    if (!(any(t < 0) || any(t > 1))) break;      // already inside the gamut
+                    if (!(any(t < 0) || any(t > 1))) break;
                     float mid = (lo + hi) * 0.5;
                     t = FromLabLinear(float3(L, hd * mid));
                     if (any(t < 0) || any(t > 1)) hi = mid; else lo = mid;
@@ -259,7 +264,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 1: Levels
         Pass
         {
             CGPROGRAM
@@ -276,7 +280,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 2: Gradient map (luminance -> gradient)
         Pass
         {
             CGPROGRAM
@@ -292,7 +295,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 3: Solid colour
         Pass
         {
             CGPROGRAM
@@ -306,7 +308,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 4: Root -> tip gradient. _Params0 = (start, end, reverse, useRawV)
         Pass
         {
             CGPROGRAM
@@ -324,7 +325,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 5: Paint layer (straight-alpha brush strokes rendered by the compositor)
         Pass
         {
             CGPROGRAM
@@ -339,7 +339,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 6: Brightness / Contrast. _Params0 = (brightness -1..1, contrast -1..1)
         Pass
         {
             CGPROGRAM
@@ -355,8 +354,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 7: Color Balance. _Params0.xyz shadows, _Params1.xyz midtones, _Color0.xyz highlights
-        //    (x = Cyan-Red, y = Magenta-Green, z = Yellow-Blue, -1..1); _Params0.w = keep brightness
         Pass
         {
             CGPROGRAM
@@ -367,9 +364,9 @@ Shader "Hidden/Avistry/Layer"
                 float4 src = tex2D(_MainTex, i.uv);
                 float3 a = saturate(src.rgb);
                 float l = Lum(a);
-                float ws = 1 - smoothstep(0.0, 0.5, l);       // dark tones
-                float wh = smoothstep(0.5, 1.0, l);           // bright tones
-                float wm = saturate(1 - ws - wh);             // middle tones
+                float ws = 1 - smoothstep(0.0, 0.5, l);
+                float wh = smoothstep(0.5, 1.0, l);
+                float wm = saturate(1 - ws - wh);
                 float3 shift = (_Params0.xyz * ws + _Params1.xyz * wm + _Color0.xyz * wh) * 0.5;
                 float3 c = saturate(a + shift);
                 if (_Params0.w > 0.5) c = SetLum(c, l);
@@ -378,7 +375,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 8: Posterization. _Params0.x = levels (2..20)
         Pass
         {
             CGPROGRAM
@@ -393,7 +389,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 9: Reverse Gradient (invert)
         Pass
         {
             CGPROGRAM
@@ -407,7 +402,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 10: Binarization. _Params0.x = threshold
         Pass
         {
             CGPROGRAM
@@ -422,7 +416,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 11: Tone Curve. _LUT = 256x1 per-channel lookup (RGB curve then channel curves)
         Pass
         {
             CGPROGRAM
@@ -438,14 +431,14 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 12: Drawn gradient (CSP Gradient tool). _Params0 = (start.xy, end.xy) in UV,
-        //     _Params1 = (shape 0 linear / 1 circle / 2 ellipse, edge 0 clamp / 1 repeat / 2 reverse repeat / 3 don't draw,
-        //                 ellipse flatness, dither)
         Pass
         {
             CGPROGRAM
             #pragma vertex vert_img
             #pragma fragment frag
+            sampler2D _ScenePositions;
+            float _SceneGradient;
+            float3 _SceneOrigin, _SceneAxis, _SceneAcross;
             float4 frag(v2f_img i) : SV_Target
             {
                 float4 src = tex2D(_MainTex, i.uv);
@@ -455,20 +448,27 @@ Shader "Hidden/Avistry/Layer"
                 float len = max(length(d), 1e-5);
                 float2 dir = d / len;
                 float2 q = i.uv * asp - s;
+                float2 projected = float2(dot(q, dir), dot(q, float2(-dir.y, dir.x))) / len;
+                float keep = 1;
+                if (_SceneGradient > 0.5)
+                {
+                    float4 p = tex2D(_ScenePositions, i.uv);
+                    float3 local = p.xyz - _SceneOrigin;
+                    projected = float2(dot(local, _SceneAxis), dot(local, _SceneAcross));
+                    keep = p.w;
+                }
                 int shape = (int)round(_Params1.x);
                 float t;
-                if (shape == 0) t = dot(q, dir) / len;
-                else if (shape == 1) t = length(q) / len;
-                else t = length(float2(dot(q, dir) / len, dot(q, float2(-dir.y, dir.x)) / (len * max(_Params1.z, 0.01))));
+                if (shape == 0) t = projected.x;
+                else if (shape == 1) t = _SceneGradient > 0.5 ? length(projected) : length(q) / len;
+                else t = length(float2(projected.x, projected.y / max(_Params1.z, 0.01)));
                 int edge = (int)round(_Params1.y);
-                float keep = 1;
                 if (edge == 1) t = frac(t);
                 else if (edge == 2) t = 1 - abs(frac(t * 0.5) * 2 - 1);
-                else if (edge == 3) keep = (t >= 0 && t <= 1) ? 1 : 0;
+                else if (edge == 3) keep *= (t >= 0 && t <= 1) ? 1 : 0;
                 float4 g = SampleLUT(saturate(t));
                 if (_Params1.w > 0.5)
                 {
-                    // Interleaved gradient noise, +-0.5 of an 8-bit step: hides banding once saved as a PNG.
                     float2 px = floor(i.uv * _MainTex_TexelSize.zw);
                     float n = frac(52.9829189 * frac(dot(px, float2(0.06711056, 0.00583715)))) - 0.5;
                     g.rgb += n / 255.0;
@@ -479,9 +479,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 13: Image layer (a picture placed on the texture; also flattened shader decals).
-        //     _Params0 = (centre.xy, size.xy) in texture UV, _Params1 = (rotation in radians, tiled, symmetry, mask channel or -1).
-        //     Same maths as Poiyomi's decals: rotate the UV around the centre, then map the rectangle to 0..1.
         Pass
         {
             CGPROGRAM
@@ -497,15 +494,15 @@ Shader "Hidden/Avistry/Layer"
                 float4 src = tex2D(_MainTex, i.uv);
                 float2 uv = i.uv;
                 int sym = (int)round(_Params1.z);
-                if (sym == 1 || sym == 3) uv.x = abs(uv.x - 0.5) + 0.5;      // copy to the other half (mirrored)
-                if (sym == 2 && uv.x < 0.5) uv.x += 0.5;                     // copy to the other half (not mirrored)
+                if (sym == 1 || sym == 3) uv.x = abs(uv.x - 0.5) + 0.5;
+                if (sym == 2 && uv.x < 0.5) uv.x += 0.5;
                 float2 d = uv - _Params0.xy;
                 float cs = cos(_Params1.x), sn = sin(_Params1.x);
                 d = float2(d.x * cs - d.y * sn, d.x * sn + d.y * cs);
                 float2 size = _Params0.zw;
                 size = float2(abs(size.x) < 1e-5 ? 1e-5 : size.x, abs(size.y) < 1e-5 ? 1e-5 : size.y);
                 d = d / size + 0.5;
-                if (sym == 3 && i.uv.x < 0.5) d.x = 1 - d.x;                 // lilToon "flip copy"
+                if (sym == 3 && i.uv.x < 0.5) d.x = 1 - d.x;
                 float inside = 1;
                 if (_Params1.y < 0.5) inside = (d.x >= 0 && d.x <= 1 && d.y >= 0 && d.y <= 1) ? 1 : 0;
                 float2 suv = d * _ImageST.xy + _ImageST.zw;
@@ -525,10 +522,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 14: Colour Match. Moves each colour by the shift of the matched palette colours near it, in OKLab, so the
-        //     shading and fine detail stay and only the colours change. _MatchFrom/_MatchTo = palette pairs (OKLab),
-        //     _Params0 = (pair count, softness, brightness amount, colour amount), _Params1.x = 1: leave far colours alone,
-        //     _Params1.y = 1: keep whites and blacks.
         Pass
         {
             CGPROGRAM
@@ -540,8 +533,9 @@ Shader "Hidden/Avistry/Layer"
             float4 frag(v2f_img i) : SV_Target
             {
                 float4 src = tex2D(_MainTex, i.uv);
-                float3 lab = ToLab(src.rgb);
                 int n = (int)round(_Params0.x);
+                if (n <= 0) return _CoverageOut > 0.5 ? float4(0, 0, 0, 1) : src;
+                float3 lab = ToLab(src.rgb);
                 float sig = max(_Params0.y, 1e-3);
                 float3 shift = 0;
                 float wsum = 0;
@@ -550,14 +544,12 @@ Shader "Hidden/Avistry/Layer"
                     if (k >= n) break;
                     float3 d = lab - _MatchFrom[k].xyz;
                     float wk = exp(-dot(d, d) / (2 * sig * sig));
-                    // "Keep whites and blacks": each pair's shift fades to 0 at lightness 0 and 1 (a curve through black, the colour, white).
                     float fL = _MatchFrom[k].x;
                     float factor = saturate(lab.x <= fL ? lab.x / max(fL, 1e-4) : (1 - lab.x) / max(1 - fL, 1e-4));
                     shift += wk * (_MatchTo[k].xyz - _MatchFrom[k].xyz) * lerp(1, factor, _Params1.y);
                     wsum += wk;
                 }
-                // "Leave other colours alone": a zero shift that wins for colours far from every matched colour.
-                float wNone = _Params1.x > 0.5 ? exp(-4.5) : 0;   // as heavy as a palette colour 3 softness away
+                float wNone = _Params1.x > 0.5 ? exp(-4.5) : 0;
                 shift /= max(wsum + wNone, 1e-6);
                 float3 o = lab + float3(shift.x * _Params0.z, shift.yz * _Params0.w);
                 return Finish(i.uv, src, FromLab(o), 1);
@@ -565,11 +557,6 @@ Shader "Hidden/Avistry/Layer"
             ENDCG
         }
 
-        // 15: Recolour part (2 · Colour › By part). The same maths as Recolour.Shift (HSV) / Recolour.ShiftOklab, so the
-        //     texture matches the Colour tab's preview. _Params0 = (hue in turns -0.5..0.5, saturation -1..1,
-        //     brightness -1..1, 1 = turn the hue in OKLab). _Params1.x = 1 means Tint instead: _Params1 = (1, tint chroma x
-        //     strength, tint hue 0..1 turns, 0). The tint's hue and chroma go on the pixel's own lightness (+ brightness),
-        //     with chroma faded near black and white and kept inside the sRGB gamut (like pass 0's Add / Set colour).
         Pass
         {
             CGPROGRAM

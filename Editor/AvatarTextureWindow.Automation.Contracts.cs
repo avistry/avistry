@@ -14,7 +14,6 @@ namespace Avistry.Textures
 
         internal string AutoSetWindowSize(int w, int h)
         {
-            // EditorWindow.docked is internal.
             var docked = typeof(UnityEditor.EditorWindow).GetProperty("docked", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
             if (docked != null && (bool)docked.GetValue(this)) return "docked";
             position = new Rect(position.x, position.y, w, h);

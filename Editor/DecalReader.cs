@@ -3,20 +3,15 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Reads the decals a material's shader draws on top of the main texture (Poiyomi Decal 1–4, lilToon's 2nd and 3rd
-    /// main textures) and turns each into an ImageLayer with the same placement and blending, so it can be flattened
-    /// into the texture. Maths follow the shader sources: Poiyomi Pro 11 `decalUV`, lilToon 2.x `lilCalcDecalUV`.
-    /// </summary>
     public static class DecalReader
     {
         public class Decal
         {
-            public string label;                 // "Decal 1", "Main colour layer 2" (also stored in the layer, so always English)
-            public string shown;                 // the same, in the interface language
-            public ImageLayer layer;             // ready to insert; null when it can't be flattened
-            public string blocked;               // why it can't be flattened at all
-            public List<string> notes = new List<string>(); // what will look different after flattening
+            public string label;
+            public string shown;
+            public ImageLayer layer;
+            public string blocked;
+            public List<string> notes = new List<string>();
         }
 
         public static List<Decal> Read(Material m)
@@ -66,13 +61,13 @@ namespace Avistry.Textures
 
             Vector2 pos = V(m, "_DecalPosition" + s, new Vector4(0.5f, 0.5f));
             Vector2 scale = V(m, "_DecalScale" + s, Vector4.one);
-            var so = V(m, "_DecalSideOffset" + s, Vector4.zero); // left, right, down, up
+            var so = V(m, "_DecalSideOffset" + s, Vector4.zero);
             int aspect = Mathf.RoundToInt(F(m, $"_Decal{n}AspectRatioMode"));
             if (aspect != 0 && tex.width > 0 && tex.height > 0)
             {
                 float w = tex.width, h = tex.height;
-                var k = w > h ? new Vector2(1f, h / w) : new Vector2(w / h, 1f);       // 1 = shrink to fit
-                if (aspect == 2) k = new Vector2(1f / k.x, 1f / k.y);                  // 2 = grow to fit
+                var k = w > h ? new Vector2(1f, h / w) : new Vector2(w / h, 1f);
+                if (aspect == 2) k = new Vector2(1f / k.x, 1f / k.y);
                 scale = Vector2.Scale(scale, k);
             }
             var colour = m.HasProperty("_DecalColor" + s) ? m.GetColor("_DecalColor" + s) : Color.white;
@@ -90,8 +85,6 @@ namespace Avistry.Textures
             {
                 name = d.label,
                 image = tex,
-                // The shader maps [position - scale/2 - (left, down), position + scale/2 + (right, up)] to the picture
-                // and rotates around the middle of that rectangle.
                 position = pos + new Vector2((so.y - so.x) * 0.5f, (so.w - so.z) * 0.5f),
                 size = scale + new Vector2(so.x + so.y, so.z + so.w),
                 rotation = Mathf.Repeat(F(m, "_DecalRotation" + s) + 180f, 360f) - 180f,
@@ -159,9 +152,7 @@ namespace Avistry.Textures
 
             Vector2 ts = m.GetTextureScale(texProp), to = m.GetTextureOffset(texProp);
             if (Mathf.Abs(ts.x) < 1e-5f || Mathf.Abs(ts.y) < 1e-5f) { d.blocked = Loc.T("its size is zero"); return; }
-            float angle = F(m, $"_Main{k}TexAngle"); // radians
-            // lilToon: decalUV = rotateAbout(0.5, uv, angle) * ST.xy + ST.zw. In "centre, size, rotation about the centre"
-            // form: size = 1 / ST.xy, and the centre is the lilToon position rotated back around the middle of the texture.
+            float angle = F(m, $"_Main{k}TexAngle");
             var size = new Vector2(1f / ts.x, 1f / ts.y);
             var p = new Vector2((0.5f - to.x) / ts.x, (0.5f - to.y) / ts.y) - new Vector2(0.5f, 0.5f);
             float cs = Mathf.Cos(-angle), sn = Mathf.Sin(-angle);
@@ -206,13 +197,12 @@ namespace Avistry.Textures
             d.layer = layer;
         }
 
-        /// <summary>After saving: switches the flattened decals off on the material that got the new texture.</summary>
         public static void TurnOffFlattened(Material m, IEnumerable<Layer> layers)
         {
             if (m == null || layers == null) return;
             foreach (var l in layers)
             {
-                if (!(l is ImageLayer img) || !img.enabled || img.image == null) continue;
+                if (!(l is ImageLayer img) || !img.enabled || img.opacity <= 0f || img.image == null) continue;
                 foreach (var p in img.offFloats) if (m.HasProperty(p)) m.SetFloat(p, 0f);
                 foreach (var k in img.offKeywords) m.DisableKeyword(k);
             }

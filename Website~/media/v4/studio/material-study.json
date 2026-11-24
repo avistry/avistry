@@ -1,0 +1,70 @@
+{
+  "effects": [
+    {
+      "caption": "mat.c.tint.b",
+      "file": "material-tint",
+      "id": "tint",
+      "image": "studio/material-tint.webp",
+      "title": "mat.c.tint.t"
+    },
+    {
+      "caption": "studio.material.satin.note",
+      "file": "material-satin",
+      "id": "satin",
+      "image": "studio/material-satin.webp",
+      "title": "studio.material.satin"
+    },
+    {
+      "caption": "mat.c.metal.b",
+      "file": "material-metal",
+      "id": "metal",
+      "image": "studio/material-metal.webp",
+      "title": "mat.c.metal.t"
+    },
+    {
+      "caption": "mat.c.shadow.b",
+      "file": "material-shadow",
+      "id": "shadow",
+      "image": "studio/material-shadow.webp",
+      "title": "mat.c.shadow.t"
+    },
+    {
+      "caption": "mat.c.matcap.b",
+      "file": "material-matcap",
+      "id": "matcap",
+      "image": "studio/material-matcap.webp",
+      "title": "mat.c.matcap.t"
+    },
+    {
+      "caption": "mat.c.glitter.b",
+      "file": "material-glitter",
+      "id": "glitter",
+      "image": "studio/material-glitter.webp",
+      "title": "mat.c.glitter.t"
+    },
+    {
+      "caption": "mat.c.rim.b",
+      "file": "material-rim",
+      "id": "rim",
+      "image": "studio/material-rim.webp",
+      "title": "mat.c.rim.t"
+    },
+    {
+      "caption": "mat.c.outline.b",
+      "file": "material-outline",
+      "id": "outline",
+      "image": "studio/material-outline.webp",
+      "title": "mat.c.outline.t"
+    },
+    {
+      "caption": "mat.c.glow.b",
+      "file": "material-emission",
+      "id": "emission",
+      "image": "studio/material-emission.webp",
+      "title": "mat.c.glow.t"
+    }
+  ],
+  "finish": "studio/material-emission.webp",
+  "framesPerEffect": 12,
+  "schema": 1
+}
