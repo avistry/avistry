@@ -8,11 +8,6 @@ using UnityEngine;
 
 namespace Avistry.Textures.McpBridge
 {
-    /// <summary>
-    /// Looks at the open Avistry Textures window without changing anything. The three tools in this file only turn
-    /// MCP for Unity's JSON into <c>AgentArgs</c> and the answer back into JSON. Every rule (access level, Undo,
-    /// approval, limits) lives in <c>AgentApi</c>, so this file is the only one an MCP for Unity API change touches.
-    /// </summary>
     [McpForUnityTool("avistry_read", Group = "core", Description =
         "Avistry (Unity editor): look at the open texture edit without changing anything. Start with action 'status'. " +
         "In this tool a 'part' is a mesh and a 'piece' is a UV island. Use 'glossary' to explain terms in the tool's own words.")]
@@ -42,7 +37,6 @@ namespace Avistry.Textures.McpBridge
         }
     }
 
-    /// <summary>Makes undoable edits in the open window. Each call is one Ctrl+Z step named "AI: ...".</summary>
     [McpForUnityTool("avistry_edit", Group = "core", Description =
         "Avistry: make undoable edits in the open window (target, pieces, recolour, layers, paint). " +
         "Each call is one Ctrl+Z step named 'AI: …'. The person's original files are never changed. " +
@@ -160,7 +154,6 @@ namespace Avistry.Textures.McpBridge
         }
     }
 
-    /// <summary>Asks the person to approve something that writes new files or shares a picture, and waits for the answer.</summary>
     [McpForUnityTool("avistry_request", Group = "core", RequiresPolling = true, PollAction = "status", MaxPollSeconds = 300, Description =
         "Avistry: ask the person in Unity to approve something that writes files or shares a picture. " +
         "The call waits until they click Allow or Deny (up to 5 minutes). Saving always makes new files.")]
@@ -181,7 +174,6 @@ namespace Avistry.Textures.McpBridge
         }
     }
 
-    /// <summary>Turns tool calls into <c>AgentArgs</c> and <c>AgentResult</c> back into MCP for Unity responses. No rules here.</summary>
     static class Bridge
     {
         internal enum Kind { Read, Edit, Request }
@@ -209,7 +201,6 @@ namespace Avistry.Textures.McpBridge
             }
             catch (Exception)
             {
-                // Details could name folders on this computer, so the Console gets them and the answer does not.
                 Debug.LogWarning("[Avistry] The AI helper bridge could not read a call.");
                 return Wrap(AgentResult.Fail(action, AgentResult.Codes.Unsupported, "The call could not be read.", "Check the parameters and try again."));
             }
@@ -342,7 +333,6 @@ namespace Avistry.Textures.McpBridge
             return list;
         }
 
-        /// <summary>Accepts [[u, v], ...] or the flat [u, v, u, v, ...].</summary>
         static Vector2[] Points(JObject p, string name)
         {
             JToken t = Get(p, name);
@@ -378,7 +368,6 @@ namespace Avistry.Textures.McpBridge
             return new Vector2((float)u, (float)v);
         }
 
-        /// <summary>Values stay plain (text, true or false, whole or decimal numbers), so the facade can check each against its whitelist.</summary>
         static Dictionary<string, object> Fields(JObject p, string name)
         {
             JToken t = Get(p, name);

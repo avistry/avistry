@@ -1,0 +1,55 @@
+#pragma kernel PadSurface
+
+Texture2D<float4> _Surface;
+RWTexture2D<half> _Coverage;
+int _Width, _Height, _Radius;
+
+groupshared float coverage[32][32];
+groupshared uint hasPaint;
+#define OUTSIDE asfloat(0xff800000u)
+
+[numthreads(16, 16, 1)]
+void PadSurface(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID, uint index : SV_GroupIndex)
+{
+    int2 origin = (int2)group.xy * 16;
+    int2 output = origin + thread.xy;
+    int2 extent = int2(_Width, _Height) - 1;
+    if (index == 0) hasPaint = 0;
+    GroupMemoryBarrierWithGroupSync();
+
+    bool painted = false;
+    [unroll] for (int y = 0; y < 32; y += 16)
+    [unroll] for (int x = 0; x < 32; x += 16)
+    {
+        int2 cell = (int2)thread.xy + int2(x, y);
+        int2 pixel = clamp(origin + cell - 8, 0, extent);
+        float2 raw = _Surface.Load(int3(pixel, 0)).rg;
+        coverage[cell.y][cell.x] = raw.g > .5 ? raw.r : OUTSIDE;
+        painted = painted || (raw.g > .5 && raw.r > 0);
+    }
+    if (painted) InterlockedOr(hasPaint, 1u);
+    GroupMemoryBarrierWithGroupSync();
+    if (any(output > extent)) return;
+
+    int2 center = (int2)thread.xy + 8;
+    float best = coverage[center.y][center.x];
+    if (best != OUTSIDE)
+    {
+        _Coverage[output] = best;
+        return;
+    }
+    if (hasPaint != 0)
+    {
+        [loop] for (int r = 1; r <= _Radius && best == OUTSIDE; r++)
+        {
+            [loop] for (int t = -r; t < r; t++)
+            {
+                best = max(best, coverage[center.y - r][center.x + t]);
+                best = max(best, coverage[center.y + t][center.x + r]);
+                best = max(best, coverage[center.y + r][center.x - t]);
+                best = max(best, coverage[center.y - t][center.x - r]);
+            }
+        }
+    }
+    _Coverage[output] = max(0, best);
+}

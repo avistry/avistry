@@ -1,15 +1,14 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// 3D brush: strokes painted on the model in the Scene view are stored as points on the mesh surface and drawn as
-    /// spheres on the posed model, so paint is round on the surface and crosses UV seams (see BrushRenderer.RenderSurface).
-    /// </summary>
     partial class AvatarTextureWindow
     {
-        /// <summary>Turns a new stroke into a 3D-brush stroke when it starts on the model and the brush supports it.</summary>
+        System.Func<MeshUV.Part, MeshUV.Part, bool> _canJoinBrushSlots;
+
         void SetupSurfaceStroke(PaintStroke s, MeshUV.SurfaceHit? hit)
         {
             if (s == null || hit == null || _uv == null || _comp == null) return;
@@ -18,27 +17,80 @@ namespace Avistry.Textures
             var h = hit.Value;
             float size = _uv.PosedSize;
             if (h.uvPerWorld <= 0 || size <= 0) return;
-            // Same size as the ring shown on the model: the brush's texture size at the spot where the stroke starts.
             float worldR = Mathf.Min(s.radius / h.uvPerWorld, 2f);
             s.surface = true;
             s.surfRadius = worldR / size;
             s.surfTwoSided = MaterialIsTwoSided(_material);
         }
 
-        /// <summary>
-        /// True when the material draws both sides of its faces (hair cards, skirts…). Then a face is painted whichever
-        /// way it points; on one-sided materials the brush skips faces that point away, so paint doesn't go through to
-        /// the far side of a thin part. Poiyomi and lilToon both store culling in _Cull (0 = off).
-        /// </summary>
-        static bool MaterialIsTwoSided(Material m)
+        void AddBrushClipPieces(PaintStroke stroke, List<int> pieces, Vector2 uv, int piece, float pressure,
+            int triangle, Vector3 bary)
         {
-            if (m == null) return false;
-            foreach (var p in new[] { "_Cull", "_CullMode", "_Culling" })
-                if (m.HasProperty(p)) return Mathf.RoundToInt(m.GetFloat(p)) == 0;
-            return false;
+            if (!stroke.clip || _uv == null) return;
+            if (piece >= 0 && !pieces.Contains(piece)) pieces.Add(piece);
+            _uv.IncludeIslandsAtUV(uv, pieces);
+            if (!stroke.surface || triangle < 0) return;
+
+            bary.x = 1f - bary.y - bary.z;
+            float radius = BrushClipRadius(stroke, _uv.PosedSize, pressure);
+            _uv.IncludeBrushJoins(triangle, bary, radius, pieces, _editedPartTileFilter ??= EditedPartTileFilter,
+                _canJoinBrushSlots ??= CanJoinBrushSlots);
         }
 
-        /// <summary>The "Paint across seams" option, shown under "Paint directly on the model".</summary>
+        static float BrushClipRadius(PaintStroke stroke, float posedSize, float pressure)
+        {
+            float radius = Mathf.Max(1e-6f, stroke.surfRadius * posedSize * BrushRenderer.SizeFactor(stroke, pressure));
+            var shape = stroke.shape;
+            if (shape?.tip != BrushTip.Stamp) return radius;
+            float size = shape.jitterVersion == 1 ? 1f + Mathf.Max(0f, shape.sizeJitter) : 1f;
+            float roundness = Mathf.Max(.05f, shape.roundness);
+            float extent = Mathf.Sqrt(1f + roundness * roundness + .35f * .35f);
+            return radius * (size * extent + Mathf.Sqrt(2f) * Mathf.Max(0f, shape.scatter));
+        }
+
+        bool CanJoinBrushSlots(MeshUV.Part first, MeshUV.Part second)
+        {
+            var slot = CurrentSlot;
+            var renderer = first.renderer;
+            if (_material == null || slot?.texture == null || renderer == null || renderer != second.renderer ||
+                TargetResolver.GetSharedMesh(renderer) != first.mesh || !IsDrawn(renderer)) return false;
+            renderer.GetSharedMaterials(_editedPartMaterials);
+            if ((uint)first.materialSlot >= (uint)_editedPartMaterials.Count ||
+                (uint)second.materialSlot >= (uint)_editedPartMaterials.Count) return false;
+            var a = _editedPartMaterials[first.materialSlot];
+            var b = _editedPartMaterials[second.materialSlot];
+            var mode = MaterialCullMode(_material);
+            return a != null && b != null && MaterialCullMode(a) == mode && MaterialCullMode(b) == mode &&
+                BrushSlotStillEdited(first, a, slot) && BrushSlotStillEdited(second, b, slot);
+        }
+
+        bool BrushSlotStillEdited(MeshUV.Part part, Material material, TextureSlot slot)
+        {
+            foreach (var user in _alsoUsers)
+                if (user.slot.renderer == part.renderer && user.slot.materialIndex == part.materialSlot)
+                    return user.material == material && IncludedHitUsesCurrentUv(part);
+            return material == _material && SavedEditSlotStillAssigned(material, slot);
+        }
+
+        static bool MaterialIsTwoSided(Material material) => MaterialCullMode(material) == CullMode.Off;
+
+        static readonly int[] CullProperties = { Shader.PropertyToID("_Cull"), Shader.PropertyToID("_CullMode"), Shader.PropertyToID("_Culling") };
+
+        static CullMode MaterialCullMode(Material material)
+        {
+            if (material != null)
+                foreach (int property in CullProperties)
+                {
+                    if (!material.HasProperty(property)) continue;
+                    float value = material.GetFloat(property);
+                    if (!float.IsFinite(value)) break;
+                    int mode = Mathf.RoundToInt(value);
+                    if (mode >= (int)CullMode.Off && mode <= (int)CullMode.Back) return (CullMode)mode;
+                    break;
+                }
+            return CullMode.Back;
+        }
+
         void DrawSurfaceBrushToggle()
         {
             if (!_paintInScene) return;
@@ -48,7 +100,7 @@ namespace Avistry.Textures
             {
                 StudioGUI.Count("paint.smoothJoins");
                 on = EditorGUILayout.ToggleLeft(new GUIContent(Loc.T("Smooth across joins"),
-                    Loc.T("On the model, the brush is a round spot on the surface: lines continue cleanly across UV seams and aren't stretched by the texture layout.")), _brush.surfaceBrush);
+                    Loc.T("On the model, supported brush tips follow the surface across UV seams and keep their size.")), _brush.surfaceBrush);
                 StudioGUI.Info("seam");
             }
             if (on != _brush.surfaceBrush) { _brush.surfaceBrush = on; Repaint(); }
@@ -60,7 +112,7 @@ namespace Avistry.Textures
                 else if (!_brush.shape.SurfaceCapable)
                     GUILayout.Label(Loc.T("This brush tip is painted flat on the texture, so it stops at seams. Round tips without scatter cross them."), StudioGUI.Hint);
                 else if (_brush.stayInsideIslands)
-                    GUILayout.Label(Loc.T("With “Brush stays inside the piece it starts on” on, paint only reaches the parts the brush centre has touched."), StudioGUI.Hint);
+                    GUILayout.Label(Loc.T("The 3D brush can cross a joined seam before the brush centre reaches it."), StudioGUI.Hint);
             }
             EditorGUI.indentLevel--;
         }

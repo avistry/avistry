@@ -1,0 +1,124 @@
+{
+  "layers": [
+    {
+      "blend": "Normal",
+      "id": "00-base",
+      "maskOf": "",
+      "opacity": 100,
+      "plane": "layer-00-base-plane.webp",
+      "stage": "layer-00-base.webp",
+      "swatch": "layer-00-base-swatch.webp"
+    },
+    {
+      "blend": "Normal",
+      "id": "01-shell",
+      "maskOf": "",
+      "opacity": 100,
+      "plane": "layer-01-shell-plane.webp",
+      "stage": "layer-01-shell.webp",
+      "swatch": "layer-01-shell-swatch.webp"
+    },
+    {
+      "blend": "Normal",
+      "id": "02-gradient",
+      "maskOf": "",
+      "opacity": 100,
+      "plane": "layer-02-gradient-plane.webp",
+      "stage": "layer-02-gradient.webp",
+      "swatch": "layer-02-gradient-swatch.webp"
+    },
+    {
+      "blend": "normal",
+      "id": "03-print",
+      "maskOf": "",
+      "opacity": 90,
+      "plane": "layer-03-print-plane.webp",
+      "stage": "layer-03-print.webp",
+      "swatch": "layer-03-print-swatch.webp"
+    },
+    {
+      "blend": "Normal",
+      "id": "04-paint",
+      "maskOf": "",
+      "opacity": 100,
+      "plane": "layer-04-paint-plane.webp",
+      "stage": "layer-04-paint.webp",
+      "swatch": "layer-04-paint-swatch.webp"
+    },
+    {
+      "blend": "soft-light",
+      "id": "05-mask",
+      "maskOf": "04-paint",
+      "opacity": 16,
+      "plane": "layer-05-mask-plane.webp",
+      "stage": "layer-05-mask.webp",
+      "swatch": "layer-05-mask-swatch.webp"
+    },
+    {
+      "blend": "Normal",
+      "id": "06-detail",
+      "maskOf": "",
+      "opacity": 100,
+      "plane": "layer-06-detail-plane.webp",
+      "stage": "layer-06-detail.webp",
+      "swatch": "layer-06-detail-swatch.webp"
+    },
+    {
+      "blend": "Normal",
+      "id": "07-finish",
+      "maskOf": "",
+      "opacity": 100,
+      "plane": "layer-07-finish-plane.webp",
+      "stage": "layer-07-finish.webp",
+      "swatch": "layer-07-finish-swatch.webp"
+    }
+  ],
+  "materials": {
+    "headband": [
+      {
+        "id": "00-base",
+        "plane": "layer-headband-base.webp",
+        "swatch": "layer-headband-base.webp",
+        "blend": "Normal",
+        "opacity": 100
+      },
+      {
+        "id": "01-tint",
+        "plane": "layer-headband-tint.webp",
+        "swatch": "layer-headband-leather.webp",
+        "blend": "Multiply",
+        "opacity": 100
+      },
+      {
+        "id": "02-stitches",
+        "plane": "layer-headband-stitches.webp",
+        "swatch": "layer-headband-composite.webp",
+        "blend": "Normal",
+        "opacity": 92
+      }
+    ],
+    "cushion": [
+      {
+        "id": "00-base",
+        "plane": "layer-cushion-base.webp",
+        "swatch": "layer-cushion-base.webp",
+        "blend": "Normal",
+        "opacity": 100
+      },
+      {
+        "id": "01-tint",
+        "plane": "layer-cushion-tint.webp",
+        "swatch": "layer-cushion-leather.webp",
+        "blend": "Multiply",
+        "opacity": 100
+      },
+      {
+        "id": "02-patina",
+        "plane": "layer-cushion-patina.webp",
+        "swatch": "layer-cushion-composite.webp",
+        "blend": "soft-light",
+        "opacity": 80
+      }
+    ]
+  }
+}

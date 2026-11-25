@@ -4,26 +4,18 @@ using UnityEditor;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Every confirmation dialog of the tool goes through here. Normally it is just EditorUtility's dialog; an
-    /// automation harness can set <see cref="Override"/> to answer them without a modal window (and see what was asked).
-    /// </summary>
     internal static class StudioDialog
     {
-        /// <summary>A question the tool asked: title, message and the button labels (ok, cancel, alt; alt may be null).</summary>
         internal class Question
         {
             public string title, message, ok, cancel, alt;
-            public int answer; // 0 = ok, 1 = cancel, 2 = alt
+            public int answer;
         }
 
-        /// <summary>When set, returns the answer (0 = ok, 1 = cancel, 2 = alt) instead of showing a dialog.</summary>
         internal static Func<Question, int> Override;
 
-        /// <summary>Questions answered by <see cref="Override"/> (most recent last, at most 50).</summary>
         internal static readonly List<Question> Log = new List<Question>();
 
-        /// <summary>When set, SaveFilePanelInProject returns this path instead of opening a file panel (then clears it).</summary>
         internal static string NextSavePath;
 
         internal static bool Ask(string title, string message, string ok, string cancel = null)

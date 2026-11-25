@@ -2,10 +2,6 @@ using System.Collections.Generic;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Ids of the things a person can do in the tool. A glossary entry lists the ones that complete it in <c>doneBy</c>,
-    /// so renaming a concept never touches C#.
-    /// </summary>
     internal static class LearnEvents
     {
         internal const string TargetPicked = "target.picked";
@@ -44,8 +40,16 @@ namespace Avistry.Textures
         internal const string WindowInspector = "window.inspector";
         internal const string WindowProject = "window.project";
         internal const string AgentApproved = "agent.approved";
+        internal const string PenPressure = "brush.pressure";
+        internal const string BristleLoadChanged = "brush.bristleLoad";
+        internal const string SceneGradient = "gradient.scene";
+        internal const string MatchPairing = "match.pairing";
+        internal const string MaterialCopied = "material.copied";
+        internal const string LayersMerged = "layers.merged";
+        internal const string AdditionalBlend = "layer.additionalBlend";
+        internal const string TemplateApplied = "template.applied";
+        internal const string PackExported = "pack.exported";
 
-        /// <summary>Every id. The glossary validator checks that each one is used by at least one entry.</summary>
         internal static readonly string[] All =
         {
             TargetPicked, TargetPoiyomi, TargetLilToon, MaterialSwitched, TexturePicked, SceneClicked, AssetPinged,
@@ -53,6 +57,8 @@ namespace Avistry.Textures
             SeamSmoothStroke, LayerStroke, LayerErase, LayerAdded, LayerAddedGradientMap, LayerOpacity, LayerBlend,
             LayerChannels, LayerClip, MaskMade, SaveDone, AuditRun, ImportFixed, MapsAo, MapsNormal, MapsFaceShadow,
             WindowHierarchy, WindowScene, WindowInspector, WindowProject, AgentApproved,
+            PenPressure, BristleLoadChanged, SceneGradient, MatchPairing, MaterialCopied, LayersMerged, AdditionalBlend,
+            TemplateApplied, PackExported,
         };
 
         static readonly HashSet<string> s_all = new HashSet<string>(All);
@@ -60,7 +66,6 @@ namespace Avistry.Textures
 
         internal static bool Has(string id) => id != null && s_all.Contains(id);
 
-        /// <summary>"layer.added.&lt;Kind&gt;" for a layer class name. Built once per kind, so calling it again does not allocate.</summary>
         internal static string LayerAddedOf(string layerTypeName)
         {
             if (!s_layerAdded.TryGetValue(layerTypeName, out var id)) s_layerAdded[layerTypeName] = id = LayerAdded + "." + layerTypeName;

@@ -7,14 +7,6 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Writes to Poiyomi / lilToon materials the way their own editors do, so edits don't silently fail:
-    /// - Poiyomi: locked materials bake every non-texture value into the shader, so colour/slider changes do nothing
-    ///   until the material is unlocked (Thry ShaderOptimizer). Keywords must follow feature toggles (Thry FixKeywords).
-    /// - lilToon: _MainTex/_Color have hidden mirrors (_BaseMap, _BaseColorMap, _BaseColor); multi shaders need
-    ///   SetupMultiMaterial; features used by a material must be enabled in lilToonSetting or they're compiled out.
-    /// Everything is found by reflection, so the tool still compiles in projects without these shaders.
-    /// </summary>
     public static class MaterialWriter
     {
 
@@ -36,7 +28,6 @@ namespace Avistry.Textures
         {
             var t = FindType(typeName);
             if (t == null) return null;
-            // Every caller passes one fixed predicate per (type, name), so the third key part only separates "no filter".
             var key = (t, method, match == null ? -1 : 0);
             if (MethodCache.TryGetValue(key, out var mi)) return mi;
             mi = t.GetMethods(AnyStatic).FirstOrDefault(m => m.Name == method && (match == null || match(m.GetParameters())));
@@ -47,13 +38,8 @@ namespace Avistry.Textures
 
         const string SectionPrefix = "Hidden/SectionLocked/";
 
-        /// <summary>
-        /// Poiyomi's editor swaps in a temporary "Hidden/SectionLocked/…" shader while a material is being edited. Colours
-        /// and sliders stay live on it, but toggles and dropdowns are baked in, and it only exists in memory.
-        /// </summary>
         public static bool IsSectionLocked(Material m) => m != null && m.shader != null && m.shader.name.StartsWith(SectionPrefix);
 
-        /// <summary>The real shader behind a section-locked one (or the shader itself).</summary>
         public static Shader SourceShader(Shader s)
         {
             if (s == null || !s.name.StartsWith(SectionPrefix)) return s;
@@ -62,11 +48,6 @@ namespace Avistry.Textures
             catch { return s; }
         }
 
-        /// <summary>
-        /// Puts section-locked materials back on their real shader before we change toggles or copy them
-        /// (a copy saved with an in-memory shader would come out pink). Poiyomi re-applies its section lock
-        /// the next time the material is edited in its inspector.
-        /// </summary>
         public static int EnsureEditable(IEnumerable<Material> materials)
         {
             int reverted = 0;
@@ -79,7 +60,6 @@ namespace Avistry.Textures
                     if (revert != null && (bool)revert.Invoke(null, new object[] { m })) { reverted++; continue; }
                 }
                 catch (Exception e) { Debug.LogWarning("[Avistry] Poiyomi section-lock revert failed: " + e.Message); }
-                // Fallback: point the material back at its source shader ourselves.
                 var src = SourceShader(m.shader);
                 if (src != null && src != m.shader) { m.shader = src; reverted++; }
             }
@@ -94,19 +74,17 @@ namespace Avistry.Textures
             var mi = FindMethod(ThryOld, "IsMaterialLocked", p => p.Length == 1) ?? FindMethod(ThryNew, "IsMaterialLocked", p => p.Length == 1);
             if (mi != null)
             {
-                try { return (bool)mi.Invoke(null, new object[] { m }); } catch { /* fall back to the name */ }
+                try { return (bool)mi.Invoke(null, new object[] { m }); } catch {  }
             }
             return m.shader.name.StartsWith("Hidden/Locked/");
         }
 
-        // Older Poiyomi keeps the optimizer inside ThryEditor; Poiyomi 9.1 moved it to Thry.ShaderOptimizer with one method for both directions.
         const string ThryOld = "Thry.ThryEditor.ShaderOptimizer", ThryNew = "Thry.ShaderOptimizer";
 
         static MethodInfo SetLockedMethod => FindMethod(ThryNew, "SetLockedForAllMaterials", p => p.Length == 6);
 
         public static bool CanUnlockPoiyomi => FindMethod(ThryOld, "UnlockMaterials", p => p.Length == 2) != null || SetLockedMethod != null;
 
-        /// <summary>Unlocks Poiyomi materials through Thry's ShaderOptimizer (Poiyomi re-locks them automatically on upload).</summary>
         public static bool UnlockPoiyomi(IEnumerable<Material> materials) => CallLock("UnlockMaterials", materials);
 
         public static bool LockPoiyomi(IEnumerable<Material> materials) => CallLock("LockMaterials", materials);
@@ -122,10 +100,9 @@ namespace Avistry.Textures
             {
                 if (mi != null)
                 {
-                    var progress = Enum.ToObject(mi.GetParameters()[1].ParameterType, 0); // ProgressBar.None
+                    var progress = Enum.ToObject(mi.GetParameters()[1].ParameterType, 0);
                     return (bool)mi.Invoke(null, new object[] { list, progress });
                 }
-                // (materials, lockState, showProgressbar, showDialog, allowCancel, shaderOptimizer): lockState 0 unlocks, 1 locks. The materials must be saved assets.
                 var ps = setLocked.GetParameters();
                 object mats = ps[0].ParameterType.IsAssignableFrom(typeof(List<Material>)) ? list : (object)list.ToArray();
                 object state = ps[1].ParameterType.IsEnum ? Enum.ToObject(ps[1].ParameterType, method == "LockMaterials" ? 1 : 0) : Convert.ChangeType(method == "LockMaterials" ? 1 : 0, ps[1].ParameterType);
@@ -139,7 +116,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>Re-sync shader keywords with feature toggles (needed after scripted toggle/texture changes).</summary>
         public static void FixPoiyomiKeywords(IEnumerable<Material> materials)
         {
             var list = materials.Where(m => m != null && ShaderProfiles.Detect(m.shader) == ShaderFamily.Poiyomi).ToList();
@@ -150,14 +126,12 @@ namespace Avistry.Textures
         }
 
 
-        /// <summary>Call after changing a lilToon material from script (texture, colour or feature values).</summary>
         public static void AfterLilToonEdit(IEnumerable<Material> materials)
         {
             var list = materials.Where(m => m != null && ShaderProfiles.Detect(m.shader) == ShaderFamily.LilToon).ToList();
             if (list.Count == 0) return;
             foreach (var m in list)
             {
-                // Hidden mirrors that other tools (and URP/lightmap baking) read.
                 if (m.HasProperty("_MainTex"))
                 {
                     var tex = m.GetTexture("_MainTex");
@@ -175,17 +149,12 @@ namespace Avistry.Textures
             EnsureLilToonFeatures(list);
         }
 
-        /// <summary>
-        /// lilToon compiles out features no material uses (lilToonSetting). If our edit starts using one
-        /// (e.g. hue/saturation), switch it on and re-apply the setting, like lilToon's inspector does.
-        /// </summary>
         static void EnsureLilToonFeatures(List<Material> materials)
         {
             var settingType = FindType("lilToonSetting");
             if (settingType == null) return;
             var load = settingType.GetMethod("LoadShaderSetting", AnyStatic);
             var fromMat = settingType.GetMethod("SetupShaderSettingFromMaterial", AnyStatic);
-            // Texture-driven features (e.g. the colour-adjust mask) are switched on by CheckTextures(ref setting, material).
             var fromTextures = settingType.GetMethods(AnyStatic).FirstOrDefault(m => m.Name == "CheckTextures" && m.GetParameters().Length == 2 && m.GetParameters()[1].ParameterType == typeof(Material));
             var save = settingType.GetMethod("SaveShaderSetting", AnyStatic);
             var apply = settingType.GetMethods(AnyStatic).FirstOrDefault(m => m.Name == "ApplyShaderSetting" && m.GetParameters().Length == 2);
@@ -209,7 +178,7 @@ namespace Avistry.Textures
                         setting = t[0];
                     }
                 }
-                if (JsonUtility.ToJson(setting) == before) return; // nothing new switched on
+                if (JsonUtility.ToJson(setting) == before) return;
                 save.Invoke(null, new[] { setting });
                 apply.Invoke(null, new object[] { setting, "Avistry" });
             }
@@ -223,18 +192,14 @@ namespace Avistry.Textures
         public struct ImportIssue
         {
             public string text;
-            public bool problem;      // true: something is wrong; false: a recommendation
-            public string fixLabel;   // null when there's no safe one-click fix
+            public bool problem;
+            public string fixLabel;
             public Action fix;
-            public bool advancedOnly; // shown only in Advanced mode
+            public bool advancedOnly;
         }
 
         static bool IsPowerOfTwo(int v) => v > 0 && (v & (v - 1)) == 0;
 
-        /// <summary>
-        /// Import-setting checks from the Poiyomi docs ("Textures and Colors") and lilToon's texture notes:
-        /// colour vs data (sRGB), normal-map type, Crunch, JPG sources, non-power-of-two sizes, mipmap filter.
-        /// </summary>
         public static List<ImportIssue> ImportIssues(TextureSlot slot)
         {
             if (slot == null) return new List<ImportIssue>();
@@ -245,7 +210,6 @@ namespace Avistry.Textures
             if (s_issueCache.TryGetValue(key, out var e) && e.path == slot.assetPath && e.lang == Loc.Current)
             {
                 if (now - e.time < IssueCacheSeconds) return e.list;
-                // Throttle expired: only rebuild when the importer changed (reimport, or edits pending in an Inspector).
                 var imp = AssetImporter.GetAtPath(slot.assetPath);
                 int dirty = imp != null ? EditorUtility.GetDirtyCount(imp) : 0;
                 var hash = imp != null ? AssetDatabase.GetAssetDependencyHash(slot.assetPath) : default;
@@ -266,7 +230,6 @@ namespace Avistry.Textures
         const double IssueCacheSeconds = 1.0;
         static readonly Dictionary<int, IssueCacheEntry> s_issueCache = new Dictionary<int, IssueCacheEntry>();
 
-        /// <summary>Drops the cached import-issue lists (call after changing an importer).</summary>
         public static void InvalidateImportIssues() => s_issueCache.Clear();
 
         static List<ImportIssue> BuildImportIssues(TextureSlot slot)
@@ -305,10 +268,6 @@ namespace Avistry.Textures
             return list;
         }
 
-        /// <summary>
-        /// Main texture transparency vs the material's render mode (Poiyomi Rendering Preset / lilToon Rendering Mode).
-        /// <paramref name="hasTransparency"/> comes from the pixels (an alpha channel alone isn't enough: it's often all opaque).
-        /// </summary>
         public static string TransparencyIssue(Material m, bool hasTransparency)
         {
             if (m == null) return null;
@@ -333,9 +292,6 @@ namespace Avistry.Textures
             return null;
         }
 
-        /// <summary>
-        /// A wrong import setting for how the shader uses this texture (null if fine). Fix() changes the importer.
-        /// </summary>
         public static string ImportProblem(TextureSlot slot, out Action fix)
         {
             fix = null;

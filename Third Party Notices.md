@@ -2,9 +2,11 @@
 
 ## TextureCraft
 
-Several blend-mode and layer formulas in `Editor/Shaders/ATS_Layer.shader` are adapted from TextureCraft
-(`crates/core/src/blend.rs`, `crates/core/src/layer.rs`). TextureCraft is dual-licensed MIT OR Apache-2.0; it is used
-here under the MIT license:
+Several blend-mode and layer formulas in `Editor/Shaders/ATS_Layer.shader`, brush presets, procedural brush
+shapes and gravity tracks are adapted from [TextureCraft](https://github.com/storytold/texturecraft)
+(`crates/core/src/blend.rs`, `crates/core/src/layer.rs`, `crates/paint/src/presets.rs`, `alphas.rs`, `brush.rs`,
+`particles.rs` and `crates/texel/src/noise.rs`). The brush library includes its original generated shapes and
+stencil glyphs. TextureCraft is dual-licensed MIT OR Apache-2.0; it is used here under the MIT license:
 
 > MIT License
 >

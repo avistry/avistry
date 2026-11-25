@@ -1,6 +1,3 @@
-// Usage: node build-listing.mjs --source .github/vpm/source.json --out _site/index.json
-// Builds the VPM repository listing from the .zip assets of every published GitHub release.
-// Env: GITHUB_REPOSITORY (owner/repo; replaces the OWNER/REPO placeholders), GITHUB_TOKEN (optional, raises API limits).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';

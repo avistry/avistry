@@ -4,21 +4,16 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// The "AI helper" window: how to connect an AI app through MCP for Unity, what the helper may do (Off by default)
-    /// and what it did lately. It only shows state and sets the person's own preferences. It installs nothing: the
-    /// only outward actions are opening a web page and copying the install address, each on a click.
-    /// </summary>
     internal class AgentWindow : EditorWindow
     {
         internal const string StateNotInstalled = "not_installed", StateUnsupported = "unsupported", StateReady = "ready";
 
         const string MenuPath = "Window/MCP for Unity/Toggle MCP Window";
 
-        /// <summary>Set by tests to draw a state this computer is not in. Empty means the real state.</summary>
         [NonSerialized] static string s_preview;
 
         [SerializeField] Vector2 _scroll;
+        [SerializeField] bool _installOpen = true, _connectOpen = true, _safetyOpen = true, _recentOpen;
         [NonSerialized] bool _menuMissing, _copied;
         [NonSerialized] string[] _recent;
         [NonSerialized] int _recentKey = -1;
@@ -34,7 +29,6 @@ namespace Avistry.Textures
         static GUIContent s_saves => new GUIContent(Loc.T("Allow saves until Unity closes"), Loc.T("Skips the Allow question when the helper saves a new PNG or map. Resets when you close Unity"));
         static GUIContent s_pictures => new GUIContent(Loc.T("Allow pictures until Unity closes"), Loc.T("Lets the helper see a picture of your texture without asking each time. The picture goes to your AI service. Resets when you close Unity"));
 
-        /// <summary>Opens the window (Help menu, "Connect an AI helper…").</summary>
         internal static void Open()
         {
             var w = GetWindow<AgentWindow>(Loc.T("AI helper"));
@@ -42,7 +36,6 @@ namespace Avistry.Textures
             w.Show();
         }
 
-        /// <summary>"not_installed", "unsupported" or "ready", or the state a test asked the window to show.</summary>
         internal static string StateWord
         {
             get
@@ -53,7 +46,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>For tests: draws a state this computer is not in. Pass "" to go back to the real one.</summary>
         internal static string Preview(string state)
         {
             s_preview = state == StateNotInstalled || state == StateUnsupported || state == StateReady ? state : null;
@@ -102,7 +94,6 @@ namespace Avistry.Textures
         {
             EnsureStyles();
             string state = StateWord;
-            // No horizontal bar: the content is laid out to fit, and a few stray pixels must not add a bar of their own.
             _scroll = EditorGUILayout.BeginScrollView(_scroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar, GUI.skin.scrollView);
             GUILayout.Space(6);
             var pad = new RectOffset(12, 12, 0, 8);
@@ -134,14 +125,7 @@ namespace Avistry.Textures
             string status = state == StateNotInstalled ? Loc.T("Not installed")
                 : state == StateUnsupported ? Loc.T("Needs version 10.x")
                 : Loc.T("Installed") + (McpDetect.Version != null ? " " + McpDetect.Version : "");
-            GUILayout.BeginHorizontal();
-            GUILayout.Label(Loc.T("1. Install MCP for Unity"), s_step);
-            GUILayout.FlexibleSpace();
-            var prev = GUI.contentColor;
-            GUI.contentColor = state == StateReady ? StudioGUI.CardGood : state == StateUnsupported ? StudioGUI.CardDanger : StudioGUI.CardTextDim;
-            GUILayout.Label(status, EditorStyles.miniBoldLabel);
-            GUI.contentColor = prev;
-            GUILayout.EndHorizontal();
+            if (!StudioGUI.Section(ref _installOpen, Loc.T("1. Install MCP for Unity"), status)) return;
 
             if (state == StateUnsupported)
                 GUILayout.Label(Loc.T("This version of MCP for Unity isn't supported yet (we need 10.x). Everything else works; the helper tools are off."), s_body);
@@ -158,7 +142,7 @@ namespace Avistry.Textures
 
         void DrawConnect(string state)
         {
-            GUILayout.Label(Loc.T("2. Connect your AI app"), s_step);
+            if (!StudioGUI.Section(ref _connectOpen, Loc.T("2. Connect your AI app"))) return;
             GUILayout.Label(Loc.T("Open Window > MCP for Unity and follow its setup. It runs a server on this computer."), s_body);
             using (new EditorGUI.DisabledScope(state == StateNotInstalled))
             {
@@ -172,7 +156,6 @@ namespace Avistry.Textures
         {
             GUILayout.Label(Loc.T("3. Choose what the helper may do"), s_step);
             bool ready = state == StateReady;
-            // Off is always reachable: a level saved earlier must be switchable off even when the bridge is gone.
             GUILayout.BeginHorizontal();
             int level = (int)AgentAccess.Current;
             int picked = level;
@@ -201,9 +184,9 @@ namespace Avistry.Textures
                 : Loc.T("The choices turn on once MCP for Unity 10.x is installed."), s_dim);
         }
 
-        static void DrawSafety()
+        void DrawSafety()
         {
-            GUILayout.Label(Loc.T("Safe by design"), s_step);
+            if (!StudioGUI.Section(ref _safetyOpen, Loc.T("Safe by design"))) return;
             GUILayout.Label(Loc.T("Without asking: look, select pieces, recolour, add and change layers (each one Ctrl+Z step)."), s_body);
             GUILayout.Label(Loc.T("Asks you first: save a new PNG, make maps, see a picture of your texture."), s_body);
             GUILayout.Label(Loc.T("Never: overwrite your originals, delete files or run code."), s_body);
@@ -213,8 +196,8 @@ namespace Avistry.Textures
 
         void DrawRecent()
         {
-            GUILayout.Label(Loc.T("Recent helper actions (this session)"), s_step);
             var log = AgentAccess.Recent;
+            if (!StudioGUI.Section(ref _recentOpen, Loc.T("Recent helper actions (this session)"), log.Count.ToString())) return;
             if (log.Count == 0) { GUILayout.Label(Loc.T("Nothing yet."), s_dim); return; }
 
             double now = EditorApplication.timeSinceStartup;
@@ -229,15 +212,15 @@ namespace Avistry.Textures
                     _recent[i] = a.text + " · " + Ago(now - a.time);
                 }
             }
-            bool canUndo = AgentApi.CanUndoLast();
+            var w = AvatarTextureWindow.AutoFind(false);
+            bool canUndo = AgentApi.CanUndoLast(w);
             for (int i = 0; i < _recent.Length; i++)
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(_recent[i], s_dim);
                 if (i == 0 && canUndo && GUILayout.Button(s_undo, EditorStyles.miniButton, GUILayout.MinWidth(48)))
                 {
-                    var w = AvatarTextureWindow.AutoFind(false);
-                    if (w != null) EditorApplication.delayCall += () => { if (w != null) { AgentApi.UndoLast(w, "undo_last"); Repaint(); } };
+                    EditorApplication.delayCall += () => { if (w != null) { w.UndoHelperEdit(); Repaint(); } };
                 }
                 GUILayout.EndHorizontal();
             }
@@ -248,10 +231,6 @@ namespace Avistry.Textures
 
     partial class AvatarTextureWindow
     {
-        /// <summary>
-        /// The AI helper window's state: "not_installed", "unsupported" or "ready". With a state name it makes the window
-        /// draw that state until called with "" (for screenshots on a computer that is in a different state).
-        /// </summary>
         internal string AutoAgentWindowState(string show = null) => show == null ? AgentWindow.StateWord : AgentWindow.Preview(show);
     }
 }

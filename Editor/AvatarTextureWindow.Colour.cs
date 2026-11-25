@@ -2,31 +2,37 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Avistry.Textures
 {
-    // 2 · Colour: harmonised recolour of whole materials through the shaders' own colour settings (no new PNG).
     public partial class AvatarTextureWindow
     {
+        enum RecolourMaterialScope { SameTexture, AllSupported, Picked }
+
         [SerializeField] RecolourSettings _rc = new RecolourSettings();
         [SerializeField] List<RecolourEntry> _rcEntries = new List<RecolourEntry>();
         [SerializeField] Color _rcTarget = new Color(0.35f, 0.55f, 1f);
         [SerializeField] bool _rcMatchBrightness;
         [SerializeField] Vector2 _rcListScroll;
-        [SerializeField] Material _rcSessionFor; // the material the current session started from
-        [SerializeField] Color _rcMainTint = new Color(1f, 0.35f, 0.55f); // colour for "Tint the material (Main Color)"
-        [SerializeField] bool _rcMainTintOn;         // the materials' Main Color is currently set by it
-        [SerializeField] bool _rcOthersOpen;         // "Also recolour other materials" foldout
+        [SerializeField] Material _rcSessionFor;
+        [SerializeField] Color _rcMainTint = new Color(1f, 0.35f, 0.55f);
+        [SerializeField] Color _rcMainTintChoice;
+        [SerializeField] bool _rcMainTintOn;
+        [SerializeField] bool _rcOthersOpen;
+        [SerializeField] bool _openColourSources;
+        [SerializeField] bool _openRecolourFollow;
+        [SerializeField] bool _openRecolourControls = true;
+        [SerializeField] bool _openRecolourMatch = true;
+        [SerializeField] bool _openColourChanges = true;
         bool _rcNeedsFinalize;
 
         bool RecolourChanged => _rcEntries.Count > 0 && (!_rc.IsIdentity || _rcMainTintOn);
 
-        /// <summary>Every mesh material on this avatar (distinct, in hierarchy order).</summary>
         List<Material> AvatarMaterials()
         {
             var root = TargetResolver.AvatarRoot(_renderer);
             if (root == null) return new List<Material>();
-            // Cached for up to a second (OnGUI calls this every repaint).
             double now = EditorApplication.timeSinceStartup;
             if (_avMatsCache != null && _avMatsRoot == root && now - _avMatsTime < 1.0) return _avMatsCache;
             _avMatsRoot = root;
@@ -48,7 +54,6 @@ namespace Avistry.Textures
         Texture _rcSampleTex;
         Hash128 _rcSampleHash;
 
-        /// <summary>Default selection: the current material plus the avatar's materials that share its main texture (e.g. outline/transparent variants).</summary>
         void StartRecolourSession()
         {
             _rcEntries.Clear();
@@ -64,26 +69,89 @@ namespace Avistry.Textures
             _rcMainTintOn = false;
         }
 
-        void SetRecolourIncluded(Material m, bool include)
+        void SetRecolourIncluded(Material material, bool include)
         {
-            Undo.RecordObject(this, "Recolour materials");
-            int i = _rcEntries.FindIndex(e => e.material == m);
-            if (include && i < 0)
+            if (include)
             {
-                Undo.RecordObject(m, "Recolour materials");
-                MaterialWriter.EnsureEditable(new[] { m }); // off Poiyomi's temporary section shader, so toggles can change
-                var e = Recolour.Capture(m);
-                _rcEntries.Add(e);
-                if (!MaterialWriter.IsPoiyomiLocked(m)) { Recolour.Apply(e, _rc, PartialMaskFor(e)); if (_rcMainTintOn) Recolour.SetMainTint(e, _rcMainTint); }
+                _avMatsCache = null;
+                if (!AvatarMaterials().Contains(material)) return;
             }
-            else if (!include && i >= 0)
+            ChangeRecolourIncluded(new[] { material }, _ => include);
+        }
+
+        void SetRecolourMaterialScope(RecolourMaterialScope scope)
+        {
+            if (_material == null) return;
+            _avMatsCache = null;
+            var materials = AvatarMaterials();
+            var main = _material.HasProperty("_MainTex") ? _material.GetTexture("_MainTex") : null;
+            var included = new HashSet<Material>(materials.Where(m => scope switch
             {
-                Undo.RecordObject(m, "Recolour materials");
-                Recolour.Restore(_rcEntries[i]);
-                _rcEntries.RemoveAt(i);
-            }
+                RecolourMaterialScope.Picked => m == _material,
+                RecolourMaterialScope.SameTexture => m == _material || (main != null && m.HasProperty("_MainTex") && m.GetTexture("_MainTex") == main),
+                _ => true,
+            }));
+            ChangeRecolourIncluded(materials.Concat(_rcEntries.Select(e => e.material)), included.Contains);
+        }
+
+        void ChangeRecolourIncluded(IEnumerable<Material> materials, System.Func<Material, bool> include)
+        {
+            if (_material == null || _rcSessionFor != _material ||
+                !QuickTargetStillMatches(_renderer, _materialIndex, _material, _material.shader)) return;
+            var enrolled = new HashSet<Material>(_rcEntries.Select(e => e.material));
+            var changes = materials.Where(m => m != null).Distinct()
+                .Select(m => (material: m, include: include(m) && Recolour.Supports(m)))
+                .Where(change => change.include != enrolled.Contains(change.material)).ToArray();
+            if (changes.Length == 0 && !_rcEntries.Any(e => e.material == null)) return;
+
+            var tint = AppliedMainTint;
+            const string undo = "Recolour materials";
+            WithTargetUndo(undo, () =>
+            {
+                Undo.RecordObjects(changes.Select(change => (Object)change.material).Append(this).ToArray(), undo);
+                _rcEntries.RemoveAll(e => e.material == null);
+                foreach (var (material, add) in changes)
+                {
+                    if (add)
+                    {
+                        MaterialWriter.EnsureEditable(new[] { material });
+                        var entry = Recolour.Capture(material);
+                        _rcEntries.Add(entry);
+                        if (!MaterialWriter.IsPoiyomiLocked(material))
+                        {
+                            Recolour.Apply(entry, _rc, PartialMaskFor(entry));
+                            if (_rcMainTintOn) Recolour.SetMainTint(entry, tint);
+                        }
+                    }
+                    else
+                    {
+                        int index = _rcEntries.FindIndex(e => e.material == material);
+                        var entry = _rcEntries[index];
+                        if (CanRestoreRecolourScopeEntry(entry)) Recolour.Restore(entry);
+                        _rcEntries.RemoveAt(index);
+                    }
+                }
+            });
             _rcNeedsFinalize = true;
+            Repaint();
             SceneView.RepaintAll();
+        }
+
+        static bool CanRestoreRecolourScopeEntry(RecolourEntry entry)
+        {
+            var shader = entry.material.shader;
+            if (shader == null || ShaderProfiles.Detect(shader) != entry.family) return false;
+            bool Matches(string name, ShaderPropertyType expected)
+            {
+                int index = shader.FindPropertyIndex(name);
+                if (index < 0) return true;
+                var actual = shader.GetPropertyType(index);
+                return actual == expected || (expected == ShaderPropertyType.Float && actual == ShaderPropertyType.Range);
+            }
+            return entry.colorNames.All(name => Matches(name, ShaderPropertyType.Color)) &&
+                entry.floatNames.All(name => Matches(name, ShaderPropertyType.Float)) &&
+                entry.vectorNames.All(name => Matches(name, ShaderPropertyType.Vector)) &&
+                entry.textureNames.All(name => Matches(name, ShaderPropertyType.Texture));
         }
 
         void ApplyRecolour()
@@ -91,21 +159,21 @@ namespace Avistry.Textures
             var mats = _rcEntries.Where(e => e.material != null).Select(e => e.material).Cast<Object>().ToList();
             mats.Add(this);
             Undo.RecordObjects(mats.ToArray(), "Recolour");
-            MaterialWriter.EnsureEditable(_rcEntries.Select(e => e.material)); // the Poiyomi inspector may have section-locked one again
+            MaterialWriter.EnsureEditable(_rcEntries.Select(e => e.material));
+            var tint = AppliedMainTint;
             foreach (var e in _rcEntries)
             {
-                if (e.material == null || MaterialWriter.IsPoiyomiLocked(e.material)) continue; // locked: values would be ignored
+                if (e.material == null || MaterialWriter.IsPoiyomiLocked(e.material)) continue;
                 Recolour.Apply(e, _rc, PartialMaskFor(e));
                 if (e.family == ShaderFamily.LilToon && e.material.HasProperty("_BaseColor") && e.material.HasProperty("_Color"))
-                    e.material.SetColor("_BaseColor", e.material.GetColor("_Color")); // cheap part of lilToon's rules, live
-                if (_rcMainTintOn) Recolour.SetMainTint(e, _rcMainTint);
+                    e.material.SetColor("_BaseColor", e.material.GetColor("_Color"));
+                if (_rcMainTintOn) Recolour.SetMainTint(e, tint);
                 EditorUtility.SetDirty(e.material);
             }
             _rcNeedsFinalize = true;
             SceneView.RepaintAll();
         }
 
-        /// <summary>The heavier shader bookkeeping, once the user lets go of a slider (not on every drag step).</summary>
         void FinalizeRecolourIfIdle()
         {
             if (!_rcNeedsFinalize || GUIUtility.hotControl != 0) return;
@@ -130,10 +198,6 @@ namespace Avistry.Textures
             Toast(Loc.T("Colours are back to how they were when you started."), MessageType.Info, 3f);
         }
 
-        /// <summary>
-        /// Sets the Main Color (lilToon / Poiyomi `_Color`) of every included material to this colour: for a grey or white
-        /// main texture, where a hue shift has nothing to turn. Reset puts the starting colour back.
-        /// </summary>
         void TintMainColour(Color colour)
         {
             var live = _rcEntries.Where(e => e.material != null && e.material.HasProperty("_Color") && !MaterialWriter.IsPoiyomiLocked(e.material)).ToList();
@@ -147,6 +211,7 @@ namespace Avistry.Textures
             Undo.RecordObjects(objs.ToArray(), "Tint the material");
             MaterialWriter.EnsureEditable(live.Select(e => e.material));
             _rcMainTint = new Color(colour.r, colour.g, colour.b, 1f);
+            _rcMainTintChoice = _rcMainTint;
             _rcMainTintOn = true;
             foreach (var e in live) { Recolour.SetMainTint(e, _rcMainTint); EditorUtility.SetDirty(e.material); }
             _rcNeedsFinalize = true;
@@ -154,21 +219,16 @@ namespace Avistry.Textures
             Toast(Loc.F("Main Color set on {0} material{1}. Reset puts it back.", live.Count, (live.Count == 1 ? "" : "s")), MessageType.Info, 3f);
         }
 
-        /// <summary>One line describing the whole-material shader change that is on.</summary>
         string WholeChangeText()
         {
             var bits = new List<string>();
             if (Mathf.Abs(_rc.hue) >= 0.01f) bits.Add(Loc.F("hue {0:+0;-0;0}°", _rc.hue));
             if (Mathf.Abs(_rc.saturation) >= 0.001f) bits.Add(Loc.F("saturation {0:+0.##;-0.##;0}", _rc.saturation));
             if (Mathf.Abs(_rc.brightness) >= 0.001f) bits.Add(Loc.F("brightness {0:+0.##;-0.##;0}", _rc.brightness));
-            if (_rcMainTintOn) bits.Add(Loc.F("Main Color #{0}", ColorUtility.ToHtmlStringRGB(_rcMainTint)));
+            if (_rcMainTintOn) bits.Add(Loc.F("Main Color #{0}", ColorUtility.ToHtmlStringRGB(AppliedMainTint)));
             return Loc.F("Everything (shader): {0}", string.Join(", ", bits));
         }
 
-        /// <summary>
-        /// When more than one kind of colour change is on (a whole-material shader change, colour parts, Colour Match
-        /// layers), lists them all at the top, each with a way to take it off, so nothing stacks up unseen.
-        /// </summary>
         void DrawColourChangesSummary()
         {
             var parts = Parts.Where(p => p.enabled && !p.IsIdentity).ToList();
@@ -178,7 +238,12 @@ namespace Avistry.Textures
             if (kinds < 2) return;
 
             StudioGUI.Count("colour.changes");
-            StudioGUI.BeginGroup(Loc.T("Colour changes on this texture"), Loc.F("{0} kinds", kinds));
+            string count = Loc.F("{0} kinds", kinds);
+            if (!StudioGUI.BeginFoldGroup(ref _openColourChanges, Loc.T("Colour changes on this texture"), count, count))
+            {
+                StudioGUI.EndGroup();
+                return;
+            }
             System.Action pending = null;
             if (whole)
                 SummaryRow(WholeChangeText(), Loc.T("Reset"), Loc.T("Put the material colours back to how they were when you started"), () => ResetRecolour());
@@ -188,12 +253,14 @@ namespace Avistry.Textures
                 string what = p.IsTint ? Loc.F("tint #{0}", ColorUtility.ToHtmlStringRGB(p.tintColour)) : Loc.F("hue {0:+0;-0;0}°", p.hue);
                 SummaryRow(Loc.F("Part “{0}”: {1}", p.name, what), Loc.T("Remove"), Loc.F("Delete the part “{0}” (Ctrl+Z brings it back)", p.name), () => pending = () => DeletePart(pp));
             }
-            if (parts.Count > 4) GUILayout.Label(Loc.F("…and {0} more parts (see One piece at a time).", parts.Count - 4), StudioGUI.Hint);
+            if (parts.Count > 4) GUILayout.Label(Loc.F("…and {0} more parts (see Pieces).", parts.Count - 4), StudioGUI.Hint);
             foreach (var m in matches)
             {
                 var mm = m;
                 SummaryRow(Loc.F("Colour Match “{0}”", m.name), Loc.T("Show"), Loc.T("Open this layer in 4 · Paint to change or remove it"), () => pending = () =>
                 {
+                    if (!TabAvailable(Tab.Paint, out var why)) { ShowColourMatchBlocked(why); return; }
+                    if (!_recipe.layers.Contains(mm)) return;
                     Undo.RecordObject(this, "Select layer");
                     _activeLayerId = mm.id;
                     SetTab(Tab.Paint);
@@ -227,7 +294,6 @@ namespace Avistry.Textures
             StartRecolourSession();
         }
 
-        /// <summary>Switching material: keep what the user did on the old session instead of silently dropping it.</summary>
         void KeepRecolourBeforeSwitch()
         {
             FinalizeRecolourIfIdle();
@@ -250,7 +316,7 @@ namespace Avistry.Textures
             {
                 if (MaterialWriter.IsPoiyomiLocked(e.material)) continue;
                 int i = _rcEntries.IndexOf(e);
-                var fresh = Recolour.Capture(e.material); // the shader changed: take the starting values again
+                var fresh = Recolour.Capture(e.material);
                 fresh.unlockedByUs = true;
                 _rcEntries[i] = fresh;
             }
@@ -269,10 +335,26 @@ namespace Avistry.Textures
 
             if (!Recolour.Supports(_material))
             {
+                if (ByPart && CanRecolourPieces)
+                {
+                    if (DrawRecolourButton(EditorGUILayout.GetControlRect(false, 26f), SelectGlyph.Material,
+                            new GUIContent(Loc.T("Material"), Loc.T("Back to material controls")), false)) LeaveByPart();
+                    DrawPartChoice(false);
+                    DrawRecolourControls();
+                    DrawPartsFooter();
+                    return;
+                }
                 StudioGUI.BeginGroup(Loc.T("Recolour"));
-                GUILayout.Label(Loc.F("Quick recolour works with Poiyomi and lilToon materials. ‘{0}’ uses {1}.", _material?.name, _material?.shader?.name), StudioGUI.CheckLabel);
-                GUILayout.Label(Loc.T("You can still recolour its texture with layers (in 4 · Paint)."), StudioGUI.Hint);
-                if (GUILayout.Button(new GUIContent(Loc.T("Match colours to another material…"), Loc.T("Adds a Colour Match layer in 4 · Paint")))) EditorApplication.delayCall += AddColourMatchLayer;
+                if (CanRecolourPieces)
+                {
+                    bool recolour = DrawRecolourButton(EditorGUILayout.GetControlRect(false, 26f), SelectGlyph.Piece,
+                        new GUIContent(Loc.T("Pieces"), Loc.T("Recolour pieces")), false);
+                    StudioGUI.Count("colour.recolourPieces", GUILayoutUtility.GetLastRect());
+                    if (recolour) EnterByPart();
+                }
+                if (CanAddColourMatchLayer(out _))
+                    DrawAddColourMatchButton();
+                GUILayout.Label(Loc.T("Quick material shows the settings this shader supports."), StudioGUI.Hint);
                 StudioGUI.EndGroup();
                 DrawQuickMaterial();
                 return;
@@ -280,8 +362,8 @@ namespace Avistry.Textures
 
             if (!ByPart) DrawUnlockBanner();
             DrawColourChangesSummary();
-            if (!ByPart) DrawRecolourMaterialList(); // shader recolour only; By part changes the texture
             DrawPartChoice();
+            if (!ByPart) DrawRecolourMaterialList();
             DrawRecolourControls();
             if (ByPart)
             {
@@ -289,12 +371,6 @@ namespace Avistry.Textures
                 DrawQuickMaterial();
                 return;
             }
-            if (Advanced)
-            {
-                DrawColourSources();
-                DrawRecolourFollow();
-            }
-
             StudioGUI.BeginGroup(null);
             GUILayout.Label(Loc.T("Changes go straight onto the materials, like editing them in the Inspector. No new texture is made. Ctrl+Z undoes; Reset puts back the starting colours."), StudioGUI.Hint);
             GUILayout.Label(Loc.T("Note: people whose VRChat Safety settings block custom shaders see a fallback that ignores these shader colour settings. " +
@@ -310,13 +386,19 @@ namespace Avistry.Textures
                 }
             }
             StudioGUI.EndGroup();
-            StudioGUI.BeginGroup(Loc.T("Match another material"));
-            GUILayout.Label(Loc.T("Give this texture the colours of another part of the avatar (for example hair matched to the outfit). " +
-                            "It changes the texture itself, keeping its shading and detail, and saves as a new PNG."), StudioGUI.Hint);
-            StudioGUI.Count("colour.copyFrom");
-            if (GUILayout.Button(new GUIContent(Loc.T("  Match colours to another material…"), StudioGUI.Icon("PreTextureRGB", "").image,
-                    Loc.T("Adds a Colour Match layer in 4 · Paint")), GUILayout.Height(26)))
-                EditorApplication.delayCall += AddColourMatchLayer;
+            if (Advanced)
+            {
+                DrawColourSources();
+                DrawRecolourFollow();
+            }
+
+            if (StudioGUI.BeginFoldGroup(ref _openRecolourMatch, Loc.T("Match another material")))
+            {
+                if (CanAddColourMatchLayer(out _))
+                    GUILayout.Label(Loc.T("Give this texture the colours of another part of the avatar (for example hair matched to the outfit). " +
+                                    "It changes the texture itself, keeping its shading and detail, and saves as a new PNG."), StudioGUI.Hint);
+                DrawAddColourMatchButton();
+            }
             StudioGUI.EndGroup();
             DrawQuickMaterial();
         }
@@ -324,59 +406,58 @@ namespace Avistry.Textures
         void DrawRecolourMaterialList()
         {
             int included = _rcEntries.Count;
-            // The current material and the ones sharing its texture are included automatically, so most people never open this.
             StudioGUI.Count("colour.otherMaterials");
-            _rcOthersOpen = EditorGUILayout.Foldout(_rcOthersOpen,
-                new GUIContent(Loc.F("Also recolour other materials ({0} included)", included),
-                    Loc.T("This material and the ones that share its texture are included automatically. Open this to include or leave out others.")), true, StudioGUI.HeaderFoldout);
-            if (_rcOthersOpen) DrawMaterialPicker();
+            if (StudioGUI.BeginFoldGroup(ref _rcOthersOpen, Loc.F("Materials included ({0})", included),
+                tooltip: Loc.T("This material and the ones that share its texture are included automatically. Open this to include or leave out others.")))
+                DrawMaterialPicker();
+            StudioGUI.EndGroup();
             DrawLockNotes();
         }
 
         void DrawMaterialPicker()
         {
             var all = AvatarMaterials();
-            int included = _rcEntries.Count;
-            StudioGUI.BeginGroup(Loc.T("Materials to recolour"), Loc.F("{0} of {1}", included, all.Count));
-
-            using (new EditorGUILayout.HorizontalScope())
+            var supported = all.Where(Recolour.Supports).ToList();
+            int included = supported.Count(m => _rcEntries.Any(entry => entry.material == m));
+            GUILayout.Label(Loc.F("{0} of {1} supported materials included", included, supported.Count), StudioGUI.Hint, GUILayout.MinWidth(0));
+            if (included < _rcEntries.Count)
+                GUILayout.Label(Loc.T("Some included materials are unavailable. Choose a scope to update the list."), StudioGUI.Hint, GUILayout.MinWidth(0));
+            using (new EditorGUI.DisabledScope(_needsRebuild))
             {
-                var main = _material.HasProperty("_MainTex") ? _material.GetTexture("_MainTex") : null;
-                if (GUILayout.Button(new GUIContent(Loc.T("Same texture"), Loc.T("This material and the avatar's materials that use the same main texture")), EditorStyles.miniButtonLeft))
-                    foreach (var m in all) SetRecolourIncluded(m, Recolour.Supports(m) && (m == _material || (main != null && m.HasProperty("_MainTex") && m.GetTexture("_MainTex") == main)));
-                if (GUILayout.Button(new GUIContent(Loc.T("All"), Loc.T("Every Poiyomi / lilToon material on this avatar")), EditorStyles.miniButtonMid))
-                    foreach (var m in all) SetRecolourIncluded(m, Recolour.Supports(m));
-                if (GUILayout.Button(Loc.T("Only this"), EditorStyles.miniButtonRight))
-                    foreach (var m in all) SetRecolourIncluded(m, m == _material);
+                int scope = WrapToolbar(-1, new[]
+                {
+                    new GUIContent(Loc.T("Same texture"), Loc.T("This material and the avatar's materials that use the same main texture")),
+                    new GUIContent(Loc.T("All supported"), Loc.T("Every Poiyomi / lilToon material on this avatar")),
+                    new GUIContent(Loc.T("Only this"), Loc.T("Include only the material picked in Avistry")),
+                }, EditorStyles.miniButton, 20f, PanelContentWidth);
+                StudioGUI.Count("colour.materialScope", GUILayoutUtility.GetLastRect());
+                if (scope >= 0) SetRecolourMaterialScope((RecolourMaterialScope)scope);
             }
 
             float h = Mathf.Min(150f, all.Count * 20f + 4f);
             _rcListScroll = EditorGUILayout.BeginScrollView(_rcListScroll, GUILayout.Height(h));
             foreach (var m in all)
             {
-                bool supported = Recolour.Supports(m);
+                bool editable = Recolour.Supports(m);
                 bool on = _rcEntries.Any(e => e.material == m);
-                bool locked = supported && MaterialWriter.IsPoiyomiLocked(m);
+                bool locked = editable && MaterialWriter.IsPoiyomiLocked(m);
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    using (new EditorGUI.DisabledScope(!supported))
+                    using (new EditorGUI.DisabledScope(!editable || _needsRebuild))
                     {
                         bool now = EditorGUILayout.ToggleLeft(new GUIContent(m.name + (m == _material ? Loc.T("  (this)") : ""),
-                            supported ? AssetDatabase.GetAssetPath(m) : Loc.T("Not a Poiyomi or lilToon material")), on, GUILayout.MinWidth(40));
+                            editable ? AssetDatabase.GetAssetPath(m) : Loc.T("Not a Poiyomi or lilToon material")), on, GUILayout.MinWidth(40));
                         if (now != on) SetRecolourIncluded(m, now);
                     }
-                    string tag = !supported ? Loc.T("other") : (ShaderProfiles.Detect(m.shader) == ShaderFamily.Poiyomi ? "Poi" : "lil");
+                    string tag = !editable ? Loc.T("other") : (ShaderProfiles.Detect(m.shader) == ShaderFamily.Poiyomi ? "Poi" : "lil");
                     if (locked) tag = Loc.T("locked");
                     var tagContent = new GUIContent(tag, locked ? Loc.T("Locked (optimised) Poiyomi material. It ignores colour changes. It is not unlocked automatically: press Unlock below (Poiyomi locks it again when you upload).") : null);
                     GUILayout.Label(tagContent, StudioGUI.MiniRight, GUILayout.Width(StudioGUI.MiniRight.CalcSize(tagContent).x + 2f));
                 }
             }
             EditorGUILayout.EndScrollView();
-            StudioGUI.EndGroup();
         }
 
-        /// <summary>Locked Poiyomi materials and ones we unlocked: shown even when the material list is folded away.</summary>
-        /// <summary>One plain line plus Unlock, shown first when the material is a locked Poiyomi material (it ignores colour changes).</summary>
         void DrawUnlockBanner()
         {
             int lockedCount = _rcEntries.Count(e => e.material != null && MaterialWriter.IsPoiyomiLocked(e.material));
@@ -395,7 +476,6 @@ namespace Avistry.Textures
         {
             if (!Advanced) return;
 
-            // Poiyomi relocks at upload, but its FAQ notes that can fail alongside other optimizers: offer to relock now.
             int unlockedByUs = _rcEntries.Count(e => e.unlockedByUs && e.material != null && !MaterialWriter.IsPoiyomiLocked(e.material));
             if (unlockedByUs > 0)
             {
@@ -430,7 +510,6 @@ namespace Avistry.Textures
         static Texture2D NewThumb(int w, int h) =>
             new Texture2D(w, h, TextureFormat.RGBA32, false, false) { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
 
-        /// <summary>Samples the main texture once per material; rebuilds the "after" thumbnail when the sliders move.</summary>
         void EnsureRecolourPreview()
         {
             var mainNow = _material != null && _material.HasProperty("_MainTex") ? _material.GetTexture("_MainTex") : null;
@@ -443,7 +522,6 @@ namespace Avistry.Textures
                 _rcPixels = Recolour.SampleMainTexture(_material, RecolourThumbSize);
                 _rcPalette = Recolour.Palette(_rcPixels, 5, out _rcColourful);
                 _rcSources = Recolour.ColourSources(_material);
-                // Default colour to match: the most prominent one that actually has colour (not black/grey).
                 _rcSourceSwatch = Mathf.Max(0, _rcPalette.FindIndex(c => { Color.RGBToHSV(c, out _, out float s, out float v); return s > 0.15f && v > 0.12f; }));
                 if (_rcThumbBefore == null) _rcThumbBefore = NewThumb(RecolourThumbSize, RecolourThumbSize);
                 if (_rcPixels != null) { _rcThumbBefore.SetPixels(_rcPixels); _rcThumbBefore.Apply(false); }
@@ -470,17 +548,19 @@ namespace Avistry.Textures
 
         void DrawRecolourControls()
         {
-            // By part: the sliders edit the current part's layer; otherwise the material-wide shader recolour (_rc).
             var part = ByPart ? CurrentPart : null;
             var cur = ByPart ? (part != null ? part.Settings : new RecolourSettings()) : _rc;
             bool oklab = part != null ? part.oklab : PreviewOklab;
-            StudioGUI.BeginGroup(part != null ? Loc.F("Colour of “{0}”", part.name) : Loc.T("Colour"));
+            if (!StudioGUI.BeginFoldGroup(ref _openRecolourControls, part != null ? Loc.F("Colour of “{0}”", part.name) : Loc.T("Colour")))
+            {
+                StudioGUI.EndGroup();
+                return;
+            }
             EnsureRecolourPreview();
             var palette = ByPart ? PartPalette(part) : _rcPalette;
 
             if (_rcPixels != null)
             {
-                // Before / after thumbnails of the real texture (the model in the Scene view shows the exact result).
                 float avail = PanelContentWidth;
                 float size = Mathf.Clamp((avail - 30f) / 2f, 60f, 130f);
                 var row = GUILayoutUtility.GetRect(0, size, GUILayout.ExpandWidth(true));
@@ -498,7 +578,6 @@ namespace Avistry.Textures
                 }
                 GUI.Label(new Rect(before.xMax, row.y, 30f, size), "→", ArrowStyle);
 
-                // Main colours as swatches: before (click to choose the colour "Shift to" matches) and after.
                 if (palette.Count > 0)
                 {
                     StudioGUI.Count("colour.swatches");
@@ -525,38 +604,42 @@ namespace Avistry.Textures
                     GUILayout.Label(Loc.T("After (preview)"), HintCentered);
                 }
 
-                // Hue rotation can't change black, grey or white: say so when that's most of the texture, and
-                // point at where this material's colour really comes from (e.g. a coloured emission map).
                 if (_rcColourful < 0.25f && !ByPart)
                 {
                     var elsewhere = _rcSources.Where(s => s.group != "main" && s.colourful >= 0.1f && s.colourful > _rcColourful + 0.05f).ToList();
                     if (elsewhere.Count > 0)
-                        StudioGUI.CheckRow(StudioGUI.Check.Note,
-                            Loc.F("The main texture is grey (only {0:0}% has colour), so Hue barely changes it. " +
-                            "This material's colour comes from {1}: " +
-                            "tick them in “Where the colour comes from” below, or tint the material:", _rcColourful * 100f, string.Join(Loc.T(" and "), elsewhere.Select(s => s.label.Split('·')[0].Trim()).Distinct().Take(3))));
+                    {
+                        string sources = string.Join(Loc.T(" and "),
+                            elsewhere.Select(s => s.label.Split('·')[0].Trim()).Distinct().Take(3));
+                        StudioGUI.CheckRow(StudioGUI.Check.Note, Advanced
+                            ? Loc.F("Hue barely changes this grey texture. To shift {0}, include it in “Where the colour comes from”.",
+                                sources)
+                            : Loc.F("Hue barely changes this grey texture. Switch to Advanced to shift the colour from {0}.", sources));
+                    }
                     else
                         StudioGUI.CheckRow(StudioGUI.Check.Note,
-                            Loc.F("This texture is mostly dark or grey (only {0:0}% has real colour). Hue only moves the coloured parts; " +
-                            "Saturation and Brightness change everything. To tint dark areas, use the layers in 4 · Paint › Solid Colour or a Gradient Map.", _rcColourful * 100f));
-                    DrawMainTintAction();
+                            Loc.F("Only {0:0}% of this texture has colour for Hue to shift. Choose a tint below to colour the grey areas.",
+                                _rcColourful * 100f));
                 }
             }
 
+            if (!ByPart && _rcEntries.Count > 0) DrawMainTintAction();
             if (!ByPart && Advanced) DrawPoiyomiColourNotes();
             if (ByPart && part == null)
-                StudioGUI.CheckRow(StudioGUI.Check.Note, Loc.T("Click a part of the model first (or press + New part), then colour it here."));
+                StudioGUI.CheckRow(StudioGUI.Check.Note, Loc.T("Click a part of the model first (or press New part), then colour it here."));
             using (new EditorGUI.DisabledScope(ByPart && part == null))
             {
                 bool tintMode = part != null && part.IsTint;
                 if (part != null)
                 {
-                    int pm = WrapToolbar(tintMode ? 1 : 0, new[]
+                    int pm = DrawRecolourChoice(false, tintMode ? 1 : 0, PanelContentWidth, false);
+                    StudioGUI.Count("colour.cover", GUILayoutUtility.GetLastRect());
+                    if (pm != (tintMode ? 1 : 0))
                     {
-                        new GUIContent(Loc.T("Rotate colours"), Loc.T("Turn the part's colours around the colour wheel. Keeps every colour's own look, but can't colour white or grey.")),
-                        new GUIContent(Loc.T("Cover with one colour"), Loc.T("Give the part one colour and keep its light and shadow. Works on white and grey.")),
-                    });
-                    if (pm != (tintMode ? 1 : 0)) { SetPartMode(part, pm == 1 ? RecolourPartLayer.PartMode.Tint : RecolourPartLayer.PartMode.Shift); tintMode = pm == 1; if (tintMode) LearnLater(LearnEvents.RecolourCover); }
+                        tintMode = pm == 1;
+                        ChangeRecolourChoice(() => SetPartMode(part, tintMode ? RecolourPartLayer.PartMode.Tint : RecolourPartLayer.PartMode.Shift));
+                        if (tintMode) LearnLater(LearnEvents.RecolourCover);
+                    }
                     if (tintMode && part.autoTinted)
                         StudioGUI.CheckRow(StudioGUI.Check.Note, Loc.T("This part is white/grey, so it's tinted (hue shift can't colour grey)."));
                 }
@@ -564,14 +647,19 @@ namespace Avistry.Textures
                 else
                 {
                 EditorGUI.BeginChangeCheck();
+                var hueLabel = new GUIContent(Loc.T("Colour shift (hue)"), Loc.T("Rotate every colour around the colour wheel (degrees)"));
+                bool hueAbove = EditorStyles.label.CalcSize(hueLabel).x > EditorGUIUtility.labelWidth - 5f;
+                if (hueAbove) GUILayout.Label(hueLabel, StudioGUI.Hint, GUILayout.MinWidth(0f));
                 float hue, sat, bri;
+                Rect hueRow;
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     StudioGUI.Count("colour.hue");
-                    hue = EditorGUILayout.Slider(new GUIContent(Loc.T("Colour shift (hue)"), Loc.T("Rotate every colour around the colour wheel (degrees)")), cur.hue, -180f, 180f);
+                    hue = EditorGUILayout.Slider(hueAbove ? GUIContent.none : hueLabel, cur.hue, -180f, 180f);
+                    hueRow = GUILayoutUtility.GetLastRect();
                     StudioGUI.Info("hue");
                 }
-                DrawHueBars(cur.hue);
+                DrawHueBars(cur.hue, !hueAbove, hueRow);
                 StudioGUI.Count("colour.saturation");
                 sat = EditorGUILayout.Slider(new GUIContent(Loc.T("Saturation"), Loc.T("−1 grey · 0 unchanged · +1 twice as vivid")), cur.saturation, -1f, 1f);
                 StudioGUI.Count("colour.brightness");
@@ -589,7 +677,7 @@ namespace Avistry.Textures
                 }
 
                 GUILayout.Space(4);
-                GUILayout.Label(Loc.T("Or shift the selected colour to"), StudioGUI.GroupTitle);
+                GUILayout.Label(Loc.T("Or shift the selected colour to"), StudioGUI.Hint, GUILayout.MinWidth(0f));
                 bool hasSource = palette.Count > 0 && _rcSourceSwatch < palette.Count;
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -604,10 +692,10 @@ namespace Avistry.Textures
                         GUILayout.Label("→", GUILayout.Width(14));
                     }
                     StudioGUI.Count("colour.shiftTo");
-                    _rcTarget = EditorGUILayout.ColorField(GUIContent.none, _rcTarget, true, false, false, GUILayout.MinWidth(30));
+                    _rcTarget = EditorGUILayout.ColorField(GUIContent.none, _rcTarget, true, false, false, GUILayout.MinWidth(35), GUILayout.ExpandWidth(true));
                     using (new EditorGUI.DisabledScope(!hasSource))
                     {
-                        var shiftLabel = new GUIContent(Loc.T("Shift"), Loc.T("Sets hue and saturation so the selected colour (orange outline above) becomes this colour"));
+                        var shiftLabel = new GUIContent(Loc.T("Apply"), Loc.T("Sets hue and saturation so the selected colour (orange outline above) becomes this colour"));
                         if (GUILayout.Button(shiftLabel, GUILayout.Width(Mathf.Max(40f, GUI.skin.button.CalcSize(shiftLabel).x + 2f))))
                         {
                             if (ByPart)
@@ -630,43 +718,79 @@ namespace Avistry.Textures
             StudioGUI.EndGroup();
         }
 
-        /// <summary>Tint mode of a part: its colour, strength and brightness.</summary>
-        void DrawPartTintControls(RecolourPartLayer part)
+        void DrawPartTintControls(RecolourPartLayer part, float sceneWidth = 0f)
         {
             EditorGUI.BeginChangeCheck();
             StudioGUI.Count("colour.tintColour");
             var col = EditorGUILayout.ColorField(new GUIContent(Loc.T("Colour"), Loc.T("The colour this part is given. Its own light and shadow stay.")), part.tintColour, true, false, false);
             StudioGUI.Count("colour.tintStrength");
-            float str = EditorGUILayout.Slider(new GUIContent(Loc.T("Strength"), Loc.T("0 = no tint · 1 = the full colour")), part.tintStrength, 0f, 1f);
+            var strength = new GUIContent(Loc.T("Strength"), Loc.T("0 = no tint · 1 = the full colour"));
+            float str = sceneWidth > 0f
+                ? DrawSceneSlider(strength, part.tintStrength, 0f, 1f, sceneWidth, "scene.recolourTintStrength")
+                : EditorGUILayout.Slider(strength, part.tintStrength, 0f, 1f);
             if (EditorGUI.EndChangeCheck()) { SetPartTint(part, col, str); LearnLater(LearnEvents.RecolourCover); }
             EditorGUI.BeginChangeCheck();
             StudioGUI.Count("colour.brightness");
-            float bri = EditorGUILayout.Slider(new GUIContent(Loc.T("Brightness"), Loc.T("−1 darker · 0 as it is · +1 lighter")), part.brightness, -1f, 1f);
+            var brightness = new GUIContent(Loc.T("Brightness"), Loc.T("−1 darker · 0 as it is · +1 lighter"));
+            float bri = sceneWidth > 0f
+                ? DrawSceneSlider(brightness, part.brightness, -1f, 1f, sceneWidth, "scene.recolourBrightness")
+                : EditorGUILayout.Slider(brightness, part.brightness, -1f, 1f);
             if (EditorGUI.EndChangeCheck()) SetPartValues(part, part.hue, part.saturation, bri);
         }
 
-        /// <summary>For a grey main texture: pick a colour and set the materials' Main Color to it (a hue shift can't colour grey).</summary>
-        void DrawMainTintAction()
+        Color MainTintChoice => _rcMainTintChoice.a == 0f ? _rcMainTint : _rcMainTintChoice;
+
+        Color AppliedMainTint
         {
-            StudioGUI.Count("colour.mainTint");
-            using (new EditorGUILayout.HorizontalScope())
+            get
             {
-                _rcMainTint = EditorGUILayout.ColorField(new GUIContent("", Loc.T("The colour the materials get. It multiplies the grey texture, so light and shadow stay.")),
-                    _rcMainTint, false, false, false, GUILayout.Width(70));
-                if (GUILayout.Button(new GUIContent(Loc.T("Tint the material (Main Color)"),
-                        Loc.T("Sets the Main Color of every included material to this colour, so the grey texture shows in it. Reset puts it back, Ctrl+Z undoes.")), GUILayout.Height(20)))
-                    TintMainColour(_rcMainTint);
+                if (!_rcMainTintOn || _rcMainTintChoice.a != 0f) return _rcMainTint;
+                var entry = _rcEntries.FirstOrDefault(e => e.material != null && e.material.HasProperty("_Color") &&
+                    e.colorNames.Contains("_Color") && !MaterialWriter.IsPoiyomiLocked(e.material));
+                if (entry == null) return _rcMainTint;
+                var colour = entry.material.GetColor("_Color");
+                colour.a = 1f;
+                return colour;
             }
         }
 
-        /// <summary>Photoshop-style hue bars under the slider: top = original colours, bottom = what each becomes.</summary>
-        void DrawHueBars() => DrawHueBars(_rc.hue);
+        void SetMainTintChoice(Color colour)
+        {
+            colour.a = 1f;
+            if (colour == MainTintChoice) return;
+            Undo.RecordObject(this, "Choose tint colour");
+            _rcMainTint = AppliedMainTint;
+            _rcMainTintChoice = colour;
+        }
 
-        void DrawHueBars(float hueShift)
+        void DrawMainTintAction(bool scene = false)
+        {
+            if (!scene) StudioGUI.Count("colour.mainTint");
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                SetMainTintChoice(EditorGUILayout.ColorField(new GUIContent("", Loc.T("Choose the colour to apply to the materials.")),
+                    MainTintChoice, false, false, false, GUILayout.Width(54)));
+                var apply = EditorGUILayout.GetControlRect(false, 26f, GUILayout.MinWidth(0f));
+                if (DrawRecolourButton(apply, SelectGlyph.Tint, new GUIContent(Loc.T("Apply material tint"),
+                        Loc.T("Sets the Main Color of every included material to this colour, so the grey texture shows in it. Reset puts it back, Ctrl+Z undoes.")), scene))
+                    TintMainColour(MainTintChoice);
+                if (scene) StudioGUI.Track("scene.applyMaterialTint", apply);
+            }
+        }
+
+        static GUIStyle _recolourActionStyle;
+
+        static bool DrawRecolourAction(GUIContent label, float height = 22f)
+        {
+            _recolourActionStyle ??= new GUIStyle(GUI.skin.button) { wordWrap = true, fixedHeight = 0f };
+            return GUILayout.Button(label, _recolourActionStyle, GUILayout.MinWidth(0f), GUILayout.MinHeight(height), GUILayout.ExpandWidth(true));
+        }
+
+        void DrawHueBars(float hueShift, bool labelled, Rect slider)
         {
             var r = EditorGUILayout.GetControlRect(false, 12);
-            r.xMin += EditorGUIUtility.labelWidth + 2f;
-            r.xMax -= EditorGUIUtility.fieldWidth + 5f;
+            r.xMin = slider.xMin + (labelled ? EditorGUIUtility.labelWidth + 2f : 2f);
+            r.xMax = slider.xMax - EditorGUIUtility.fieldWidth - 5f;
             if (Event.current.type != EventType.Repaint || _rcHueBar == null || r.width < 10) return;
             var top = new Rect(r.x, r.y, r.width, 5);
             var bottom = new Rect(r.x, r.y + 6, r.width, 5);
@@ -695,15 +819,15 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>
-        /// Every colour texture that's actually visible on this material, how colourful it is, and whether the recolour
-        /// includes it, so it's obvious which part of the look the sliders move (and which they can't).
-        /// </summary>
         void DrawColourSources()
         {
+            if (!_openRecolourControls) EnsureRecolourPreview();
             if (_rcSources.Count == 0) return;
-            StudioGUI.BeginGroup(Loc.T("Where the colour comes from"));
-            // Narrow panel: the Included button moves under the name instead of squeezing it.
+            if (!StudioGUI.BeginFoldGroup(ref _openColourSources, Loc.T("Where the colour comes from")))
+            {
+                StudioGUI.EndGroup();
+                return;
+            }
             bool stack = _panelContentWidth < 300f;
             foreach (var src in _rcSources.OrderByDescending(x => x.colourful))
             {
@@ -734,7 +858,6 @@ namespace Avistry.Textures
             StudioGUI.EndGroup();
         }
 
-        /// <summary>"Main colour · texture  (tone)" for a row of the given width. Only the texture name is shortened (with …); the slot name and the tone stay.</summary>
         static string SourceRowText(string label, string tone, float width)
         {
             int dot = label.IndexOf(" · ", System.StringComparison.Ordinal);
@@ -742,7 +865,7 @@ namespace Avistry.Textures
             string head = label.Substring(0, dot + 3), name = label.Substring(dot + 3), tail = $"  ({tone})";
             float room = width - StudioGUI.RowLabel.CalcSize(new GUIContent(head + tail)).x - 4f;
             if (room >= 40f) return head + StudioGUI.Ellipsize(name, StudioGUI.RowLabel, room) + tail;
-            room = width - StudioGUI.RowLabel.CalcSize(new GUIContent(head)).x - 4f; // too tight for the tone: drop it
+            room = width - StudioGUI.RowLabel.CalcSize(new GUIContent(head)).x - 4f;
             return head + StudioGUI.Ellipsize(name, StudioGUI.RowLabel, Mathf.Max(room, 16f));
         }
 
@@ -768,8 +891,12 @@ namespace Avistry.Textures
 
         void DrawRecolourFollow()
         {
-            if (ByPart) return; // By part changes the texture only (tints would change everywhere)
-            StudioGUI.BeginGroup(Loc.T("Also shift"));
+            if (ByPart) return;
+            if (!StudioGUI.BeginFoldGroup(ref _openRecolourFollow, Loc.T("Also shift")))
+            {
+                StudioGUI.EndGroup();
+                return;
+            }
             EditorGUI.BeginChangeCheck();
             bool main = EditorGUILayout.ToggleLeft(new GUIContent(Loc.T("Main texture"), Loc.T("Through the shader's colour adjustment (no new PNG)")), _rc.main);
             bool shadows = EditorGUILayout.ToggleLeft(new GUIContent(Loc.T("Shadow colours")), _rc.shadows);
@@ -791,7 +918,6 @@ namespace Avistry.Textures
             StudioGUI.EndGroup();
         }
 
-        /// <summary>Colour space the current material's hue shift uses (preview and "Shift" match it).</summary>
         bool PreviewOklab
         {
             get
@@ -802,10 +928,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>
-        /// Things the Poiyomi docs warn about that change what a recolour does: Hue Select mode, animated hue,
-        /// the old HSV colour space, colours driven by Global Themes or AudioLink.
-        /// </summary>
         void DrawPoiyomiColourNotes()
         {
             var m = _material;
@@ -852,7 +974,7 @@ namespace Avistry.Textures
             if (i >= 0)
             {
                 bool unlocked = _rcEntries[i].unlockedByUs;
-                _rcEntries[i] = Recolour.Capture(m); // new starting point: OKLab
+                _rcEntries[i] = Recolour.Capture(m);
                 _rcEntries[i].unlockedByUs = unlocked;
                 Recolour.Apply(_rcEntries[i], _rc, PartialMaskFor(_rcEntries[i]));
             }
@@ -882,33 +1004,28 @@ namespace Avistry.Textures
 
         Texture CurrentMainTexture => _material != null && _material.HasProperty("_MainTex") ? _material.GetTexture("_MainTex") : null;
 
-        /// <summary>The mask for this material in partial mode, or null (whole mode, not eligible, or it would change the look outside).</summary>
         Texture PartialMaskFor(RecolourEntry e)
         {
             if (!_rc.partial || _rcMask == null || e?.material == null) return null;
             var main = CurrentMainTexture;
-            // The mask is made from this mesh's UV islands: only materials showing the same main texture share that layout.
             if (main == null || !e.material.HasProperty("_MainTex") || e.material.GetTexture("_MainTex") != main) return null;
             return Recolour.PartialBlocker(e) == null ? _rcMask : null;
         }
 
-        /// <summary>(Re)builds the mask PNG when the selection changed. Runs on Layout so the GUI never changes mid-frame.</summary>
         void EnsurePartialMask()
         {
-            if (!_rc.partial || Event.current.type != EventType.Layout || _uv == null || _selection.Count == 0) return;
+            if (!_rc.partial || Event.current.type != EventType.Layout || _uv == null) return;
+            var pieces = _highlightedColourPart?.islands ?? _selection;
+            if (pieces.Count == 0) return;
             var main = CurrentMainTexture;
-            string key = RecolourMask.Key(main, _selection);
+            string key = RecolourMask.Key(main, pieces);
             if (key == _rcMaskKey && _rcMask != null) return;
-            _rcMask = RecolourMask.Write(main, _uv, _selection);
+            _rcMask = RecolourMask.Write(main, _uv, pieces);
             _rcMaskKey = key;
             _rcThumbKey = null;
             ApplyRecolour();
         }
 
-        /// <summary>
-        /// Neutralises a material's whole-texture colour adjustment (Poiyomi Color Adjust values / lilToon HSVG and gradation)
-        /// so partial recolour can be used on it, then takes that as the new starting point.
-        /// </summary>
         void ClearExistingAdjustment(RecolourEntry e)
         {
             var m = e.material;
@@ -938,7 +1055,6 @@ namespace Avistry.Textures
             Toast(Loc.F("Cleared {0}'s whole-texture colour adjustment. Ctrl+Z brings it back.", m.name), MessageType.Info, 4f);
         }
 
-        /// <summary>The "after" thumbnail: shifted everywhere, or only inside the selected islands in partial mode.</summary>
         Color[] PreviewAfterPixels()
         {
             if (ByPart) return PartsAfterPixels();

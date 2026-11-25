@@ -1,4 +1,3 @@
-// Avistry: colour-space conversions and final output.
 Shader "Hidden/Avistry/Util"
 {
     Properties
@@ -13,7 +12,6 @@ Shader "Hidden/Avistry/Util"
     float _Convert;
     float _Dither;
 
-    // Exact sRGB transfer functions (UnityCG's versions are approximations).
     float3 SRGBToLinear(float3 c)
     {
         c = saturate(c);
@@ -38,7 +36,6 @@ Shader "Hidden/Avistry/Util"
     {
         Cull Off ZWrite Off ZTest Always
 
-        // 0: imported (hardware-decoded) texture -> raw values. _Convert = 1 re-encodes to sRGB.
         Pass
         {
             CGPROGRAM
@@ -53,8 +50,6 @@ Shader "Hidden/Avistry/Util"
             ENDCG
         }
 
-        // 1: raw values -> preview render texture. _Convert = 1 decodes sRGB so an sRGB RT re-encodes it,
-        //    making the RT sample exactly like the original imported sRGB texture.
         Pass
         {
             CGPROGRAM
@@ -70,7 +65,6 @@ Shader "Hidden/Avistry/Util"
             ENDCG
         }
 
-        // 2: final 8-bit output with optional dither (avoids banding in smooth gradients).
         Pass
         {
             CGPROGRAM
@@ -86,8 +80,6 @@ Shader "Hidden/Avistry/Util"
             ENDCG
         }
 
-        // 3: layer-mask overlay for the canvas: hidden areas in translucent red (like a quick mask).
-        //    _MainTex = mask strokes (alpha = coverage); _Convert = 1 when the mask started hidden (coverage reveals).
         Pass
         {
             CGPROGRAM
@@ -102,9 +94,6 @@ Shader "Hidden/Avistry/Util"
             ENDCG
         }
 
-        // 4: eyedropper. Averages the (2r+1)^2 texels around _Pick.xy (UV of a texel centre), r = _Pick.z (max 12).
-        //    _Pick.w = 1 weights by alpha (straight-alpha paint layers: transparent pixels don't count).
-        //    Rendered into a 1x1 target; sampling by UV avoids per-API differences in ReadPixels origins.
         Pass
         {
             CGPROGRAM
@@ -125,6 +114,59 @@ Shader "Hidden/Avistry/Util"
                 }
                 return float4(wsum > 1e-5 ? rgb / wsum : 0, asum / max(n, 1));
             }
+            ENDCG
+        }
+
+        Pass
+        {
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            float4x4 _SceneWorldToLocal;
+            struct input { float4 uv : POSITION; float3 world : TEXCOORD0; };
+            struct positionSample { float4 clip : SV_POSITION; float3 local : TEXCOORD0; };
+            positionSample vert(input v)
+            {
+                positionSample o;
+                o.clip = UnityObjectToClipPos(float4(v.uv.xy, 0, 1));
+                o.local = mul(_SceneWorldToLocal, float4(v.world, 1)).xyz;
+                return o;
+            }
+            float4 frag(positionSample i) : SV_Target { return float4(i.local, 1); }
+            ENDCG
+        }
+
+        Pass
+        {
+            CGPROGRAM
+            #pragma target 3.0
+            #pragma vertex vert_img
+            #pragma fragment frag
+            float4 frag(v2f_img i) : SV_Target
+            {
+                float4 p = tex2D(_MainTex, i.uv);
+                if (p.a < 0.5)
+                {
+                    [unroll]
+                    for (int y = -1; y <= 1; y++)
+                    [unroll]
+                    for (int x = -1; x <= 1; x++)
+                    {
+                        float4 n = tex2Dlod(_MainTex, float4(i.uv + float2(x, y) * _MainTex_TexelSize.xy, 0, 0));
+                        if (p.a < 0.5 && n.a > 0.5) p = n;
+                    }
+                }
+                return p;
+            }
+            ENDCG
+        }
+
+        Pass
+        {
+            CGPROGRAM
+            #pragma vertex vert_img
+            #pragma fragment frag
+            float4 frag(v2f_img i) : SV_Target { return tex2D(_MainTex, i.uv).aaaa; }
             ENDCG
         }
     }

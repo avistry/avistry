@@ -3,7 +3,6 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>Renders a sample S-shaped stroke with the current brush for the panel (re-rendered only when the brush changes).</summary>
     sealed class BrushPreview : IDisposable
     {
         BrushRenderer _renderer;
@@ -11,11 +10,12 @@ namespace Avistry.Textures
         long _key = long.MinValue;
         bool _hasKey;
 
-        public Texture Get(BrushSettings b, int w, int h)
+        public Texture Get(BrushSettings b, int w, int h, float strength = 1f)
         {
             w = Mathf.Max(16, w);
             h = Mathf.Max(8, h);
-            long key = Hash(b, w, h);
+            strength = Mathf.Clamp01(strength);
+            long key = Hash(b, w, h, strength);
             if (_rt != null && _rt.IsCreated() && _hasKey && key == _key) return _rt;
             _key = key;
             _hasKey = true;
@@ -27,14 +27,14 @@ namespace Avistry.Textures
                     { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Bilinear };
                 _rt.Create();
             }
-            if (_renderer == null) _renderer = new BrushRenderer();
+            if (_renderer == null) _renderer = new BrushRenderer { PreviewStamp = true };
 
-            // Show the brush at a readable size: big brushes are scaled down to fit the strip.
             float diameter = Mathf.Clamp(b.size, 3f, h * 0.55f);
             float scale = diameter / Mathf.Max(1f, b.size);
             var s = b.NewStroke(1);
             s.mode = BrushMode.Paint;
             s.radius = diameter * 0.5f / w;
+            s.fixedDotRadius *= scale / w;
             s.seed = 12345;
             s.clip = false;
             const int n = 64;
@@ -48,25 +48,34 @@ namespace Avistry.Textures
             }
 
             var prev = RenderTexture.active;
+            var coverage = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
             try
             {
                 float grainPx = Mathf.Max(0.5f, (s.shape?.grainSize ?? 6f) * scale);
-                _renderer.RenderCoverage(s, _rt, w / grainPx);
+                _renderer.RenderCoverage(s, coverage, w / grainPx);
+                _renderer.Material.SetFloat("_PreviewStrength", strength);
+                Graphics.Blit(coverage, _rt, _renderer.Material, 9);
             }
-            finally { RenderTexture.active = prev; }
+            finally
+            {
+                RenderTexture.active = prev;
+                RenderTexture.ReleaseTemporary(coverage);
+            }
             return _rt;
         }
 
-        // Every field that reaches the rendered stroke (BrushSettings.NewStroke + BrushShape).
-        static long Hash(BrushSettings b, int w, int h)
+        static long Hash(BrushSettings b, int w, int h, float strength)
         {
             unchecked
             {
                 ulong x = 1469598103934665603UL;
                 void Add(float v) { x = (x ^ (uint)BitConverter.SingleToInt32Bits(v)) * 1099511628211UL; }
                 Add(w); Add(h);
-                Add(b.size); Add(b.opacity); Add((int)b.mode);
+                Add(b.size); Add(strength); Add((int)b.mode);
                 Add(b.pressureSize ? 1 : 0); Add(b.pressureOpacity ? 1 : 0);
+                Add(b.pen?.sensitivity ?? 1f); Add(b.pen?.minimumSize ?? .15f); Add(b.pen?.minimumStrength ?? 0f);
+                Add(b.pen?.lightPressureTrim ?? 0); Add(b.pen?.firmPressureTrim ?? 0);
+                Add((int)(b.pen?.direction ?? BrushPenDirection.Brush));
                 Add(b.fillTool ? 1 : 0); Add(b.blendTool ? 1 : 0); Add((int)b.blendKind);
                 Add(b.colorMixing ? 1 : 0); Add(b.amountOfPaint); Add(b.colorStretch); Add(b.blendAmount);
                 Add(b.blendKeepIsland ? 1 : 0); Add(b.stayInsideIslands ? 1 : 0);
@@ -74,8 +83,11 @@ namespace Avistry.Textures
                 var sh = b.shape;
                 if (sh == null) { Add(-1); return (long)x; }
                 Add((int)sh.tip); Add(sh.hardness); Add(sh.spacing); Add(sh.buildUp ? 1 : 0); Add(sh.flow);
+                Add(sh.alphaVersion); Add(sh.angleJitter); Add(sh.jitterVersion); Add(sh.alphaId?.Length ?? -1);
+                if (sh.alphaId != null) foreach (char character in sh.alphaId) Add(character);
                 Add(sh.roundness); Add(sh.angle); Add(sh.followStroke ? 1 : 0); Add(sh.grain); Add(sh.grainSize);
-                Add(sh.scatter); Add(sh.sizeJitter); Add(sh.opacityJitter); Add(sh.density);
+                Add(sh.scatter); Add(sh.sizeJitter); Add(sh.opacityJitter); Add(sh.density); Add(sh.dotSize);
+                if (sh.tip == BrushTip.Bristle) Add((int)sh.bristleLoad);
                 Add(sh.colorJitter ? 1 : 0); Add(sh.jitterHue); Add(sh.jitterSaturation); Add(sh.jitterLuminosity); Add(sh.jitterSubBlend);
                 if (sh.colorJitter) { Add(b.subColor.r); Add(b.subColor.g); Add(b.subColor.b); }
                 return (long)x;

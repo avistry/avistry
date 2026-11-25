@@ -1,272 +1,258 @@
-/* glossary.html and skills.html: both render from data/glossary.<lang>.json, a copy of
-   Editor/Glossary, one file per language the tool has. */
 (function () {
   'use strict';
+  const find = selector => document.querySelector(selector);
+  const t = key => window.ATS.t(key);
+  const cache = new Map();
+  const skills = find('#sk-root');
+  const glossary = find('#gl-list');
+  const routes = find('#workshop-routes');
+  const search = find('#sk-search') || find('#gl-search');
+  const topic = find('#gl-topic');
+  let model, chapter = 1, order = 'az', generation = 0;
 
-  var $ = function (s, r) { return (r || document).querySelector(s); };
-  function T(key, fb) { var v = window.ATS && window.ATS.t(key); return v != null ? v : (fb != null ? fb : key); }
-  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
-
-  /* languages that have a data file; the others show English without a failing request */
-  var HAS_DATA = ['en', 'ja', 'ko', 'zh-CN'];
-  var cache = {};
-  var model = null;          /* { entries, tiers, byId } for the shown language */
-  var order = 'az';
-
-  function load(lang) {
-    if (cache[lang]) return Promise.resolve(cache[lang]);
-    if (HAS_DATA.indexOf(lang) < 0) return Promise.reject(new Error(lang));
-    return fetch('data/glossary.' + lang + '.json').then(function (r) {
-      if (!r.ok) throw new Error(lang);
-      return r.json();
-    }).then(function (d) { cache[lang] = d; return d; });
+  function element(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
   }
-
-  function get() {
-    var lang = window.ATS.lang();
-    return load(lang).catch(function () { return load('en'); }).then(function (d) {
-      var m = { entries: d.entries, tiers: d.tiers, byId: {}, lang: d.language };
-      d.entries.forEach(function (e) { m.byId[e.id] = e; });
-      var note = $('#gl-note');
-      if (note) note.hidden = d.language === lang;
-      return m;
-    });
+  function link(text, href, cls) {
+    const node = element('a', cls, text);
+    node.href = href;
+    return node;
   }
-
-  function tierOf(m, n) { return m.tiers.filter(function (t) { return t.n === n; })[0]; }
-
-  /* ---------- glossary ---------- */
-  var FIELDS = [['what', 'gl.f.what'], ['when', 'gl.f.when'], ['example', 'gl.f.example'], ['tryIt', 'gl.f.try'], ['watchOut', 'gl.f.watch'], ['whereInUnity', 'gl.f.where']];
-
-  function termNode(e, m) {
-    var d = el('details', 'term'); d.id = e.id; d.setAttribute('data-id', e.id);
-    d._blob = [e.title, e.tip, e.definition, e.alsoCalled.join(' '), e.aliases.join(' ')].join(' ').toLowerCase();
-    var s = el('summary');
-    var left = el('span', 't-main');
-    left.appendChild(el('span', 't-name', e.title));
-    left.appendChild(el('span', 't-tip', e.tip));
-    s.appendChild(left);
-    var tier = tierOf(m, e.tier);
-    s.appendChild(el('span', 't-tier', T('gl.tier') + ' ' + e.tier + (tier ? ': ' + tier.name : '')));
-    d.appendChild(s);
-    var b = el('div', 't-body');
-    b.appendChild(el('p', 't-def', e.definition));
-    var dl = el('dl', 't-dl');
-    FIELDS.forEach(function (f) {
-      if (!e[f[0]]) return;
-      dl.appendChild(el('dt', null, T(f[1])));
-      dl.appendChild(el('dd', null, e[f[0]]));
-    });
-    b.appendChild(dl);
-    if (e.alsoCalled.length) b.appendChild(el('p', 't-also', T('gl.also') + ' ' + e.alsoCalled.join(', ')));
-    if (e.related.length) {
-      var p = el('p', 't-rel', T('gl.related') + ' ');
-      e.related.forEach(function (id, i) {
-        var r = m.byId[id]; if (!r) return;
-        if (i) p.appendChild(document.createTextNode(', '));
-        var a = el('a', null, r.title); a.href = '#' + id;
-        a.addEventListener('click', function () { setTimeout(openHash, 0); });
-        p.appendChild(a);
-      });
-      b.appendChild(p);
+  function localPage(page, hash) {
+    const url = new URL(location.href);
+    if (page) url.pathname = url.pathname.replace(/[^/]*$/, page);
+    url.hash = hash || '';
+    return url.pathname + url.search + url.hash;
+  }
+  async function load(lang) {
+    if (cache.has(lang)) return cache.get(lang);
+    const response = await fetch('data/glossary.' + encodeURIComponent(lang) + '.json?v=030-workshop-1');
+    if (!response.ok) throw new Error('catalog unavailable');
+    const data = await response.json();
+    const byId = new Map(data.entries.map(e => [e.id, e]));
+    const tiers = new Map(data.tiers.map(tier => [tier.n, tier]));
+    const haystacks = new Map(data.entries.map(e => [e.id,
+      [e.id.replace(/-/g, ' '), e.title, e.tip, e.definition, ...(e.aliases || []), ...(e.alsoCalled || [])]
+        .join(' ').normalize('NFKC').toLocaleLowerCase(lang)]));
+    const catalog = { entries: data.entries, tiers, byId, haystacks, lang };
+    cache.set(lang, catalog);
+    return catalog;
+  }
+  function matches(entry, query) {
+    return query.every(word => model.haystacks.get(entry.id).includes(word));
+  }
+  function words() {
+    return search.value.normalize('NFKC').trim().toLocaleLowerCase(model.lang).split(/\s+/).filter(Boolean);
+  }
+  function field(parent, key, value) {
+    if (!value) return;
+    parent.append(element('dt', '', t(key)), element('dd', '', value));
+  }
+  function related(parent, key, ids, isSkill) {
+    const group = element('div', 'lesson-related');
+    for (const id of ids || []) {
+      const other = model.byId.get(id);
+      if (other) group.append(link(other.title, localPage('', (isSkill ? 'sk-' : '') + id)));
     }
-    d.appendChild(b);
-    return d;
-  }
-
-  function renderGlossary(m) {
-    var list = $('#gl-list');
-    var keep = $('noscript', list);
-    list.textContent = '';
-    if (keep) list.appendChild(keep);
-    var q = ($('#gl-search').value || '').trim().toLowerCase();
-    var entries = m.entries.slice();
-    var groups = [];
-    if (order === 'az') {
-      entries.sort(function (a, b) { return a.title.localeCompare(b.title, m.lang); });
-      var cur = null;
-      entries.forEach(function (e) {
-        var L = e.title.charAt(0).toUpperCase();
-        if (!cur || cur.key !== L) { cur = { key: L, label: L, items: [] }; groups.push(cur); }
-        cur.items.push(e);
-      });
-    } else {
-      m.tiers.forEach(function (t) {
-        groups.push({ key: 't' + t.n, label: t.n + '. ' + t.name, sub: t.blurb, items: entries.filter(function (e) { return e.tier === t.n; }) });
-      });
-    }
-    var shown = 0;
-    groups.forEach(function (g) {
-      var sec = el('section', 'gl-group');
-      var h = el('h2', 'gl-head', g.label); sec.appendChild(h);
-      if (g.sub) sec.appendChild(el('p', 'gl-sub', g.sub));
-      var any = 0;
-      g.items.forEach(function (e) {
-        var n = termNode(e, m);
-        var hit = !q || n._blob.indexOf(q) !== -1;
-        n.hidden = !hit;
-        if (hit) { any++; shown++; }
-        sec.appendChild(n);
-      });
-      sec.hidden = !any;
-      list.appendChild(sec);
-    });
-    $('#gl-count').textContent = window.ATS.fmt(T('gl.count'), { n: shown, total: m.entries.length });
-    $('#gl-empty').hidden = shown > 0;
-    openHash();
-  }
-
-  function openHash() {
-    var id = decodeURIComponent((location.hash || '').slice(1));
-    if (!id) return;
-    var t = document.getElementById(id);
-    if (t && t.classList.contains('term')) {
-      if (t.hidden) { $('#gl-search').value = ''; if (model) renderGlossary(model); t = document.getElementById(id); }
-      t.open = true;
-      t.scrollIntoView({ block: 'start' });
+    if (group.childNodes.length) {
+      group.prepend(element('strong', '', t(key)));
+      parent.append(group);
     }
   }
-
-  function initGlossary() {
-    var input = $('#gl-search');
-    function again() { get().then(function (m) { model = m; renderGlossary(m); }); }
-    input.addEventListener('input', function () { if (model) renderGlossary(model); });
-    $('#gl-az').addEventListener('click', function () { order = 'az'; $('#gl-az').setAttribute('aria-pressed', 'true'); $('#gl-tier').setAttribute('aria-pressed', 'false'); if (model) renderGlossary(model); });
-    $('#gl-tier').addEventListener('click', function () { order = 'tier'; $('#gl-az').setAttribute('aria-pressed', 'false'); $('#gl-tier').setAttribute('aria-pressed', 'true'); if (model) renderGlossary(model); });
-    window.addEventListener('hashchange', openHash);
-    document.addEventListener('ats:lang', again);
-  }
-
-  /* ---------- skill tree ---------- */
-  function renderSkills(m) {
-    var root = $('#sk-root');
-    var keep = $('noscript', root);
-    root.textContent = '';
-    if (keep) root.appendChild(keep);
-    m.tiers.forEach(function (t) {
-      var sec = el('section', 'sk-tier'); sec.setAttribute('aria-labelledby', 'tier-' + t.n);
-      var head = el('div', 'sk-head');
-      head.appendChild(el('span', 'sk-num', String(t.n)));
-      var txt = el('div', 'sk-headtext');
-      var h = el('h2', 'sk-name', t.name); h.id = 'tier-' + t.n;
-      txt.appendChild(h);
-      txt.appendChild(el('p', 'sk-blurb', t.blurb));
-      txt.appendChild(el('p', 'sk-medal', t.achievement));
-      head.appendChild(txt);
-      sec.appendChild(head);
-      var ul = el('ul', 'sk-cards'); ul.setAttribute('role', 'list');
-      m.entries.filter(function (e) { return e.tier === t.n; }).forEach(function (e) {
-        var li = el('li', 'sk-card'); li.id = 'sk-' + e.id;
-        var top = el('div', 'sk-top');
-        top.appendChild(el('h3', 'h3', e.title));
-        top.appendChild(el('span', 'sk-lv', T('sk.lv.' + e.level)));
-        if (e.bonus) top.appendChild(el('span', 'sk-bonus', T('sk.bonus')));
-        li.appendChild(top);
-        li.appendChild(el('p', 'sk-tip', e.tip));
-        if (e.requires.length) {
-          var after = el('p', 'sk-after', T('sk.after') + ' ');
-          e.requires.forEach(function (id, i) {
-            var r = m.byId[id]; if (!r) return;
-            if (i) after.appendChild(document.createTextNode(', '));
-            var a = el('a', null, r.title); a.href = '#sk-' + id; after.appendChild(a);
-          });
-          li.appendChild(after);
-        }
-        if (e.tryIt) { var tp = el('p', 'sk-try'); tp.appendChild(el('strong', null, T('gl.f.try') + ': ')); tp.appendChild(document.createTextNode(e.tryIt)); li.appendChild(tp); }
-        var more = el('a', 'sk-more', T('sk.more')); more.href = 'glossary.html#' + e.id;
-        li.appendChild(more);
-        ul.appendChild(li);
-      });
-      sec.appendChild(ul);
-      root.appendChild(sec);
-    });
-    var grad = el('section', 'sk-tier sk-grad');
-    grad.appendChild(el('p', 'sk-medal sk-medal--big', T('sk.graduate')));
-    grad.appendChild(el('p', 'sk-blurb', T('sk.graduate.body')));
-    root.appendChild(grad);
-    /* the tiers only exist now, so a link like skills.html#tier-4 has to be followed here */
-    if (!scrolled) { scrolled = true; goTier(); }
-  }
-  var scrolled = false;
-  function goTier() {
-    var t = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
-    if (t && $('#sk-root').contains(t)) t.scrollIntoView({ block: 'start' });
-  }
-
-  /* ---------- learn page: the six tiers as one path ---------- */
-  function renderPath(m) {
-    var root = $('#lr-path');
-    root.textContent = '';
-    m.tiers.forEach(function (t) {
-      var count = m.entries.filter(function (e) { return e.tier === t.n; }).length;
-      var li = el('li', 'lr-stop');
-      var a = el('a', 'lr-link'); a.href = 'skills.html#tier-' + t.n;
-      a.appendChild(el('span', 'sk-num lr-num', String(t.n)));
-      var txt = el('span', 'lr-text');
-      txt.appendChild(el('span', 'lr-name', t.name));
-      txt.appendChild(el('span', 'lr-blurb', t.blurb));
-      var meta = el('span', 'lr-meta');
-      meta.appendChild(el('span', 'lr-count', T('lr.count', '{n} skills').replace('{n}', count)));
-      meta.appendChild(el('span', 'sk-medal lr-medal', t.achievement));
-      txt.appendChild(meta);
-      a.appendChild(txt);
-      li.appendChild(a);
-      root.appendChild(li);
-    });
-    trackPath();
-  }
-
-  /* the path lights up as it scrolls by: the tier that has reached the middle of the screen is the current one, the
-     line fills down to it, and the badge on the screenshot counts along */
-  var pathUpdate = null;
-  function trackPath() {
-    if (pathUpdate) { pathUpdate(); return; }
-    var root = $('#lr-path'), shot = $('.lr-shot'), badge = null, raf = 0;
-    if (!root) return;
-    root.classList.add('is-live');
-    if (shot) {
-      badge = el('div', 'lr-tier-badge');
-      badge.setAttribute('aria-hidden', 'true');
-      badge.appendChild(el('span', 'lr-tb-word'));
-      badge.appendChild(el('b', null, '1'));
-      badge.appendChild(el('span', 'lr-tb-of', '/ 6'));
-      shot.appendChild(badge);
-    }
-    pathUpdate = function () {
-      raf = 0;
-      var stops = root.querySelectorAll('.lr-stop');
-      if (!stops.length) return;
-      var mid = window.innerHeight * 0.55, on = -1;
-      stops.forEach(function (s, i) { if (s.getBoundingClientRect().top < mid) on = i; });
-      stops.forEach(function (s, i) { s.classList.toggle('is-on', i <= on); s.classList.toggle('is-now', i === on); });
-      /* the line runs from the first number's centre to the current one's, never past it */
-      function centre(s) { var n = s.querySelector('.lr-num') || s, r = n.getBoundingClientRect(); return r.top + r.height / 2; }
-      var top0 = root.getBoundingClientRect().top, a = centre(stops[0]);
-      root.style.setProperty('--line-top', Math.round(a - top0) + 'px');
-      root.style.setProperty('--fill-h', on < 0 ? '0px' : Math.round(centre(stops[on]) - a) + 'px');
-      if (badge) {
-        var n = String(Math.max(1, on + 1)), bn = $('b', badge);
-        $('.lr-tb-word', badge).textContent = T('lr.tier', 'Tier');
-        if (bn.textContent !== n) { bn.textContent = n; badge.classList.remove('is-tick'); void badge.offsetWidth; badge.classList.add('is-tick'); }
+  function manual(parent, entry) {
+    if (!entry.docsUrl) return;
+    try {
+      const url = new URL(entry.docsUrl);
+      if (url.protocol === 'https:' && !url.username && !url.password) {
+        parent.append(link(t('lr.manual'), url.href, 'lesson-manual'));
       }
-    };
-    function soon() { if (!raf) raf = requestAnimationFrame(pathUpdate); }
-    window.addEventListener('scroll', soon, { passive: true });
-    window.addEventListener('resize', soon);
-    pathUpdate();
+    } catch {  }
+  }
+  function entryCard(entry, isSkill, expanded) {
+    const card = element('details', 'term lesson-card');
+    card.id = (isSkill ? 'sk-' : '') + entry.id;
+    const summary = element('summary');
+    const label = element('span', 't-main');
+    label.append(element('span', 't-name', entry.title), element('span', 't-tip', entry.tip));
+    const tag = isSkill ? t(entry.bonus ? 'sk.bonus' : 'sk.lv.' + entry.level) : model.tiers.get(entry.tier).name;
+    summary.append(label, element('span', 't-tier', tag));
+    card.append(summary);
+
+    function addBody() {
+      if (card.children.length > 1) return;
+      const body = element('div', 't-body');
+      if (entry.definition) body.append(element('p', 't-def', entry.definition));
+      const fields = element('dl', 't-dl');
+      if (isSkill) {
+        field(fields, 'gl.f.example', entry.example);
+        field(fields, 'gl.f.try', entry.tryIt);
+        field(fields, 'gl.f.where', entry.whereInUnity);
+        field(fields, 'gl.f.watch', entry.watchOut);
+      } else {
+        for (const [name, key] of [['what','what'], ['when','when'], ['example','example'], ['tryIt','try'], ['watchOut','watch'], ['whereInUnity','where']]) {
+          field(fields, 'gl.f.' + key, entry[name]);
+        }
+        if (entry.alsoCalled?.length) field(fields, 'gl.also', entry.alsoCalled.join(', '));
+      }
+      body.append(fields);
+      related(body, isSkill ? 'sk.after' : 'gl.related', isSkill ? entry.requires : entry.related, isSkill);
+      const actions = element('div', 'lesson-actions');
+      actions.append(link(t(isSkill ? 'sk.more' : 'lr.practice'), localPage(isSkill ? 'glossary.html' : 'skills.html', (isSkill ? '' : 'sk-') + entry.id)));
+      manual(actions, entry);
+      body.append(actions);
+      card.append(body);
+    }
+    card.addEventListener('toggle', () => { if (card.open) addBody(); });
+    if (expanded) { addBody(); card.open = true; }
+    return card;
   }
 
-  function initSkills() {
-    function again() { get().then(renderSkills); }
-    document.addEventListener('ats:lang', again);
-    window.addEventListener('hashchange', goTier);
+  function renderSkills(openId) {
+    const q = words();
+    const current = model.tiers.get(chapter) || model.tiers.values().next().value;
+    const found = model.entries.filter(e => q.length ? matches(e, q) : e.tier === current.n);
+    for (const anchor of find('#sk-nav').children) {
+      if (!q.length && Number(anchor.dataset.chapter) === current.n) anchor.setAttribute('aria-current', 'true');
+      else anchor.removeAttribute('aria-current');
+    }
+    const header = element('header', 'lesson-chapter');
+    const h2 = element('h2', 'h-display', q.length ? t('sk.results') : current.name);
+    if (!q.length) h2.id = 'tier-' + current.n;
+    header.append(h2, element('p', '', q.length ? t('lr.count').replace('{n}', found.length) : current.blurb));
+    const cards = found.map(entry => entryCard(entry, true, entry.id === openId));
+    if (!cards.length) cards.push(element('p', 'pg-empty', t('gl.empty')));
+    skills.replaceChildren(header, ...cards);
+    if (!q.length && current.achievement) {
+      const footer = element('div', 'lesson-milestone');
+      footer.append(element('span', 'sk-medal', current.achievement));
+      const next = model.tiers.get(current.n + 1);
+      if (next) footer.append(link(next.name + ' →', localPage('', 'tier-' + next.n)));
+      skills.append(footer);
+    }
+    find('#sk-status').textContent = t('lr.count').replace('{n}', found.length);
+  }
+  function renderGlossary(openId) {
+    const q = words();
+    const found = model.entries.filter(e => (!topic.value || e.tier === Number(topic.value)) && matches(e, q));
+    const collate = new Intl.Collator(model.lang);
+    found.sort((a, b) => (order === 'tier' ? a.tier - b.tier : 0) || collate.compare(a.title,b.title));
+    const groups = new Map();
+    for (const entry of found) {
+      const title = order === 'tier' ? model.tiers.get(entry.tier).name : Array.from(entry.title)[0].toLocaleUpperCase(model.lang);
+      if (!groups.has(title)) {
+        const group = element('section', 'gl-group');
+        group.append(element('h2', 'gl-head', title));
+        groups.set(title, group);
+      }
+      groups.get(title).append(entryCard(entry, false, entry.id === openId));
+    }
+    glossary.replaceChildren(...groups.values());
+    find('#gl-count').textContent = window.ATS.fmt(t('gl.count'), { n: found.length, total: model.entries.length });
+    find('#gl-empty').hidden = !!found.length;
+  }
+  function navigate(scroll) {
+    if (!model || !search) return;
+    const hash = location.hash.slice(1);
+    const entry = model.byId.get(skills ? hash.replace(/^sk-/, '') : hash);
+    const tier = skills && /^tier-(\d+)$/.exec(hash);
+    if (entry || tier) {
+      search.value = '';
+      if (topic) topic.value = '';
+      chapter = entry ? entry.tier : Number(tier[1]);
+    } else if (skills && (!hash || hash === 'lessons')) {
+      chapter = 1;
+    }
+    if (skills) renderSkills(entry?.id);
+    else renderGlossary(entry?.id);
+    if (scroll && (entry || tier)) document.getElementById(hash)?.scrollIntoView({ block: 'start' });
   }
 
-  function boot() {
-    if (!window.ATS) return;
-    if ($('#gl-list')) initGlossary();
-    if ($('#sk-root')) initSkills();
-    if ($('#lr-path')) document.addEventListener('ats:lang', function () { get().then(renderPath); });
+  const pathways = [
+    ['paint','media/v4/studio/surface-print-texture.webp',['island','selection-preview','pen-pressure','scene-gradient','edit-draft']],
+    ['finish','media/v4/studio/normal-detail-after.webp',['blend-stack','normal-map','material-copy','poiyomi','liltoon']],
+    ['upload','media/v4/hero-crimson-saved-16x9-1280.webp',['creator-companion','avatar-descriptor','vrcfury-toggle','build-and-test','vrchat-upload']]
+  ];
+  function renderRoutes() {
+    const cards = pathways.map(([key, src, ids]) => {
+      const card = element('article', 'workshop-route route-' + key);
+      const img = element('img');
+      img.src = src; img.alt = ''; img.loading = 'lazy';
+      card.append(img, element('h3', 'h-display', t('lr.route.' + key)));
+      const lessons = element('ol');
+      for (const id of ids) {
+        const entry = model.byId.get(id);
+        if (!entry) continue;
+        const item = element('li');
+        item.append(link(entry.title, localPage('skills.html', 'sk-' + id)));
+        lessons.append(item);
+      }
+      card.append(lessons);
+      return card;
+    });
+    routes.replaceChildren(...cards);
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+  function renderChapters() {
+    const chapters = [...model.tiers.values()];
+    if (skills) {
+      find('#sk-nav').replaceChildren(...chapters.map(item => {
+        const anchor = link(item.name, localPage('', 'tier-' + item.n));
+        anchor.dataset.chapter = item.n;
+        return anchor;
+      }));
+    }
+    if (topic) {
+      const selected = topic.value;
+      topic.replaceChildren(new Option(t('gl.any'), ''), ...chapters.map(item => new Option(item.name, item.n)));
+      topic.value = selected;
+    }
+  }
+  async function refresh() {
+    const seq = ++generation;
+    const lang = window.ATS.lang();
+    try {
+      const catalog = await load(lang).catch(() => load('en'));
+      if (seq !== generation) return;
+      model = catalog;
+      const note = find('#gl-note');
+      if (note) note.hidden = lang === model.lang;
+      if (routes) renderRoutes();
+      else { renderChapters(); navigate(true); }
+    } catch {
+      if (seq === generation) (routes || skills || glossary).replaceChildren(element('p', 'pg-note', t('lr.load.error')));
+    }
+  }
+  search?.addEventListener('input', () => { if (model) (skills ? renderSkills : renderGlossary)(); });
+  topic?.addEventListener('change', () => { if (model) renderGlossary(); });
+  for (const mode of ['az', 'tier']) {
+    find('#gl-' + mode)?.addEventListener('click', () => {
+      order = mode;
+      for (const id of ['az', 'tier']) find('#gl-' + id).setAttribute('aria-pressed', String(mode === id));
+      if (model) renderGlossary();
+    });
+  }
+  document.addEventListener('click', event => {
+    const anchor = event.target.closest('a');
+    if (!anchor || !anchor.hash || anchor.pathname !== location.pathname || anchor.hash !== location.hash || !anchor.closest('.chapter-rail, .lesson-related')) return;
+    if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) navigate(true);
+  });
+  window.addEventListener('hashchange', () => navigate(true));
+
+  const swatches = { original: 'base', texture: 'print', metal: 'metal' };
+  document.querySelectorAll('[data-study]').forEach(button => button.addEventListener('click', () => {
+    const phase = button.dataset.study;
+    find('#study-model').src = 'media/v4/studio/opening/' + phase + '.webp';
+    find('#study-map').src = 'media/v4/studio/opening/swatch-' + swatches[phase] + '.webp';
+    document.querySelectorAll('[data-study]').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
+    const info = find('#study-info');
+    info.dataset.i18n = 'lr.study.' + phase;
+    info.textContent = t(info.dataset.i18n);
+  }));
+
+  window.ATS.ready(() => {
+    refresh();
+    document.addEventListener('ats:lang', refresh);
+  });
 })();

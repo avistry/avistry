@@ -12,13 +12,13 @@
 <meta property="og:title" content="Avistry gallery: every angle, every look">
 <meta property="og:url" content="https://avistry.github.io/avistry/gallery.html">
 <meta property="og:description" content="Spin the avatar, compare close-ups with the original and see it in three kinds of light.">
-<meta property="og:image" content="https://avistry.github.io/avistry/media/og-gallery.jpg">
+<meta property="og:image" content="https://avistry.github.io/avistry/media/og-gallery.jpg?v=030-text-1">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:alt" content="One avatar in four looks: Original, Crimson, Frost and Venom.">
 <meta property="og:site_name" content="Avistry">
-<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-gallery.jpg">
+<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-gallery.jpg?v=030-text-1">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://avistry.github.io/avistry/gallery.html">
 <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
@@ -34,8 +34,6 @@
   try {
     var theme = localStorage.getItem('ats-theme');
     root.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
-    /* Performance mode by itself: on weak devices, with data saver, or after this tab crashed or ran short of memory
-       (app.js keeps ats-alive set while the page is on screen); never just for being a phone on strong hardware */
     var perf = localStorage.getItem('ats-perf'), nav = navigator, mem = nav.deviceMemory, cores = nav.hardwareConcurrency, con = nav.connection || {};
     var ss = sessionStorage, sick = ss.getItem('ats-sick') === '1' || ss.getItem('ats-alive') === '1';
     if (sick) ss.setItem('ats-sick', '1');
@@ -64,7 +62,7 @@
 })();
 </script>
 <style>html{background:#141218}html[data-theme="light"]{background:#F3F1F6}html.i18n-wait body{visibility:hidden}</style>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=030-paper-3">
 </head>
 <body class="v4 sub-page">
 
@@ -157,9 +155,11 @@
 </div>
 
 <section class="page-head" data-hero aria-labelledby="page-title">
-  <span class="stk stk-corner" data-stk="pink_again" aria-hidden="true"></span>
   <div class="wrap">
-    <h1 class="h-display" id="page-title" data-i18n="ga.title" data-emo="avistry_spin">Every angle, every look.</h1>
+    <div class="sticker-heading">
+      <h1 class="h-display" id="page-title" data-i18n="ga.title" data-emo="avistry_spin">Every angle, every look.</h1>
+      <span class="stk stk-placed" data-stk="pink_again" aria-hidden="true"></span>
+    </div>
     <p class="lead" data-i18n="ga.lead">Pick a look, then spin it, compare close-ups and see it in different light.</p>
   </div>
 </section>
@@ -179,7 +179,6 @@
   </div>
 </div>
 
-<!-- 2. SPIN -->
 <section class="sec" id="spin" aria-labelledby="spin-title">
   <div class="wrap">
     <h2 class="sr-only" id="spin-title" data-i18n="ga.spin">Spin it.</h2>
@@ -194,7 +193,6 @@
   </div>
 </section>
 
-<!-- 3. CLOSE-UPS: full width, one part at a time, the picture switching sides -->
 <section class="sec cu-band" id="closeups" aria-labelledby="closeups-title">
   <div class="wrap">
     <h2 id="closeups-title"><span data-i18n="ga.close">Close-ups.</span><i class="emo" data-emo="e_avistry_cool" aria-hidden="true"></i></h2>
@@ -326,7 +324,6 @@
   </div>
 </section>
 
-<!-- 4. WINGS IN MOTION -->
 <section class="sec" id="wings" aria-labelledby="wings-title">
   <div class="wrap">
     <h2 id="wings-title" data-i18n="ga.wings">Wings in motion.</h2>
@@ -341,7 +338,6 @@
   </div>
 </section>
 
-<!-- 5. IN ANY WORLD: one held stage, the light changes as you scroll -->
 <section class="sec lw-band surface-dark" id="light" aria-labelledby="light-title">
   <div class="lw" id="lw">
     <div class="lw-track" id="lw-track">
@@ -369,7 +365,6 @@
   </div>
 </section>
 
-<!-- 6. ONE MAKEOVER -->
 <section class="sec" id="makeover" aria-labelledby="mk-title" hidden>
   <div class="wrap">
     <h2 id="mk-title" data-i18n="mk.title">One makeover, start to finish.</h2>
@@ -423,10 +418,12 @@
   </div>
 </section>
 
-<!-- 7. HONESTY -->
 <section class="sec" id="honest" aria-labelledby="honest-title">
   <div class="wrap">
-    <h2 id="honest-title"><span data-i18n="ga.honest">How these pictures were made.</span><i class="emo" data-emo="e_avistry_happy" aria-hidden="true"></i></h2>
+    <div class="sticker-heading">
+      <h2 id="honest-title"><span data-i18n="ga.honest">How these pictures were made.</span><i class="emo" data-emo="e_avistry_happy" aria-hidden="true"></i></h2>
+      <span class="stk stk-placed" data-stk="recoloured" data-stk-pool="recoloured lgtm" aria-hidden="true"></span>
+    </div>
     <p class="note-lg" data-i18n="note.shader">Avistry saved the colours and textures. The tattoos are Avistry paint layers (ink, chrome and a bright Add layer) with a normal map made by Avistry, all saved in the texture. Glow, sparkle and the horn tint are shader values set by hand; lights, backdrop and pose are set up in Unity.</p>
     <ul class="note-list">
       <li data-i18n="ga.honest.1">The face, horns and wing cut-out over the home picture is cut from the same render. It is only there for depth.</li>
@@ -447,26 +444,31 @@
 
 <section class="sec install" id="install" aria-labelledby="install-title" data-fx>
   <div class="wrap">
-    <div class="inst-head">
-      <p class="tag" data-i18n="nav.get">Get it</p>
-      <h2 class="h-display" id="install-title" data-i18n="final.title" data-emo="avistry_party">Your avatar. Your colours.</h2>
-      <svg class="inst-stroke" viewBox="0 0 600 36" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="s3" pathLength="1" d="M6 26C120 14 230 30 340 21S520 12 594 20"/><path class="s2" pathLength="1" d="M6 22C120 10 230 26 340 17S520 8 594 16"/><path class="s1" pathLength="1" d="M6 18C120 6 230 22 340 13S520 4 594 12"/></svg>
-      <span class="inst-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-      <p class="lead" data-i18n="final.line">Free. Editor only. Your originals stay as they are.</p>
-    </div>
-    <div class="inst-quick">
-      <a class="btn btn-primary btn-lg" id="btn-vcc" href="vcc://vpm/addRepo?url=https://avistry.github.io/avistry/index.json" data-i18n="cta.vcc">Get it in VCC</a>
-      <a class="btn btn-outline btn-lg" href="download.html"><span data-i18n="dl.all">All download options</span> <svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
-    </div>
-    <p class="vcc-help" id="vcc-help" hidden data-i18n-html="dl.vcchelp">VCC did not open? The <a href="download.html">Download page</a> has the listing URL and the other ways to install.</p>
-    <p class="inst-meta"><span class="tnum" id="inst-version" hidden></span><span class="tnum js-dl-line" hidden><span class="js-dl-total"></span> <span data-i18n="dl.downloads">downloads</span> · </span><a class="js-vt" href="https://github.com/avistry/avistry/releases/latest" rel="noopener" data-i18n="trust.r1">Scanned on VirusTotal</a> <span aria-hidden="true">&middot;</span> <span data-i18n="install.meta">Unity 2022.3 · VRChat avatars</span></p>
-    <div class="share-pc" id="share-pc-box" hidden>
-      <button type="button" class="btn btn-outline btn-lg" id="share-pc" data-share-url="https://avistry.github.io/avistry/" data-i18n="share.btn">Send this link to your PC</button>
-      <p class="small" id="share-pc-note" data-i18n="share.note">Avistry runs in Unity on a PC.</p>
+    <div class="install-invite">
+      <div class="inst-head">
+        <p class="tag" data-i18n="nav.get">Get it</p>
+        <h2 class="h-display" id="install-title" data-i18n="final.title" data-emo="avistry_party">Your avatar. Your colours.</h2>
+        <svg class="inst-stroke" viewBox="0 0 600 36" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="s3" pathLength="1" d="M6 26C120 14 230 30 340 21S520 12 594 20"/><path class="s2" pathLength="1" d="M6 22C120 10 230 26 340 17S520 8 594 16"/><path class="s1" pathLength="1" d="M6 18C120 6 230 22 340 13S520 4 594 12"/></svg>
+        <span class="inst-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <p class="lead" data-i18n="final.line">Free. Editor only. Save your edits to a new texture.</p>
+      </div>
+      <div class="inst-quick">
+        <a class="btn btn-primary btn-lg" id="btn-vcc" href="vcc://vpm/addRepo?url=https://avistry.github.io/avistry/index.json" data-i18n="cta.vcc">Get it in VCC</a>
+        <a class="btn btn-outline btn-lg" href="download.html"><span data-i18n="dl.all">All download options</span> <svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
+      </div>
+      <p class="vcc-help" id="vcc-help" hidden data-i18n-html="dl.vcchelp">VCC did not open? The <a href="download.html">Download page</a> has the listing URL and the other ways to install.</p>
+      <p class="inst-meta"><span class="tnum" id="inst-version" hidden></span><span class="tnum js-dl-line" hidden><span class="js-dl-total"></span> <span data-i18n="dl.downloads">downloads</span> · </span><a class="js-vt" href="https://github.com/avistry/avistry/releases/latest" rel="noopener" data-i18n="trust.r1">Scanned on VirusTotal</a> <span aria-hidden="true">&middot;</span> <span data-i18n="install.meta">Unity 2022.3 · VRChat avatars</span></p>
+      <div class="share-pc" id="share-pc-box" hidden>
+        <button type="button" class="btn btn-outline btn-lg" id="share-pc" data-share-url="https://avistry.github.io/avistry/" data-i18n="share.btn">Send this link to your PC</button>
+        <p class="small" id="share-pc-note" data-i18n="share.note">Avistry runs in Unity on a PC.</p>
+      </div>
+      <div class="install-samples" aria-hidden="true">
+        <i></i><i></i><i></i>
+      </div>
     </div>
     <dl class="qa">
-      <div><dt data-i18n="qa.1.q">Will it change my original?</dt><dd data-i18n="qa.1.a">No. Saving makes a new PNG and a new material copy.</dd></div>
-      <div><dt data-i18n="qa.2.q">Does it work with Poiyomi and lilToon?</dt><dd data-i18n="qa.2.a">Yes. Selecting and painting work on any shader.</dd></div>
+      <div><dt data-i18n="qa.1.q">Will it change my original?</dt><dd data-i18n="qa.1.a">The default save keeps the original texture and material. You can choose to update the existing material instead.</dd></div>
+      <div><dt data-i18n="qa.2.q">Does it work with Poiyomi and lilToon?</dt><dd data-i18n="qa.2.a">Yes. You can also select and paint colour textures used by other shaders.</dd></div>
       <div><dt data-i18n="qa.3.q">Is it free?</dt><dd data-i18n="qa.3.a">Yes. It is free and open source (MIT).</dd></div>
     </dl>
     <p class="more-link"><a href="about.html#faq"><span data-i18n="qa.more">More questions</span> <svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a></p>
@@ -517,9 +519,10 @@
 
 <p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
 
-<script src="tour.js" defer></script>
-<script src="paint.js" defer></script>
-<script src="app.js" defer></script>
-<script src="ideas.js" defer></script>
+<script src="tour.js?v=030-paper-3" defer></script>
+<script src="ink-effects.js?v=030-paper-3" defer></script>
+<script src="paint.js?v=030-paper-3" defer></script>
+<script src="app.js?v=030-learning-1" defer></script>
+<script src="ideas.js?v=030-paper-3" defer></script>
 </body>
 </html>

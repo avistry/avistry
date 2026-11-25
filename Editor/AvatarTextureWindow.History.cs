@@ -5,39 +5,58 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// The "History" list in 4 · Paint: the undo steps of this edit, newest first. It is a view on Unity's own undo
-    /// (Ctrl+Z / Ctrl+Y keep working): clicking a step repeats undo or redo until that step is the current one.
-    /// </summary>
     partial class AvatarTextureWindow
     {
         struct HistoryEntry
         {
-            public int group;     // Unity undo group this step lives in
-            public string name;   // what the step was ("Paint stroke", "Add layer"…)
+            public int revision;
+            public int group;
+            public string name;
+            public string recipeJson;
+            public string activeLayerId;
         }
 
-        const int HistoryMax = 200;   // entries kept
-        const int HistoryShown = 20;  // rows shown
+        const int HistoryMax = 200;
+        const int HistoryShown = 20;
+        const int HistoryCharacterBudget = 16 * 1024 * 1024;
 
-        [NonSerialized] bool _foldHistory; // not serialized, so going back a step never snaps the list shut
+        [SerializeField] int _historyRevision;
+        [NonSerialized] bool _foldHistory;
         [NonSerialized] readonly List<HistoryEntry> _history = new List<HistoryEntry>();
-        [NonSerialized] int _historyPos = -1; // index of the last applied step (-1 = the start of this edit)
+        [NonSerialized] int _historyPos = -1;
+        [NonSerialized] HistoryEntry _historyStart;
+        [NonSerialized] int _nextHistoryRevision, _historyCharacters;
 
-        /// <summary>Called after the tool recorded an undo step on the recipe (MarkEdited, end of a stroke).</summary>
-        void RecordHistory()
+        void RecordHistory(int? undoGroup = null)
         {
-            int group = Undo.GetCurrentGroup();
+            string json = EditorJsonUtility.ToJson(_recipe);
+            var current = _historyPos < 0 ? _historyStart : _history[_historyPos];
+            if (json == current.recipeJson) return;
+
+            int group = undoGroup ?? Undo.GetCurrentGroup();
             string name = Undo.GetCurrentGroupName();
             if (string.IsNullOrEmpty(name)) name = "Edit";
 
-            // Stepping back and editing again: Unity drops the redo steps, so do we.
-            if (_historyPos + 1 < _history.Count) _history.RemoveRange(_historyPos + 1, _history.Count - _historyPos - 1);
-            // A step that was merged into an earlier group (strokes collapse theirs) replaces what it merged.
-            while (_history.Count > 0 && _history[_history.Count - 1].group >= group) _history.RemoveAt(_history.Count - 1);
+            while (_history.Count > 0 && (_history.Count > _historyPos + 1 || _history[_history.Count - 1].group >= group))
+            {
+                int last = _history.Count - 1;
+                _historyCharacters -= _history[last].recipeJson.Length;
+                _history.RemoveAt(last);
+            }
 
-            _history.Add(new HistoryEntry { group = group, name = name });
-            if (_history.Count > HistoryMax) _history.RemoveAt(0);
+            Undo.RecordObject(this, name);
+            _historyRevision = ++_nextHistoryRevision;
+            _history.Add(new HistoryEntry
+            {
+                revision = _historyRevision, group = group, name = name, recipeJson = json, activeLayerId = _activeLayerId,
+            });
+            _historyCharacters += json.Length;
+            while (_history.Count > 1 && (_history.Count > HistoryMax || _historyCharacters > HistoryCharacterBudget))
+            {
+                _historyCharacters -= _historyStart.recipeJson.Length;
+                _historyStart = _history[0];
+                _history.RemoveAt(0);
+            }
             _historyPos = _history.Count - 1;
         }
 
@@ -45,51 +64,56 @@ namespace Avistry.Textures
         {
             _history.Clear();
             _historyPos = -1;
+            _nextHistoryRevision = Mathf.Max(_nextHistoryRevision, _historyRevision);
+            _historyStart = new HistoryEntry
+            {
+                revision = _historyRevision,
+                recipeJson = _recipe != null ? EditorJsonUtility.ToJson(_recipe) : "",
+                activeLayerId = _activeLayerId,
+            };
+            _historyCharacters = _historyStart.recipeJson.Length;
         }
 
-        /// <summary>Keeps the "current step" right when the user presses Ctrl+Z / Ctrl+Y (or a step is jumped to).</summary>
-        void OnUndoRedoEvent(in UndoRedoInfo info)
+        void OnUndoRedoEvent(in UndoRedoInfo _)
         {
-            // By group order rather than an exact match: strokes and harness steps collapse or renumber their groups, so
-            // the group Unity reports can differ from the one recorded. After undoing group g, the steps still applied
-            // are those before g; after redoing g, those up to and including g.
             RepairRecipe("undo");
-            int g = info.undoGroup;
-            int pos = -1;
-            for (int i = 0; i < _history.Count; i++)
-                if (info.isRedo ? _history[i].group <= g : _history[i].group < g) pos = i;
-            _historyPos = pos;
+            _historyPos = _history.FindIndex(entry => entry.revision == _historyRevision);
+            if (_historyPos < 0 && _historyRevision != _historyStart.revision) ClearHistory();
         }
 
-        /// <summary>Goes to just after step <paramref name="index"/> (-1 = the start): undo or redo until it is current.</summary>
         void GoToHistory(int index)
         {
-            index = Mathf.Clamp(index, -1, _history.Count - 1);
             EndStroke();
-            int stuck = 0; // other undo steps (selection changes…) sit between ours; give up if nothing moves for a long while
-            for (int guard = 0; guard < 400 && _historyPos != index && stuck < 40; guard++)
-            {
-                int before = _historyPos;
-                if (index < _historyPos) Undo.PerformUndo(); else Undo.PerformRedo();
-                stuck = _historyPos == before ? stuck + 1 : 0;
-            }
-            _dirty = true;
-            Repaint();
-        }
+            if (_needsRebuild) Rebuild();
+            index = Mathf.Clamp(index, -1, _history.Count - 1);
+            if (_recipe == null || index == _historyPos) return;
 
-        /// <summary>Drops steps Unity no longer has (undo history cleared, e.g. after a reload or play mode).</summary>
-        void PruneHistory()
-        {
-            int top = Undo.GetCurrentGroup();
-            while (_history.Count > 0 && _history[_history.Count - 1].group > top + 1) _history.RemoveAt(_history.Count - 1);
-            if (_historyPos >= _history.Count) _historyPos = _history.Count - 1;
+            var entry = index < 0 ? _historyStart : _history[index];
+            var checkpoint = CreateInstance<TextureRecipe>();
+            try
+            {
+                EditorJsonUtility.FromJsonOverwrite(entry.recipeJson, checkpoint);
+                Undo.FlushUndoRecordObjects();
+                Undo.IncrementCurrentGroup();
+                Undo.RecordObjects(new UnityEngine.Object[] { this, _recipe }, Loc.T("Restore Avistry layers"));
+                _recipe.layers = checkpoint.layers;
+            }
+            finally { DestroyImmediate(checkpoint); }
+            _historyRevision = entry.revision;
+            _historyPos = index;
+            _activeLayerId = entry.activeLayerId;
+            if (_maskEditLayerId != _activeLayerId) _maskEditLayerId = null;
+            RefreshEditedRecipe();
+            _unsaved = _recipe.layers.Count > 0;
+            Undo.FlushUndoRecordObjects();
+            Undo.IncrementCurrentGroup();
         }
 
         void DrawHistory()
         {
-            PruneHistory();
             string title = _history.Count == 1 ? Loc.T("History (1 step)") : Loc.F("History ({0} steps)", _history.Count);
-            if (!StudioGUI.BeginFoldGroup(ref _foldHistory, title, null, null, Loc.T("The steps of this edit. Click one to go back to it, or forward again. Ctrl+Z and Ctrl+Y work too."), "undo"))
+            if (!StudioGUI.BeginFoldGroup(ref _foldHistory, title, null, null,
+                Loc.T("Restore a layer step from this edit. Ctrl+Z undoes the jump in one step."), "undo"))
             {
                 StudioGUI.EndGroup();
                 return;
@@ -104,10 +128,11 @@ namespace Avistry.Textures
                 if (DrawHistoryRow(i, _history[i].name, i == _historyPos, i > _historyPos, shown)) jump = i;
             if (_history.Count > HistoryShown)
                 GUILayout.Label(Loc.F("…and {0} older step(s)", _history.Count - HistoryShown), StudioGUI.Hint);
-            if (DrawHistoryRow(-1, _history.Count == 0 ? Loc.T("Start (no steps yet)") : Loc.T("Start of this edit"), _historyPos == -1, false, shown))
+            string start = _historyStart.name ?? (_history.Count == 0 ? Loc.T("Start (no steps yet)") : Loc.T("Start of this edit"));
+            if (DrawHistoryRow(-1, start, _historyPos == -1, false, shown))
                 jump = -1;
             EditorGUILayout.EndVertical();
-            GUILayout.Label(Loc.T("Click a step to go back to it, or forward again if it's greyed. Ctrl+Z / Ctrl+Y still work."), StudioGUI.Hint);
+            GUILayout.Label(Loc.T("Click a step to restore its layers. Other Unity edits stay in place."), StudioGUI.Hint);
             StudioGUI.EndGroup();
 
             if (jump != int.MinValue && jump != _historyPos)
@@ -117,7 +142,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>One history row. Returns true when it was clicked.</summary>
         bool DrawHistoryRow(int index, string name, bool current, bool undone, int visualIndex)
         {
             var e = Event.current;
@@ -138,7 +162,6 @@ namespace Avistry.Textures
             return false;
         }
 
-        // For the test harness (ats history).
         internal int AutoHistoryPos => _historyPos;
         internal List<string> AutoHistoryNames()
         {

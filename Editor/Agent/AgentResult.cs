@@ -1,12 +1,7 @@
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// The answer to one AI helper call. <see cref="data"/> is plain JSON-shaped data (Dictionary of string to object,
-    /// List of object, string, bool, numbers, null) so the bridge can turn it into JSON without knowing the tool.
-    /// </summary>
     internal class AgentResult
     {
-        /// <summary>The error codes of the helper tools.</summary>
         internal static class Codes
         {
             internal const string AccessOff = "access_off";
@@ -27,16 +22,16 @@ namespace Avistry.Textures
         internal const string ReadOnlyHint = "Ask the person to choose Look and edit in Help › Connect an AI helper… in Avistry.";
 
         public bool ok;
-        public string code;       // set when ok is false
+        public string code;
         public string action;
-        public string message;    // plain words; may name assets, never a drive or home path
-        public string hint;       // what to try next
-        public string[] changed;  // what this call changed, in plain words
-        public string undo;       // the Undo step name, when one was made
-        public string toast;      // the message the window showed, if any
-        public bool pending;      // waiting for the person; the server polls again
+        public string message;
+        public string hint;
+        public string[] changed;
+        public string undo;
+        public string toast;
+        public bool pending;
         public object data;
-        internal bool partial;    // failed after it had already changed something: still logged, so its Undo step is not hidden
+        internal bool partial;
 
         internal static AgentResult Ok(string action, object data = null, string undo = null, string toast = null, params string[] changed)
             => new AgentResult { ok = true, action = action, data = data, undo = undo, toast = toast, changed = changed ?? new string[0] };

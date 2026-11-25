@@ -1,14 +1,8 @@
-/* The tour video: a language switch on the video, and a mini player that keeps playing while the visitor moves
-   around the site. Moving to another page while the tour plays swaps the page in place (fetch, swap the body,
-   pushState) instead of loading it, so the video element never leaves the document. Without JS, or when a fetch
-   fails, the links are ordinary links. Loaded before app.js on every page. */
 (function () {
   'use strict';
 
   var add = EventTarget.prototype.addEventListener, rem = EventTarget.prototype.removeEventListener;
 
-  /* the page scripts (app.js, ideas.js, learn.js) listen on window, document and media queries; those listeners are
-     noted here so a page swap can remove them before the next page's scripts run again */
   var tracked = [];
   function trackOn(obj, proto) {
     obj.addEventListener = function (type, fn, opts) {
@@ -39,29 +33,24 @@
     return null;
   }
   function svg(d) { return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="' + d + '"/></svg>'; }
-  function button(cls, key, fb, html) {
+  function button(cls, key, fb, html, withTitle) {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = cls;
     b.setAttribute('aria-label', T(key, fb));
-    b.setAttribute('data-i18n-attr', 'aria-label:' + key);
+    b.setAttribute('data-i18n-attr', 'aria-label:' + key + (withTitle ? ',title:' + key : ''));
+    if (withTitle) b.title = b.getAttribute('aria-label');
     b.innerHTML = html;
     return b;
   }
 
-  /* focus moves to the video only for keyboard users: a video with focus takes Space and the arrow keys */
   var lastKey = false;
   add.call(document, 'keydown', function () { lastKey = true; }, true);
   add.call(document, 'pointerdown', function () { lastKey = false; }, true);
   function focusVideo() { var b = P.wrap && $('.tc-play', P.wrap); if (lastKey && b) try { b.focus({ preventScroll: true }); } catch (e) {} }
 
-  /* ---------- the player ---------- */
-  /* hold: until this time a click in the player does not send it to the mini player (only scrolling away does) */
   var P = { wrap: null, video: null, lang: null, picked: false, mode: 'off', active: false, plate: null, ph: null, io: null, ratio: 1, pin: 1, wantInline: false, hold: 0, centred: false };
   function held() { return performance.now() < P.hold; }
-  /* the video leaves for the corner when it is scrolled away from while it plays: under 35% in view and lower than
-     the best view since the last click in it (a click on a half-hidden player is not scrolling away). While a click
-     holds it, the check runs again when the hold ends */
   var recheck = 0;
   function checkMini() {
     clearTimeout(recheck);
@@ -82,8 +71,6 @@
     P.wrap.querySelectorAll('.tlang button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-tl') === P.lang)); });
   }
 
-  /* the four files share one timeline, so the new file picks up at the same second; the current frame stays on a
-     canvas until the new file has seeked there */
   function setLang(l, user) {
     if (user) P.picked = true;
     if (!P.video || l === P.lang) { P.lang = l; paintLangs(); return; }
@@ -121,10 +108,8 @@
     } else if (playing) v.play().catch(function () {});
   }
 
-  /* ---------- our own controls: a bar under the picture, so the burned-in subtitles stay clear ---------- */
   var SPEEDS = [0.75, 1, 1.25, 1.5, 2];
-  var DUR = 180; /* all four files; shown until the video has loaded */
-  /* iPhones keep the volume on the hardware buttons: there the slider is left out and the speaker only mutes */
+  var DUR = 180;
   var canVolume = (function () { try { var t = document.createElement('video'); t.volume = 0.5; return t.volume === 0.5; } catch (e) { return false; } })();
   function clock(s) { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
   function icon(paths, cls) { return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="' + cls + '">' + paths + '</svg>'; }
@@ -139,10 +124,8 @@
     fs: icon('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>', 'i-fs') + icon('<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>', 'i-fsx')
   };
 
-  /* ---------- effects: a tape-stop when the tour pauses, a spin-up when it starts, a glitch between languages ---------- */
   function pitch(v, keep) { v.preservesPitch = keep; v.mozPreservesPitch = keep; v.webkitPreservesPitch = keep; }
   function rateOf(v) { return v.defaultPlaybackRate || 1; }
-  /* the playback rate glides, and with the pitch let go the voice glides with it */
   var rampId = 0;
   function ramp(v, from, to, ms, done) {
     cancelAnimationFrame(rampId);
@@ -156,7 +139,6 @@
   }
   function stopRamp(v) { cancelAnimationFrame(rampId); try { v.playbackRate = rateOf(v); } catch (e) {} pitch(v, true); }
 
-  /* a short synthesised glitch: crushed noise and square blips, then a quick tuning sweep; as loud as the video */
   var ac = null;
   function glitchSound(v) {
     var level = v.muted ? 0 : v.volume;
@@ -206,7 +188,6 @@
     return bursts;
   }
 
-  /* the real voice stutters: the same few frames again and again, at changing speeds */
   function stutter(v, ms) {
     if (v.paused) return 0;
     var t = v.currentTime, n = 0, speeds = [1.4, 0.6, 1.9, 0.5];
@@ -218,8 +199,6 @@
     return Math.max(1, Math.floor(ms / 50));
   }
 
-  /* the picture: torn strips, moved blocks, a rolling frame, a red/cyan split, a flash and scanlines over the last
-     frame. Drawn at 384x216 and scaled up: cheap, and the big pixels are part of the look */
   function glitchFx(box, src) {
     var w = 384, h = 216, c = document.createElement('canvas'), off = document.createElement('canvas'), tint = document.createElement('canvas');
     c.className = 'tv-glitch';
@@ -235,14 +214,12 @@
     function size(s) {
       return s.videoWidth ? [s.videoWidth, s.videoHeight] : s.naturalWidth ? [s.naturalWidth, s.naturalHeight] : [s.width, s.height];
     }
-    /* one colour channel of the torn frame, shifted sideways; red plus cyan adds up to the full picture */
     function channel(color, dx) {
       t.globalCompositeOperation = 'copy';
       t.drawImage(off, 0, 0);
       t.globalCompositeOperation = 'multiply';
       t.fillStyle = color;
       t.fillRect(0, 0, w, h);
-      /* keep the empty edges empty (multiply fills them with the colour) */
       t.globalCompositeOperation = 'destination-in';
       t.drawImage(off, 0, 0);
       x.drawImage(tint, dx, 0);
@@ -298,7 +275,6 @@
     return g;
   }
 
-  /* the console: a few lines of what the player does, typed in under the language switch and gone again */
   function stamp(t) { t = Math.max(0, t || 0); return clock(t) + '.' + ('0' + Math.floor((t % 1) * 100)).slice(-2); }
   function console_(media) {
     var el = null, timer = 0, queue = 0, pend = [];
@@ -329,7 +305,6 @@
         $('.tt-body', e).textContent = '';
         e.classList.add('is-on');
       },
-      /* lines typed one after another, a few frames apart */
       lines: function (list) {
         pend = pend.concat(list);
         (function pump() {
@@ -363,8 +338,6 @@
     return b;
   }
 
-  /* one slider for the time and the volume: mouse sets at once, touch on a tap or a sideways drag (an upward drag
-     still scrolls the page), keys as listed */
   function slider(el, pick, keys) {
     var id = null, moved = false, touch = false;
     function frac(e) { var r = el.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / (r.width || 1))); }
@@ -400,8 +373,6 @@
 
   function hdrH() { return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hdr-h')) || 56; }
 
-  /* the tour in focus: its title just under the header and the whole player below it, on one screen (the plate is
-     sized for that from --tour-head, the room the title takes) */
   function tourHead() {
     var h = $('#tour-title'), plate = $('#tour .tour-plate');
     if (h && plate) document.documentElement.style.setProperty('--tour-head', Math.round(plate.getBoundingClientRect().top - h.getBoundingClientRect().top) + 'px');
@@ -414,9 +385,6 @@
     if (Math.abs(top - window.scrollY) > 4) window.scrollTo({ top: Math.max(0, top), behavior: reduced ? 'auto' : 'smooth' });
   }
 
-  /* the plate grows or shrinks when the video leaves for the corner or comes back; when its top is above the screen,
-     the page below it must not jump, so the scroll moves by the same amount (the browser's own scroll anchoring is
-     off for that moment, so it is not done twice) */
   function keepView(change) {
     if (!P.plate) { change(); return; }
     var root = document.documentElement, r0 = P.plate.getBoundingClientRect(), above = r0.top < hdrH();
@@ -429,8 +397,6 @@
     setTimeout(function () { root.style.overflowAnchor = ''; }, 120);
   }
 
-  /* while the tour plays in the page, a glow at the bottom says the page can still be scrolled: the video keeps
-     playing in the corner. It shows for a while each time the tour starts, until the visitor has used the mini player */
   var hint = null, hintT = 0, hintDone = false;
   function showHint() {
     if (hintDone || P.mode !== 'inline' || !P.video || P.video.paused) return;
@@ -449,7 +415,6 @@
     }
     hintText();
     if (!hint.isConnected) document.body.appendChild(hint);
-    /* on phones the "Get it" bar sits at the bottom: the hint goes above it */
     var cta = $('#cta-bar.is-on');
     hint.style.setProperty('--lift', cta && cta.offsetHeight ? cta.offsetHeight + 'px' : '0px');
     hint.hidden = false;
@@ -469,8 +434,6 @@
     setTimeout(function () { if (!hint.classList.contains('is-on')) hint.hidden = true; }, reduced ? 0 : 300);
   }
 
-  /* full screen: a computer gets this player (control bar under the picture, logo in the corner); a phone or tablet
-     gets the system's own player, which on iPhone Safari only exists on the video itself */
   function fsEl() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
   function fullscreen() {
     var v = P.video, d = document;
@@ -485,12 +448,10 @@
       }, function () {});
     } else if (v.webkitEnterFullscreen) {
       try { v.webkitEnterFullscreen(); } catch (e) {
-        /* Safari wants the video loaded first; it starts playing here and the next tap goes full screen */
         v.play().catch(function () {});
       }
     }
   }
-  /* the system's controls only while the video really is full screen (a request can be granted and still not happen) */
   function fsChange() {
     if (!P.video) return;
     var f = fsEl(), native = f === P.video;
@@ -512,7 +473,6 @@
     wrap.appendChild(media);
     media.appendChild(video);
     video.setAttribute('data-own-lang', '');
-    /* the page keeps the browser's controls for visitors without JS */
     video.controls = false;
     video.removeAttribute('controls');
     Array.prototype.slice.call(video.querySelectorAll('source')).forEach(function (s) { s.remove(); });
@@ -535,7 +495,6 @@
     });
     media.appendChild(g);
 
-    /* the logo shown in full screen */
     var logo = document.createElement('img');
     logo.className = 'tv-logo';
     logo.src = 'media/lockup.svg';
@@ -543,8 +502,6 @@
     media.appendChild(logo);
     var con = console_(media);
 
-    /* a language picked here glitches over: picture and sound break up for a moment, then the new voice comes in,
-       and the console shows what happened */
     var switching = 0, fx = null;
     function switchLang(l) {
       if (l === P.lang && !switching) return;
@@ -598,7 +555,6 @@
     function q(s) { return $(s, wrap); }
     var seek = q('.tc-strack'), vtr = q('.tc-vtrack'), playB = q('.tc-play'), muteB = q('.tc-mute'), speedB = q('.tc-speed');
 
-    /* time: a spot picked before the video has loaded is kept until it has */
     var pending = null;
     function dur() { return isFinite(video.duration) && video.duration > 0 ? video.duration : DUR; }
     function now() { return pending != null ? pending : video.currentTime || 0; }
@@ -632,7 +588,6 @@
       ' ': function () { toggle(true); }
     });
 
-    /* a pause winds down like a tape stopping (picture and voice slow and drop); a start spins up from half speed */
     var stopping = false, spin = 0;
     function playing() { return !video.paused && !video.ended && !stopping; }
     function settle() {
@@ -679,7 +634,6 @@
         video.addEventListener('playing', up);
       }
       if (video.paused || video.ended) video.play().catch(function () {});
-      /* the first start brings the player to the middle of the screen; later ones leave the page where it is */
       if (user) {
         P.hold = performance.now() + 1500;
         if (!P.centred) { P.centred = true; focusTour(); fadeIn(); }
@@ -694,16 +648,12 @@
     ['play', 'pause', 'ended', 'emptied'].forEach(function (ev) { video.addEventListener(ev, paintPlay); });
     playB.addEventListener('click', function () { toggle(true); });
     big.addEventListener('click', function () { toggle(true); });
-    /* in full screen the system's controls are on (video.controls) and take the clicks */
     video.addEventListener('click', function () { if (!video.controls) toggle(true); });
     video.addEventListener('dblclick', function () { if (!video.controls) fullscreen(); });
     q('.tc-back').addEventListener('click', function () { skip(-10); });
     q('.tc-fwd').addEventListener('click', function () { skip(10); });
     q('.tc-fs').addEventListener('click', fullscreen);
 
-    /* volume: the level is remembered, mute is not (the tour is about the voice) */
-    /* the tour starts at 40% (or the viewer's own level), and the first start fades the sound in, so nobody gets
-       blasted; the volume slider rises with it */
     var fading = false;
     try {
       var sv = JSON.parse(store('ats-tour-vol') || 'null');
@@ -716,7 +666,6 @@
       video.volume = 0;
       var id = setInterval(function () {
         var k = Math.min(1, (performance.now() - t0) / 1200);
-        /* a click on the volume during the fade wins */
         if (!fading) { clearInterval(id); return; }
         video.volume = to * k * k;
         if (k >= 1) { clearInterval(id); fading = false; }
@@ -752,8 +701,6 @@
       Home: function () { setVol(0); }, End: function () { setVol(1); }
     });
 
-    /* speed: one button that steps through the speeds (Shift steps back); a new language file keeps it */
-    /* the chosen speed lives in defaultPlaybackRate; playbackRate moves during the effects */
     function paintSpeed() {
       var r = rateOf(video);
       $('span', speedB).textContent = r + '×';
@@ -768,7 +715,6 @@
     speedB.addEventListener('click', function (e) { speed(e.shiftKey ? -1 : 1); });
     video.addEventListener('ratechange', paintSpeed);
 
-    /* after a mouse click the button lets go of the keyboard, so Space keeps scrolling the page */
     ctl.addEventListener('click', function (e) {
       var a = document.activeElement;
       if (e.detail > 0 && !lastKey && a && ctl.contains(a)) a.blur();
@@ -790,7 +736,6 @@
     P.mute = mute;
     P.speed = speed;
 
-    /* the switch fades while the video plays and the pointer rests, like the native controls */
     var idle = 0;
     function wake() {
       wrap.classList.remove('is-idle');
@@ -804,11 +749,9 @@
     video.addEventListener('play', function () {
       P.active = true;
       wake();
-      /* only one voice at a time: another video with sound pauses */
       document.querySelectorAll('video').forEach(function (o) { if (o !== video && !o.paused && !o.muted) o.pause(); });
       checkMini();
     });
-    /* using the player is not scrolling away from it */
     ['pointerdown', 'keydown'].forEach(function (ev) { wrap.addEventListener(ev, function () { P.hold = performance.now() + 1500; P.pin = P.ratio; }, true); });
 
     P.wrap = wrap;
@@ -819,7 +762,6 @@
     return wrap;
   }
 
-  /* ---------- the mini player: position and size per viewer, never off screen ---------- */
   var GAP = 8;
   var box = { x: 0, y: 0, w: 0 };
   function narrow() { return document.documentElement.clientWidth < 640; }
@@ -834,10 +776,8 @@
     var s = getComputedStyle(p);
     return { t: parseFloat(s.paddingTop) || 0, r: parseFloat(s.paddingRight) || 0, b: parseFloat(s.paddingBottom) || 0, l: parseFloat(s.paddingLeft) || 0 };
   }
-  /* the player may grow to the whole screen (minus the margins), so a big screen gets a big player */
   function bounds() {
     var i = insets(), vw = document.documentElement.clientWidth, vh = window.innerHeight;
-    /* the title bar plus the control bar under the picture */
     var ctl = dock && P.wrap && dock.contains(P.wrap) ? $('.tctl', P.wrap) : null;
     var bar = (dock ? $('.tdock-bar', dock).offsetHeight || 36 : 36) + (ctl ? ctl.offsetHeight : 0);
     var maxW = Math.max(160, Math.min(vw - i.l - i.r - 2 * GAP, ((vh - i.t - i.b - 2 * GAP - bar) * 16) / 9));
@@ -851,7 +791,6 @@
     if (!dock) return;
     var b = bounds();
     box.w = Math.round(Math.max(b.minW, Math.min(b.maxW, box.w)));
-    /* the control bar changes its rows with the width, so the height is measured after the width is set */
     dock.style.setProperty('--w', box.w + 'px');
     var h = dock.offsetHeight || height(box.w, b);
     box.x = Math.round(Math.max(b.l, Math.min(b.r - box.w, box.x)));
@@ -867,8 +806,6 @@
       store('ats-tour-dock', JSON.stringify(all));
     }
   }
-  /* size and spot are kept as shares of the screen (width) and of the free room (spot), so the player scales with the
-     window and top right stays top right */
   function restore() {
     var b = bounds(), s = saved();
     var fw = s && s.fw > 0 ? s.fw : narrow() ? 0.56 : 0.3;
@@ -894,7 +831,7 @@
     dock.setAttribute('data-i18n-attr', 'aria-label:player.region');
     var bar = document.createElement('div');
     bar.className = 'tdock-bar';
-    var grip = button('tdock-grip', 'player.move', 'Move the player (arrow keys)', '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g class="dots"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></g></svg>');
+    var grip = button('tdock-grip', 'player.move', 'Move the player (arrow keys)', '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g class="dots"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></g></svg>', true);
     var title = document.createElement('span');
     title.className = 'tdock-title';
     title.setAttribute('data-i18n', 'player.title');
@@ -907,16 +844,13 @@
     bar.appendChild(grip); bar.appendChild(title); bar.appendChild(full); bar.appendChild(close); bar.appendChild(prog);
     var media = document.createElement('div');
     media.className = 'tdock-media';
-    var size = button('tdock-size', 'player.resize', 'Resize the player (arrow keys)', svg('M6.5 6.5l11 11M6.5 6.5h5.5M6.5 6.5V12M17.5 17.5H12M17.5 17.5V12'));
-    size.title = T('player.resize', 'Resize the player (arrow keys)');
-    grip.title = T('player.move', 'Move the player (arrow keys)');
+    var size = button('tdock-size', 'player.resize', 'Resize the player (arrow keys)', svg('M6.5 6.5l11 11M6.5 6.5h5.5M6.5 6.5V12M17.5 17.5H12M17.5 17.5V12'), true);
     dock.appendChild(bar); dock.appendChild(media); dock.appendChild(size);
     document.body.appendChild(dock);
 
     full.addEventListener('click', backToFull);
     close.addEventListener('click', closeMini);
 
-    /* drag by the bar (not its buttons); touch, pen and mouse alike */
     var drag = null;
     function start(e, kind) {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -927,12 +861,10 @@
     }
     function move(e) {
       if (!drag || e.pointerId !== drag.id) return;
-      /* the button came up somewhere this page did not hear about: the drag is over */
       if (e.pointerType === 'mouse' && e.buttons === 0) { end(e); return; }
       var dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
       if (drag.kind === 'move') { box.x = drag.bx + dx; box.y = drag.by + dy; }
       else {
-        /* the knob sits on the corner away from the screen edge; the other edges stay put */
         var byX = drag.left ? -dx : dx, byY = (dy * 16) / 9;
         var w = drag.bw + (Math.abs(byX) > Math.abs(byY) ? byX : byY);
         var b = bounds();
@@ -980,12 +912,9 @@
     return dock;
   }
 
-  /* ---------- modes: inline in the home page's tour plate, or mini in the corner ---------- */
   function placeholder() {
     if (!P.plate) return null;
     if (P.ph && P.ph.parentNode === P.plate) return P.ph;
-    /* while the video plays in the corner, its room shows a stand-in: the poster, blurred and drifting, scanlines, a
-       little equaliser and the progress, to invite a scroll back */
     var ph = document.createElement('div');
     ph.className = 'tour-ph';
     ph.innerHTML = '<div class="tour-ph-stage"><div class="tour-ph-bg" aria-hidden="true"></div><div class="tour-ph-in">' +
@@ -1013,7 +942,6 @@
         if (P.plate) {
           var ph = placeholder();
           if (ph && ph.parentNode !== P.plate) {
-            /* the stand-in takes exactly the player's room (picture plus control bar), so nothing below moves */
             var c = $('.tctl', P.wrap);
             ph.style.setProperty('--foot', (c ? c.offsetHeight : 53) + 'px');
             P.plate.appendChild(ph);
@@ -1029,7 +957,6 @@
           dock.classList.remove('is-in', 'is-hint');
           void dock.offsetWidth;
           dock.classList.add('is-in');
-          /* the first time, the resize handle pulses so people notice it */
           if (!store('ats-tour-knob')) { dock.classList.add('is-hint'); store('ats-tour-knob', '1'); }
         }
       }
@@ -1047,7 +974,6 @@
       }
     }
     P.mode = mode;
-    /* a keyboard user keeps their place; after a mouse click the moved video lets go of the keys */
     if (had && lastKey) try { had.focus({ preventScroll: true }); } catch (e) {}
     else if (had && document.activeElement === had) had.blur();
   }
@@ -1073,7 +999,6 @@
     go('index.html#tour', true);
   }
 
-  /* called on the first load and after every swap: find this page's tour plate, if it has one */
   function attach() {
     if (P.io) { P.io.disconnect(); P.io = null; }
     P.ratio = 1;
@@ -1104,7 +1029,6 @@
       P.io = new IntersectionObserver(function (en) {
         P.ratio = en[0].intersectionRatio;
         if (P.ratio > P.pin) P.pin = P.ratio;
-        /* a gap between the two thresholds, so a small scroll at the edge does not flip it back and forth */
         if (P.mode === 'mini' && P.ratio >= 0.6) setMode('inline');
         else checkMini();
       }, { threshold: [0, 0.1, 0.2, 0.3, 0.35, 0.6, 0.8, 1] });
@@ -1112,7 +1036,6 @@
     }
   }
 
-  /* Esc closes the mini player unless a menu, a dialog or a text field has it */
   add.call(document, 'keydown', function (e) {
     if (e.key !== 'Escape' || e.defaultPrevented || !dock || dock.hidden || P.mode !== 'mini') return;
     if (document.documentElement.classList.contains('sheet-open') || $('dialog[open]')) return;
@@ -1120,9 +1043,6 @@
     if (a && !dock.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
     closeMini();
   });
-  /* player keys: Space and K play or pause, the arrows seek 5 s, J and L 10 s, M mutes, F full screen, < and >
-     change the speed. They work while the focus is in the player, or after a click in it (focus on the page);
-     Space then still scrolls the page */
   var armed = false;
   add.call(document, 'pointerdown', function (e) { armed = !!(P.wrap && P.wrap.contains(e.target)); }, true);
   add.call(document, 'keydown', function (e) {
@@ -1154,25 +1074,62 @@
     var t = dock && $('.tdock-title', dock);
     if (t) t.textContent = T('player.title', 'Tour');
   });
-  /* a muted loop is fine; another voice pauses the tour */
   add.call(document, 'play', function (e) {
     if (P.video && e.target !== P.video && !e.target.muted && !P.video.paused) P.video.pause();
   }, true);
 
-  /* ---------- soft navigation, only while the tour plays or sits in the corner ---------- */
   function softOk() { return !!(P.wrap && P.active && (P.mode === 'mini' || !P.video.paused)); }
   function pageOf(path) { return path.replace(/\/$/, '/index.html'); }
   var rendered = pageOf(location.pathname);
-  var base = location.pathname.replace(/[^/]*$/, '');
+  var base = new URL('.', document.baseURI).pathname;
   var seq = 0;
+
+  function isSitePage(url) {
+    if (url.origin !== location.origin || url.pathname.indexOf(base) !== 0) return false;
+    return /^(?:(?:ja|ko|zh-CN)\/)?(?:[\w-]+\.html)?$/.test(url.pathname.slice(base.length));
+  }
+
+  var turnMotion = window.matchMedia('(min-width: 768px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)');
+  var corner;
+  function clearCorner() {
+    if (!corner) return;
+    corner.removeEventListener('animationend', clearCorner);
+    corner.removeEventListener('animationcancel', clearCorner);
+    corner.remove();
+    corner = null;
+  }
+
+  function pageTurn() {
+    clearCorner();
+    if (!turnMotion.matches || document.hidden || document.documentElement.classList.contains('perf')) return;
+    corner = document.createElement('span');
+    corner.className = 'page-turn';
+    corner.setAttribute('aria-hidden', 'true');
+    corner.addEventListener('animationend', clearCorner);
+    corner.addEventListener('animationcancel', clearCorner);
+    document.body.appendChild(corner);
+  }
+
+  function fromAnotherPage() {
+    var nav = performance.getEntriesByType('navigation')[0];
+    if (nav && nav.type === 'back_forward') return true;
+    if (!document.referrer || (nav && nav.type === 'reload')) return false;
+    var previous = new URL(document.referrer);
+    return isSitePage(previous) && pageOf(previous.pathname) !== rendered;
+  }
+  if (fromAnotherPage()) {
+    if (document.documentElement.classList.contains('i18n-wait')) {
+      add.call(document, 'ats:lang', pageTurn, { once: true });
+    } else pageTurn();
+  }
+  add.call(window, 'pagehide', clearCorner);
+  add.call(window, 'pageshow', function (e) { if (e.persisted) pageTurn(); });
 
   function siteUrl(a) {
     if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download')) return null;
     var u;
-    try { u = new URL(a.getAttribute('href'), location.href); } catch (e) { return null; }
-    if (u.origin !== location.origin || u.pathname.indexOf(base) !== 0) return null;
-    var rest = u.pathname.slice(base.length);
-    return rest === '' || /^[\w-]+\.html$/.test(rest) ? u : null;
+    try { u = new URL(a.href); } catch (e) { return null; }
+    return isSitePage(u) ? u : null;
   }
 
   add.call(document, 'click', function (e) {
@@ -1180,7 +1137,7 @@
     var a = e.target.closest && e.target.closest('a[href]');
     var u = siteUrl(a);
     if (!u) return;
-    if (pageOf(u.pathname) === rendered) {
+    if (pageOf(u.pathname) === pageOf(location.pathname)) {
       if (u.hash) return;
       e.preventDefault();
       window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
@@ -1199,13 +1156,22 @@
     if (from && from.hasAttribute(name)) to.setAttribute(name, from.getAttribute(name)); else to.removeAttribute(name);
   }
 
+  function preparePageStyle(style) {
+    if (!style) return Promise.resolve();
+    style.media = 'not all';
+    return new Promise(function (resolve, reject) {
+      style.onload = function () { resolve(); };
+      style.onerror = function () { reject(new Error('Page stylesheet unavailable')); };
+      document.head.appendChild(style);
+    });
+  }
+
   function go(href, push, y) {
-    var my = ++seq, root = document.documentElement;
+    var my = ++seq, incomingStyle;
     if (push) {
       try { history.replaceState(Object.assign({}, history.state, { y: window.scrollY }), ''); } catch (e) {}
     }
     if (P.mode === 'inline' && P.video && !P.video.paused && !P.wantInline) setMode('mini');
-    root.classList.add('soft-fade', 'is-soft');
     fetch(href, { credentials: 'same-origin' })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .then(function (html) {
@@ -1214,21 +1180,25 @@
         if (!d.body || !d.getElementById('main')) throw new Error('not a page');
         var srcs = Array.prototype.slice.call(d.body.querySelectorAll('script[src]')).map(function (s) { return s.getAttribute('src'); })
           .filter(function (src) { return !/(^|\/)tour\.js(\?|$)/.test(src); });
-        return Promise.all(srcs.map(code)).then(function (codes) {
-          if (my !== seq) return;
+        var style = d.head.querySelector('link[data-page-style]');
+        if (style) incomingStyle = document.importNode(style, false);
+        return Promise.all([Promise.all(srcs.map(code)), preparePageStyle(incomingStyle)]).then(function (parts) {
+          if (my !== seq) { if (incomingStyle) incomingStyle.remove(); return; }
           if (push) history.pushState({ y: 0 }, '', href);
           if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-          swap(d, y, srcs, codes);
+          var oldStyle = document.head.querySelector('link[data-page-style]:not([media])');
+          if (oldStyle) oldStyle.remove();
+          if (incomingStyle) incomingStyle.removeAttribute('media');
+          swap(d, y, srcs, parts[0]);
         });
       })
       .catch(function () {
+        if (incomingStyle) incomingStyle.remove();
         if (my !== seq) return;
         if (push) location.href = href; else location.reload();
       });
   }
 
-  /* the page scripts are fetched (from the cache, mostly) before the swap and then run in one go, like deferred
-     scripts: app.js announces the language with an event that learn.js and ideas.js must already be listening for */
   var codes = {};
   function code(src) {
     if (!codes[src]) codes[src] = fetch(src, { credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); });
@@ -1238,10 +1208,12 @@
 
   function swap(d, y, srcs, texts) {
     var root = document.documentElement, body = document.body, nr = d.documentElement;
+    document.dispatchEvent(new Event('ats:leave'));
     untrackAll();
     copyAttr(nr, root, 'data-page');
     copyAttr(nr, root, 'data-title-key');
     root.classList.remove('sheet-open');
+    root.classList.toggle('is-soft', pageLang() !== 'en');
     document.title = d.title;
     ['meta[name="description"]', 'link[rel="canonical"]', 'meta[property="og:title"]', 'meta[property="og:url"]', 'meta[property="og:description"]'].forEach(function (sel) {
       var o = document.head.querySelector(sel), n = d.head.querySelector(sel);
@@ -1266,17 +1238,21 @@
     var hash = decodeURIComponent((location.hash || '').slice(1));
     if (!hash && y == null) window.scrollTo(0, 0);
 
-    /* app.js starts at once when ATS_SOFT is set */
     window.ATS_SOFT = true;
-    var shown = false;
+    var shown = false, wordTimeout, newMain = $('#main');
     function show() {
       if (shown) return;
       shown = true;
+      clearTimeout(wordTimeout);
       rem.call(document, 'ats:lang', show);
+      if (!newMain.isConnected) return;
       root.classList.remove('is-soft');
+      pageTurn();
     }
-    add.call(document, 'ats:lang', show);
-    setTimeout(show, 1500);
+    if (root.classList.contains('is-soft')) {
+      add.call(document, 'ats:lang', show);
+      wordTimeout = setTimeout(show, 1500);
+    } else show();
     srcs.forEach(function (src, i) {
       var s = document.createElement('script');
       s.setAttribute('data-src', src);
@@ -1286,7 +1262,6 @@
     var el = hash && document.getElementById(hash);
     if (el) el.scrollIntoView();
     else if (y != null) window.scrollTo(0, y);
-    /* the words arrive a moment later and can move the target; follow it unless the visitor scrolled meanwhile */
     if (el || y != null) {
       var at = window.scrollY;
       var again = function () {

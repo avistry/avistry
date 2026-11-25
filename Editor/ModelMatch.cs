@@ -4,27 +4,21 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// "Match on the model": measures the colour of a point as it's actually rendered (lighting, glow, material
-    /// settings and the live edit preview included), from the Scene camera view the user had when they clicked it.
-    /// Rendered offscreen, so it doesn't matter if the Scene view is hidden or the camera moved since.
-    /// </summary>
     public static class ModelMatch
     {
-        /// <summary>A clicked point and the camera it was seen from.</summary>
         [Serializable]
         public struct View
         {
             public bool valid;
-            public Vector3 point;          // world position of the click on the surface
+            public Vector3 point;
             public Vector3 camPos;
             public Quaternion camRot;
             public float fov, orthoSize, near, far, aspect;
             public bool ortho;
-            public Renderer renderer;      // what was clicked
-            public int submesh;            // material slot on that renderer
-            public Vector2 uv;             // texture UV at the click (on the mesh being edited)
-            public Color texel;            // original texture colour at the click (edited mesh), gamma
+            public Renderer renderer;
+            public int submesh;
+            public Vector2 uv;
+            public Color texel;
 
             public static View From(Camera cam, Vector3 point, Renderer r, int submesh, Vector2 uv, Color texel) => new View
             {
@@ -35,31 +29,23 @@ namespace Avistry.Textures
             };
         }
 
-        /// <summary>The result of a match, for the UI.</summary>
         public struct Result
         {
             public bool done;
-            public Color goal, achieved;   // rendered colours (gamma)
-            public float difference;       // OKLab distance × 100 (below ~2 looks the same)
+            public Color goal, achieved;
+            public float difference;
             public bool reached;
-            public int pair;               // which colour pair was adjusted
+            public int pair;
             public string note;
         }
 
         public const float GoodEnough = 2f;
 
-        /// <summary>
-        /// Renders the scene from the view and returns the colour at its point (gamma, clamped like the screen), averaged
-        /// over 3×3 pixels. False with a reason if the point isn't in view.
-        /// </summary>
         public static bool Measure(View v, out Color colour, out string why)
         {
             colour = Color.black;
             why = null;
             if (!v.valid) { why = Loc.T("The point isn't picked yet."); return false; }
-            // A virtual 360-pixel-high view like the Scene view, of which only a 9×9-pixel window around the point is
-            // rendered: the projection is shifted and scaled so the point sits in the centre. Cheap, and reading the
-            // centre is the same whichever way up the graphics API stores the image.
             const int H = 360, N = 9;
             float W = Mathf.Clamp(H * v.aspect, 64, 1280);
             var go = new GameObject("ATS Measure Camera") { hideFlags = HideFlags.HideAndDontSave };
@@ -70,7 +56,7 @@ namespace Avistry.Textures
             {
                 var cam = go.AddComponent<Camera>();
                 var sv = SceneView.lastActiveSceneView;
-                if (sv != null && sv.camera != null) cam.CopyFrom(sv.camera); // same clear flags, skybox and culling as the Scene view
+                if (sv != null && sv.camera != null) cam.CopyFrom(sv.camera);
                 cam.cameraType = CameraType.Game;
                 cam.ResetProjectionMatrix();
                 cam.transform.SetPositionAndRotation(v.camPos, v.camRot);
@@ -99,7 +85,7 @@ namespace Avistry.Textures
                 foreach (var c in read.GetPixels()) sum += c;
                 var avg = sum / 9f;
                 bool linear = QualitySettings.activeColorSpace == ColorSpace.Linear;
-                var shown = new Color(Mathf.Clamp01(avg.r), Mathf.Clamp01(avg.g), Mathf.Clamp01(avg.b), 1f); // the screen clips at white
+                var shown = new Color(Mathf.Clamp01(avg.r), Mathf.Clamp01(avg.g), Mathf.Clamp01(avg.b), 1f);
                 colour = linear ? shown.gamma : shown;
                 return true;
             }
@@ -113,14 +99,8 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>Perceptual difference of two gamma colours (OKLab distance × 100; under ~2 they look the same).</summary>
         public static float Difference(Color a, Color b) => Vector3.Distance(Recolour.ToOklab(a), Recolour.ToOklab(b)) * 100f;
 
-        /// <summary>
-        /// One step of the search, per component (OKLab): how the rendered colour responds to the pair's target
-        /// colour is learned from the last two tries (lighting multiplies, glow adds), then the target moves to close the
-        /// gap. Returns the next target (not yet limited to what a texture can hold).
-        /// </summary>
         public static Vector3 Step(Vector3 target, Vector3 rendered, Vector3 goal, ref Vector3 slope, float damping = 0.85f)
         {
             var next = target;
@@ -129,7 +109,6 @@ namespace Avistry.Textures
             return next;
         }
 
-        /// <summary>Updates the learned response from two tries (kept positive and within reason).</summary>
         public static void Learn(ref Vector3 slope, Vector3 t0, Vector3 r0, Vector3 t1, Vector3 r1)
         {
             for (int c = 0; c < 3; c++)

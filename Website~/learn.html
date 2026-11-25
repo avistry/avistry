@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Learn Avistry and Unity</title>
-<meta name="description" content="Learn Avistry and Unity: a six-tier skill tree, a glossary of every word the tool uses, and a look at each tool at work." data-i18n-attr="content:lr.meta.description">
+<meta name="description" content="Practice painting, material editing and VRChat avatar setup with guided Unity lessons and a searchable glossary." data-i18n-attr="content:lr.meta.description">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#141218">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Learn Avistry and Unity">
 <meta property="og:url" content="https://avistry.github.io/avistry/learn.html">
-<meta property="og:image" content="https://avistry.github.io/avistry/media/og-learn.jpg">
+<meta property="og:image" content="https://avistry.github.io/avistry/media/og-learn.jpg?v=030-learning-1">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:alt" content="Learn Avistry, and Unity with it: a short course in the tool, a glossary and a skill tree.">
 <meta property="og:site_name" content="Avistry">
-<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-learn.jpg">
+<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-learn.jpg?v=030-learning-1">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://avistry.github.io/avistry/learn.html">
 <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
@@ -32,8 +32,6 @@
   try {
     var theme = localStorage.getItem('ats-theme');
     root.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
-    /* Performance mode by itself: on weak devices, with data saver, or after this tab crashed or ran short of memory
-       (app.js keeps ats-alive set while the page is on screen); never just for being a phone on strong hardware */
     var perf = localStorage.getItem('ats-perf'), nav = navigator, mem = nav.deviceMemory, cores = nav.hardwareConcurrency, con = nav.connection || {};
     var ss = sessionStorage, sick = ss.getItem('ats-sick') === '1' || ss.getItem('ats-alive') === '1';
     if (sick) ss.setItem('ats-sick', '1');
@@ -62,7 +60,8 @@
 })();
 </script>
 <style>html{background:#141218}html[data-theme="light"]{background:#F3F1F6}html.i18n-wait body{visibility:hidden}</style>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=030-paper-3">
+<link rel="stylesheet" href="learn.css?v=030-workshop-1">
 </head>
 <body class="v4 sub-page page-learn">
 
@@ -148,49 +147,65 @@
 
 
 <main id="main">
-  <section class="stage surface-dark pg-hero" id="top">
-    <span class="stk stk-corner" data-stk="ship_it" aria-hidden="true"></span>
-    <div class="wrap pg-hero-in">
-      <h1 class="h-display" data-i18n="lr.title" data-emo="avistry_bounce">Learn Avistry, and Unity with it.</h1>
-      <p class="sub" data-i18n="lr.lead">A short course inside the tool, a glossary of every word it uses, and a look at each tool at work.</p>
-      <div class="hero-actions">
-        <a class="btn btn-primary btn-lg" href="skills.html" data-i18n="lb.start">Start the skill tree</a>
-        <a class="btn btn-outline btn-lg" href="glossary.html" data-i18n="lb.glossary">Open the glossary</a>
+  <section class="workshop-cover" id="top" aria-labelledby="workshop-title">
+    <div class="wrap workshop-cover-in">
+      <div class="workshop-intro">
+        <h1 class="h-display" id="workshop-title" data-i18n="lr.title">Learn to edit your avatar.</h1>
+        <p class="sub" data-i18n="lr.lead">Paint a surface in Unity, tune the material, then test how it looks and behaves in VRChat.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary btn-lg" href="skills.html" data-i18n="lb.start">Start the skill tree</a>
+          <a class="workshop-text-link" href="glossary.html" data-i18n="lb.glossary">Open the glossary</a>
+        </div>
       </div>
+      <figure class="material-study" aria-labelledby="study-title">
+        <div class="study-render">
+          <div class="study-grid" aria-hidden="true"></div>
+          <img id="study-model" src="media/v4/studio/opening/metal.webp" alt="" width="1600" height="900" fetchpriority="high">
+          <img id="study-map" src="media/v4/studio/opening/swatch-metal.webp" alt="" width="512" height="512">
+        </div>
+        <figcaption class="study-caption">
+          <strong id="study-title" data-i18n="lr.study">Explore the material</strong>
+          <div class="study-controls" role="group" aria-labelledby="study-title">
+            <button type="button" data-study="original" aria-pressed="false" data-i18n="lr.base">Base</button>
+            <button type="button" data-study="texture" aria-pressed="false" data-i18n="lr.print">Artwork</button>
+            <button type="button" data-study="metal" aria-pressed="true" data-i18n="lr.finish">Finish</button>
+          </div>
+          <p id="study-info" aria-live="polite" data-i18n="lr.study.metal">Metallic trim catches the light around the printed leather.</p>
+        </figcaption>
+      </figure>
     </div>
   </section>
 
-  <section class="sec" aria-labelledby="lr-path-title">
-    <div class="wrap lr-path-wrap">
-      <div>
-        <h2 class="h-display" id="lr-path-title" data-i18n="lr.path.title" data-emo="e_avistry_happy">Six tiers.</h2>
-        <p class="lead lr-path-lead" data-i18n="lr.path.lead">From the first click to baked maps.</p>
-        <ol class="lr-path" id="lr-path" role="list" aria-labelledby="lr-path-title">
-          <noscript><li><a href="skills.html" data-i18n="lb.start">Start the skill tree</a></li></noscript>
-        </ol>
+  <section class="sec workshop-paths" aria-labelledby="lr-path-title" id="lr-path">
+    <div class="wrap">
+      <h2 class="h-display" id="lr-path-title" data-i18n="lr.path.title">What would you like to make?</h2>
+      <div class="workshop-routes" id="workshop-routes">
+        <noscript><a href="skills.html" data-i18n="lb.start">Start the skill tree</a></noscript>
       </div>
-      <figure class="plate plate--sm lr-shot">
-        <picture class="plate-body still">
-          <img src="media/v4/skill-tree-hue.webp" width="306" height="415" loading="lazy" decoding="async" alt="A page of the skill tree in Unity. Each skill is a short card that says what the word means, when to use it and what to try." data-i18n-attr="alt:lr.shot.alt">
-        </picture>
-      </figure>
     </div>
   </section>
 
   <section class="sec lr-unity" aria-labelledby="in-unity-title" data-fx>
     <div class="wrap sk-how">
       <h2 class="h-display" id="in-unity-title" data-i18n="sk.how.title">Start it in Unity.</h2>
-      <ol class="steps-list sk-steps">
-        <li data-i18n-html="sk.how.1">Open <span class="path">Tools &gt; Avistry &gt; Textures</span>.</li>
-        <li data-i18n-html="sk.how.2">Press <strong>Start the skill tree</strong> in the New to Unity? note at the top of the window. It opens the first thing to try.</li>
-        <li data-i18n-html="sk.how.3">Or open the <strong>?</strong> Help menu and choose <strong>Glossary and skill tree</strong>. Pick a skill, read the card and press <strong>Show me</strong> to try it.</li>
-      </ol>
-      <p class="small sk-fine" data-i18n="sk.how.note">Progress is kept on your computer only, with medals for each tier. Reset skill progress clears it.</p>
+      <div class="workshop-unity">
+        <div>
+          <ol class="steps-list sk-steps">
+            <li data-i18n-html="sk.how.1">In Unity, open <span class="path">Tools → Avistry → Skill tree</span>.</li>
+            <li data-i18n-html="sk.how.2">Choose a chapter and a skill. Follow <strong>Try it</strong> on your own avatar.</li>
+            <li data-i18n-html="sk.how.3">Avistry records supported actions as you work. For a manual lesson, check the result in Unity and choose <strong>I've got it</strong>.</li>
+          </ol>
+          <p class="small sk-fine" data-i18n="sk.how.note">Progress is kept on your computer only, with medals for each tier. Reset skill progress clears it.</p>
+        </div>
+        <a class="workshop-unity-shot" href="media/v4/ui-skill-tree-030.webp?v=030-learning-1" target="_blank" rel="noopener"><img src="media/v4/ui-skill-tree-030.webp?v=030-learning-1" width="940" height="542" loading="lazy" decoding="async" alt="Browse chapters and open a lesson in the Unity skill tree." data-i18n-attr="alt:lr.unity.alt"></a>
+      </div>
       <div class="community community--help">
-        <span class="stk stk-community" data-stk="need_help" aria-hidden="true"></span>
         <svg class="brand-ic community-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.38-.44.87-.61 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.62-1.25.08.08 0 0 0-.08-.04 19.74 19.74 0 0 0-4.88 1.52.07.07 0 0 0-.03.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 5.99 3.03.08.08 0 0 0 .09-.03c.46-.63.87-1.3 1.22-1.99a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.89.08.08 0 0 1-.01-.13l.37-.29a.07.07 0 0 1 .08-.01c3.93 1.79 8.18 1.79 12.06 0a.07.07 0 0 1 .08.01l.37.29a.08.08 0 0 1-.01.13c-.6.35-1.22.65-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.36 1.22 1.99a.08.08 0 0 0 .09.03 19.84 19.84 0 0 0 6-3.03.08.08 0 0 0 .03-.06c.5-5.18-.84-9.67-3.55-13.66a.06.06 0 0 0-.03-.03zM8.02 15.33c-1.18 0-2.16-1.09-2.16-2.42 0-1.33.96-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.96 2.42-2.16 2.42zm7.97 0c-1.18 0-2.15-1.09-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.95 2.42-2.16 2.42z"/></svg>
         <div class="community-text">
-          <h3 data-i18n="lr.help.title">Stuck? Ask on Discord.</h3>
+          <div class="sticker-heading">
+            <h3 data-i18n="lr.help.title">Stuck? Ask on Discord.</h3>
+            <span class="stk stk-placed" data-stk="need_help" aria-hidden="true"></span>
+          </div>
           <p data-i18n="lr.help.body">Struggling with Avistry or with Unity itself? Ask in our Discord. Other creators and the maintainers help out, and no question is too small.</p>
           <span class="help-typing" aria-hidden="true"><i></i><i></i><i></i></span>
         </div>
@@ -201,16 +216,19 @@
 
   <section class="sec lr-tools-sec" aria-labelledby="lr-tools-title" data-fx>
     <div class="wrap">
-      <h2 class="h-display" id="lr-tools-title" data-i18n="lr.tools.title">See each tool at work.</h2>
-      <p class="lead lr-tools-lead" data-i18n="lr.tools.lead">Each one has a short loop on the features page.</p>
+      <div class="sticker-heading">
+        <h2 class="h-display" id="lr-tools-title" data-i18n="lr.tools.title">See each tool at work.</h2>
+        <span class="stk stk-placed" data-stk="my_uvs" data-stk-pool="my_uvs recoloured" aria-hidden="true"></span>
+      </div>
+      <p class="lead lr-tools-lead" data-i18n="lr.tools.lead">See the selection, strokes and material changes on the same model.</p>
       <ul class="lr-tools" role="list">
         <li><a href="features.html?view=overview#select"><span class="lr-tool" data-i18n="lr.t.select">Select</span><span class="lr-tool-say" data-i18n="lr.t.select.p">Select exactly what you mean.</span></a></li>
         <li><a href="features.html?view=overview#paint"><span class="lr-tool" data-i18n="lr.t.paint">Paint</span><span class="lr-tool-say" data-i18n="lr.t.paint.p">Paint like in your art app.</span></a></li>
         <li><a href="features.html?view=overview#layers"><span class="lr-tool" data-i18n="lr.t.layers">Layers</span><span class="lr-tool-say" data-i18n="lr.t.layers.p">Every edit is its own layer.</span></a></li>
         <li><a href="features.html?view=overview#colour"><span class="lr-tool" data-i18n="lr.t.colour">Colour</span><span class="lr-tool-say" data-i18n="lr.t.colour.p">Recolour and match.</span></a></li>
-        <li><a href="features.html?view=overview#material"><span class="lr-tool" data-i18n="lr.t.material">Material</span><span class="lr-tool-say" data-i18n="lr.t.material.p">Tune the material.</span></a></li>
+        <li><a href="features.html?view=overview#quick-material"><span class="lr-tool" data-i18n="lr.t.material">Material</span><span class="lr-tool-say" data-i18n="lr.t.material.p">Tune the material.</span></a></li>
         <li><a href="features.html?view=overview#maps"><span class="lr-tool" data-i18n="lr.t.maps">Maps</span><span class="lr-tool-say" data-i18n="lr.t.maps.p">Bake maps.</span></a></li>
-        <li><a href="features.html?view=overview#safety"><span class="lr-tool" data-i18n="lr.t.safety">Safety</span><span class="lr-tool-say" data-i18n="lr.t.safety.p">Undo any step. Your originals never change.</span></a></li>
+        <li><a href="features.html?view=overview#safety"><span class="lr-tool" data-i18n="lr.t.safety">Safety</span><span class="lr-tool-say" data-i18n="lr.t.safety.p">Undo layer edits and save a new texture.</span></a></li>
       </ul>
       <div class="pg-cta">
         <a class="btn btn-primary btn-lg" href="download.html" data-i18n="nav.get">Get it</a>
@@ -269,9 +287,10 @@
 
 <p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
 
-<script src="tour.js" defer></script>
-<script src="paint.js" defer></script>
-<script src="app.js" defer></script>
-<script src="learn.js" defer></script>
+<script src="tour.js?v=030-paper-3" defer></script>
+<script src="ink-effects.js?v=030-paper-3" defer></script>
+<script src="paint.js?v=030-paper-3" defer></script>
+<script src="app.js?v=030-learning-1" defer></script>
+<script src="learn.js?v=030-workshop-1" defer></script>
 </body>
 </html>

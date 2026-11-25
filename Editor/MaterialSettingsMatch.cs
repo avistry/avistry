@@ -5,11 +5,6 @@ using UnityEngine.Rendering;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// "Also match material settings": copies a material's colour and lighting settings (shadow colours and borders,
-    /// lighting mode and limits, optionally rim / shine and outline colour) onto another material with the same shader
-    /// family. Textures, masks, UV settings and the rendering mode are never touched.
-    /// </summary>
     public static class MaterialSettingsMatch
     {
         public enum Group { Lighting, RimShine, Outline, Emission }
@@ -19,8 +14,9 @@ namespace Avistry.Textures
             public string property;
             public Group group;
             public ShaderPropertyType type;
-            public Vector4 from, to;   // floats in x; colours as rgba
+            public Vector4 from, to;
             public bool isInt;
+            internal int? originalInteger, copiedInteger;
         }
 
         public static bool Compatible(Material target, Material source, out string why)
@@ -43,7 +39,6 @@ namespace Avistry.Textures
             "SrcBlend", "DstBlend", "BlendOp", "AlphaToMask", "Offset", "Texel", "Animated", "Version",
         };
 
-        /// <summary>Which group a property belongs to, or null if it is never copied.</summary>
         public static Group? Classify(string n, ShaderPropertyType type)
         {
             if (string.IsNullOrEmpty(n) || n[0] != '_' || type == ShaderPropertyType.Texture) return null;
@@ -57,13 +52,13 @@ namespace Avistry.Textures
                 n.StartsWith("_LightMin") || n.StartsWith("_LightMax") || n.Contains("Monochrome") || n == "_AsUnlit" ||
                 n == "_lilDirectionalLightStrength" || n == "_BeforeExposureLimit")
                 return Group.Lighting;
-            if (n.StartsWith("_Rim") || n.StartsWith("_Matcap") || n.StartsWith("_MatCap") || n.StartsWith("_Backlight"))
+            if (n.StartsWith("_Rim") || n.StartsWith("_Matcap") || n.StartsWith("_MatCap") || n.StartsWith("_Backlight") ||
+                n is "_EnableRimLighting" or "_EnableRim2Lighting" or "_UseRim" or "_UseMatCap" or "_UseMatCap2nd" or "_UseBacklight")
                 return Group.RimShine;
             if (n.StartsWith("_Outline") && type == ShaderPropertyType.Color) return Group.Outline;
             return null;
         }
 
-        /// <summary>The settings that would change on target (only properties both materials have, and only if different).</summary>
         public static List<Change> Plan(Material target, Material source, bool lighting, bool rimShine, bool outline, bool emission = false)
         {
             var list = new List<Change>();
@@ -77,7 +72,9 @@ namespace Avistry.Textures
                 var g = Classify(n, type);
                 if (g == null) continue;
                 if ((g == Group.Lighting && !lighting) || (g == Group.RimShine && !rimShine) || (g == Group.Outline && !outline) || (g == Group.Emission && !emission)) continue;
-                if (!target.HasProperty(n) || !source.HasProperty(n)) continue;
+                int targetIndex = target.shader.FindPropertyIndex(n), sourceIndex = source.shader.FindPropertyIndex(n);
+                if (targetIndex < 0 || sourceIndex < 0 || target.shader.GetPropertyType(targetIndex) != type ||
+                    source.shader.GetPropertyType(sourceIndex) != type) continue;
                 var c = new Change { property = n, group = g.Value, type = type };
                 switch (type)
                 {
@@ -91,8 +88,12 @@ namespace Avistry.Textures
                         break;
                     case ShaderPropertyType.Int:
                         c.isInt = true;
-                        c.from = new Vector4(target.GetInteger(n), 0, 0, 0); c.to = new Vector4(source.GetInteger(n), 0, 0, 0);
-                        if (c.from.x == c.to.x) continue;
+                        int from = target.GetInteger(n), to = source.GetInteger(n);
+                        if (from == to) continue;
+                        c.originalInteger = from;
+                        c.copiedInteger = to;
+                        c.from = new Vector4(from, 0, 0, 0);
+                        c.to = new Vector4(to, 0, 0, 0);
                         break;
                     default:
                         c.from = new Vector4(target.GetFloat(n), 0, 0, 0); c.to = new Vector4(source.GetFloat(n), 0, 0, 0);
@@ -104,24 +105,50 @@ namespace Avistry.Textures
             return list;
         }
 
-        /// <summary>Writes the planned values onto target (one undo step) and lets the shader tidy up afterwards.</summary>
         public static int Apply(Material target, List<Change> changes)
+            => Write(target, changes, false);
+
+        internal static void PrepareCopy(Material copy, List<Change> changes) => Write(copy, changes, false, recordUndo: false);
+
+        internal static int Restore(Material target, List<Change> changes)
+        {
+            if (target == null || MaterialWriter.IsPoiyomiLocked(target) || MaterialWriter.IsSectionLocked(target)) return 0;
+            var restorable = changes.FindAll(c => target.HasProperty(c.property) && HasCopiedValue(target, c));
+            return Write(target, restorable, true);
+        }
+
+        static bool HasCopiedValue(Material target, Change c)
+        {
+            switch (c.type)
+            {
+                case ShaderPropertyType.Color: return target.GetColor(c.property).Equals((Color)c.to);
+                case ShaderPropertyType.Vector: return target.GetVector(c.property).Equals(c.to);
+                default: return c.isInt
+                    ? target.GetInteger(c.property) == (c.copiedInteger ?? Mathf.RoundToInt(c.to.x))
+                    : target.GetFloat(c.property).Equals(c.to.x);
+            }
+        }
+
+        static int Write(Material target, List<Change> changes, bool restore, bool recordUndo = true)
         {
             if (target == null || changes == null || changes.Count == 0) return 0;
-            Undo.RecordObject(target, "Match material settings");
+            if (recordUndo) Undo.RecordObject(target, restore ? Loc.T("Restore material settings") : "Match material settings");
             MaterialWriter.EnsureEditable(new[] { target });
+            int written = 0;
             foreach (var c in changes)
             {
                 if (!target.HasProperty(c.property)) continue;
+                var value = restore ? c.from : c.to;
                 switch (c.type)
                 {
-                    case ShaderPropertyType.Color: target.SetColor(c.property, c.to); break;
-                    case ShaderPropertyType.Vector: target.SetVector(c.property, c.to); break;
+                    case ShaderPropertyType.Color: target.SetColor(c.property, value); break;
+                    case ShaderPropertyType.Vector: target.SetVector(c.property, value); break;
                     default:
-                        if (c.isInt) target.SetInteger(c.property, Mathf.RoundToInt(c.to.x));
-                        else target.SetFloat(c.property, c.to.x);
+                        if (c.isInt) target.SetInteger(c.property, (restore ? c.originalInteger : c.copiedInteger) ?? Mathf.RoundToInt(value.x));
+                        else target.SetFloat(c.property, value.x);
                         break;
                 }
+                written++;
             }
             EditorUtility.SetDirty(target);
             switch (ShaderProfiles.Detect(target.shader))
@@ -129,16 +156,21 @@ namespace Avistry.Textures
                 case ShaderFamily.Poiyomi: MaterialWriter.FixPoiyomiKeywords(new[] { target }); break;
                 case ShaderFamily.LilToon: MaterialWriter.AfterLilToonEdit(new[] { target }); break;
             }
-            return changes.Count;
+            return written;
         }
 
         public static string Describe(Change c)
         {
             string name = ShaderProfiles.FriendlyName(c.property, null);
             if (c.type == ShaderPropertyType.Color)
-                return $"{name}: #{ColorUtility.ToHtmlStringRGB((Color)c.from)} → #{ColorUtility.ToHtmlStringRGB((Color)c.to)}";
+                return $"{name}: {DescribeColour(c.from)} → {DescribeColour(c.to)}";
             if (c.type == ShaderPropertyType.Vector) return $"{name}: {((Vector4)c.from).ToString("0.##")} → {((Vector4)c.to).ToString("0.##")}";
             return $"{name}: {c.from.x:0.###} → {c.to.x:0.###}";
         }
+
+        static string DescribeColour(Vector4 rgba) => rgba.x >= 0f && rgba.x <= 1f && rgba.y >= 0f && rgba.y <= 1f &&
+            rgba.z >= 0f && rgba.z <= 1f && rgba.w >= 0f && rgba.w <= 1f
+            ? "#" + ColorUtility.ToHtmlStringRGBA((Color)rgba)
+            : rgba.ToString("0.###");
     }
 }

@@ -5,10 +5,6 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// What the person has read and done in the skill tree. One EditorPrefs value per machine holding concept ids only:
-    /// no times, names, paths or counts. Nothing here ever locks a feature.
-    /// </summary>
     internal static class Learn
     {
         internal enum State { New, Read, Done }
@@ -16,10 +12,10 @@ namespace Avistry.Textures
         internal const string PrefKey = "Avistry.Learn.v1";
         const string BackupKey = "Avistry.Learn.Backup";
         internal const string GraduateName = "Avistry graduate";
-        /// <summary>The value stored in "celebrated" once the graduate medal was shown.</summary>
-        internal const int GraduateMark = Glossary.TierCount + 1;
+        internal const int GraduateMark = -1;
+        const int LegacyGraduateMark = 7;
 
-        [Serializable] class Store { public int v = 1; public List<string> read = new List<string>(), done = new List<string>(); public List<int> celebrated = new List<int>(); }
+        [Serializable] class Store { public int v = 2; public List<string> read = new List<string>(), done = new List<string>(); public List<int> celebrated = new List<int>(); }
         class Book { public readonly HashSet<string> read = new HashSet<string>(), done = new HashSet<string>(); public readonly HashSet<int> celebrated = new HashSet<int>(); }
 
         static Book s_real, s_sandbox;
@@ -27,22 +23,15 @@ namespace Avistry.Textures
         static int s_suppress;
         static string s_sandboxBackup;
 
-        /// <summary>A concept became Done through <see cref="Did"/> or <see cref="GotIt"/> (not through a silent bulk mark).</summary>
         internal static event Action<string> ConceptDone;
-        /// <summary>Anything in the store changed; windows repaint.</summary>
         internal static event Action Changed;
 
         static Learn()
         {
-            // A write waiting for the next frame must not be lost to a reload or to closing Unity.
             AssemblyReloadEvents.beforeAssemblyReload += Flush;
             EditorApplication.quitting += Flush;
         }
 
-        /// <summary>
-        /// Keeps everything in memory and never reads or writes EditorPrefs. Switching it on starts from an empty book;
-        /// switching it off drops that book. For tests.
-        /// </summary>
         internal static bool Sandbox
         {
             get => s_inSandbox;
@@ -56,7 +45,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>Marks nothing while any scope is open. The AI helper wraps every call in one. Dispose it once.</summary>
         internal readonly struct Suppression : IDisposable
         {
             public void Dispose() { if (s_suppress > 0) s_suppress--; }
@@ -76,7 +64,6 @@ namespace Avistry.Textures
 
         internal static bool IsDone(string conceptId) => conceptId != null && Cur.done.Contains(conceptId);
 
-        /// <summary>Runs once per user action. One dictionary lookup, no allocation, never throws.</summary>
         internal static void Did(string learnEvent)
         {
             if (s_suppress > 0) return;
@@ -92,14 +79,12 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>The "I've got it" button.</summary>
         internal static void GotIt(string conceptId)
         {
             if (s_suppress > 0 || !Glossary.Has(conceptId)) return;
             MarkDone(conceptId, true);
         }
 
-        /// <summary>"Mark as not done": the card keeps its Read mark.</summary>
         internal static void Unmark(string conceptId)
         {
             if (s_suppress > 0 || conceptId == null) return;
@@ -116,7 +101,6 @@ namespace Avistry.Textures
             Changed?.Invoke();
         }
 
-        /// <summary>"I know Unity already": marks a whole tier Done with no toast or medal.</summary>
         internal static void MarkTierDone(int tier)
         {
             if (s_suppress > 0) return;
@@ -136,7 +120,6 @@ namespace Avistry.Textures
             Changed?.Invoke();
         }
 
-        /// <summary>Counted concepts that are Done.</summary>
         internal static int DoneCount()
         {
             int n = 0;
@@ -164,8 +147,8 @@ namespace Avistry.Textures
         }
 
         internal static bool IsGraduate => Glossary.CountedCount > 0 && DoneCount() >= Glossary.CountedCount;
+        internal static bool HasGraduateMedal => IsCelebrated(GraduateMark) || IsGraduate;
 
-        /// <summary>The highest tier with any progress (0 when there is none). The unseen dots use it.</summary>
         internal static int HighestTierWithProgress()
         {
             int top = 0;
@@ -176,10 +159,6 @@ namespace Avistry.Textures
             return top;
         }
 
-        /// <summary>
-        /// Up to <paramref name="max"/> concepts to try next: not Done, and everything they come after is Done.
-        /// By tier, then by order. Bonus nodes are never listed.
-        /// </summary>
         internal static void NextUp(List<string> into, int max)
         {
             into.Clear();
@@ -205,7 +184,6 @@ namespace Avistry.Textures
             MarkDirty();
         }
 
-        /// <summary>Clears progress. A copy is kept until Unity closes so <see cref="BringBack"/> can undo it.</summary>
         internal static void Reset()
         {
             var b = Cur;
@@ -243,7 +221,6 @@ namespace Avistry.Textures
             set { if (s_inSandbox) s_sandboxBackup = value; else SessionState.SetString(BackupKey, value ?? ""); }
         }
 
-        // At most one write per frame, and only when something changed.
         static void MarkDirty()
         {
             if (s_inSandbox) return;
@@ -264,7 +241,6 @@ namespace Avistry.Textures
 
         static Book LoadReal() => FromJson(EditorPrefs.GetString(PrefKey, ""), true);
 
-        // Unknown ids are dropped so renamed concepts stay compatible, unless the glossary itself failed to load.
         static Book FromJson(string json, bool dropUnknown)
         {
             var book = new Book();
@@ -272,15 +248,16 @@ namespace Avistry.Textures
             Store s;
             try { s = JsonUtility.FromJson<Store>(json); }
             catch (Exception) { return book; }
-            if (s == null || s.v != 1) return book;
+            if (s == null || (s.v != 1 && s.v != 2)) return book;
             bool check = dropUnknown && Glossary.All.Count > 0;
             if (s.read != null) foreach (var id in s.read) if (!check || Glossary.Has(id)) book.read.Add(id);
             if (s.done != null) foreach (var id in s.done) if (!check || Glossary.Has(id)) book.done.Add(id);
-            if (s.celebrated != null) foreach (var n in s.celebrated) book.celebrated.Add(n);
+            if (s.celebrated != null)
+                foreach (var n in s.celebrated)
+                    book.celebrated.Add(s.v == 1 && n == LegacyGraduateMark ? GraduateMark : n);
             return book;
         }
 
-        // Sorted so the same progress always gives the same text.
         static string ToJson(Book b)
         {
             var s = new Store();

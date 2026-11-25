@@ -3,7 +3,6 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>The AI helper's approval banner and activity strip in the panel. The helper itself lives in Editor/Agent.</summary>
     partial class AvatarTextureWindow
     {
         const float AgentBannerH = 52f, AgentStripH = 20f;
@@ -21,7 +20,6 @@ namespace Avistry.Textures
         [System.NonSerialized] int _agentStripKey = -1;
         [System.NonSerialized] string _agentStripLang;
 
-        // Windows repaint when the helper asks for something, so the banner shows even while Unity sits idle.
         [InitializeOnLoadMethod]
         static void WatchAgentAccess()
         {
@@ -34,7 +32,6 @@ namespace Avistry.Textures
             foreach (var w in Resources.FindObjectsOfTypeAll<AvatarTextureWindow>()) if (w != null) w.Repaint();
         }
 
-        /// <summary>The height of the approval banner (0 when nothing waits), for the panel frame.</summary>
         float AgentBannerHeight
         {
             get
@@ -44,7 +41,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>The height of the activity strip (0 when the helper is off or has done nothing lately), for the panel frame.</summary>
         float AgentStripHeight
         {
             get
@@ -113,13 +109,14 @@ namespace Avistry.Textures
             }
 
             double age = EditorApplication.timeSinceStartup - last.time;
-            bool canUndo = AgentApi.CanUndoLast();
+            bool canUndo = AgentApi.CanUndoLast(this);
             int key = (log.Count * 10000 + (age < 60 ? (int)age / 5 : 100 + (int)age / 60)) * 2 + (canUndo ? 1 : 0);
             if (key != _agentStripKey || _agentStripLang != Loc.Current)
             {
                 _agentStripKey = key;
                 _agentStripLang = Loc.Current;
-                _agentStripContent = new GUIContent(canUndo ? Loc.F("AI helper · {0} · {1}", last.text, AgoText(age)) : Loc.F("AI helper · {0} · {1} · Use Ctrl+Z", last.text, AgoText(age)), Loc.T("Ctrl+Z undoes the helper's steps one by one"));
+                _agentStripContent = new GUIContent(Loc.F("AI helper · {0} · {1}", last.text, AgoText(age)),
+                    Loc.T("Unity’s Edit menu shows which action Undo will take back."));
             }
 
             float right = r.xMax - 6;
@@ -135,13 +132,20 @@ namespace Avistry.Textures
             {
                 var undo = new Rect(right - 40, r.y + 2, 40, 16);
                 if (GUI.Button(undo, s_undo, EditorStyles.miniButton))
-                    EditorApplication.delayCall += () => { if (this != null) { AgentApi.UndoLast(this, "undo_last"); Repaint(); } };
+                    EditorApplication.delayCall += () => { if (this != null) UndoHelperEdit(); };
                 right = undo.x - 4;
             }
 
             s_agentStrip ??= new GUIStyle(EditorStyles.miniLabel) { clipping = TextClipping.Clip };
             s_agentStrip.normal.textColor = StudioGUI.CardTextDim;
             GUI.Label(new Rect(r.x + 8, r.y + 2, Mathf.Max(0f, right - r.x - 8), 16), _agentStripContent, s_agentStrip);
+        }
+
+        internal void UndoHelperEdit()
+        {
+            if (!AgentApi.UndoLast(this, "undo_last").ok)
+                Toast(Loc.T("Unity’s Edit menu shows which action Undo will take back."));
+            Repaint();
         }
     }
 }

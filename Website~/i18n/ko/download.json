@@ -32,16 +32,16 @@
  "install.tab.vcc": "VCC (권장)",
  "install.tab.unity": ".unitypackage",
  "install.tab.git": "Git URL",
- "install.vcc.s1": "<strong>VCC로 받기</strong> 버튼을 누르세요. 반응이 없으면 아래 리스트 URL을 복사해 VCC의 <span class=\"path\">Settings &gt; Packages &gt; Add Repository</span>에서 추가하세요.",
+ "install.vcc.s1": "<strong>VCC로 받기</strong> 버튼을 누르세요. 반응이 없으면 아래 패키지 목록 URL을 복사해 VCC의 <span class=\"path\">Settings &gt; Packages &gt; Add Repository</span>에서 추가하세요.",
  "install.vcc.s2": "VCC에서 아바타 프로젝트를 열고 <strong>Manage Project</strong>에서 Avistry 옆의 <strong>+</strong>를 누르세요.",
  "install.open": "Unity에서 <span class=\"path\">Tools &gt; Avistry &gt; Textures</span>를 엽니다.",
- "install.listing": "리스트 URL",
+ "install.listing": "패키지 목록 URL",
  "install.unity.s1": "위 버튼이나 GitHub Releases에서 <code>.unitypackage</code> 파일을 다운로드하세요.",
  "install.unity.s2": "프로젝트를 연 상태에서 파일을 Project 창으로 끌어다 놓거나 <span class=\"path\">Assets &gt; Import Package &gt; Custom Package</span>를 선택한 다음, <strong>Import</strong>를 클릭하세요.",
  "install.git.s1": "Unity에서 <span class=\"path\">Window &gt; Package Manager</span>를 엽니다.",
  "install.git.s2": "<strong>+</strong> 버튼에서 <strong>Add package from git URL</strong>을 선택하고 아래 URL을 붙여넣으세요.",
  "install.gitLabel": "Git URL",
- "install.vcchelp": "VCC가 열리지 않았나요? 리스트 URL을 복사해 Settings > Packages > Add Repository에서 추가하세요.",
+ "install.vcchelp": "VCC가 열리지 않았나요? 패키지 목록 URL을 복사해 Settings > Packages > Add Repository에서 추가하세요.",
  "install.steps": "단계",
  "dl.history.lead2": "모든 릴리스를 바로 다운로드할 수 있습니다.",
  "dl.older": "이전 버전 {n}개 보기",
@@ -57,5 +57,6 @@
  "dl.dev.3.b2": "풀 리퀘스트를 열어 주세요. 모두 테스트한 뒤 일반 버전에 포함해 배포합니다.",
  "dl.dev.pr": "풀 리퀘스트 열기",
  "dl.banner.go": "새로운 점 보기",
- "dl.banner.alt": "Avistry 0.2.0, 첫 번째 공개 릴리스"
+ "dl.banner.alt": "Avistry 0.2.0, 첫 번째 공개 릴리스",
+ "dl.banner.alt.0.3.0": "Avistry 0.3.0 Surface Studio. 이어컵에 벚꽃을 그린 갈색 헤드폰."
 }

@@ -2,8 +2,7 @@
   'use strict';
 
   var LANGS = ['en', 'ja', 'ko', 'zh-CN'];
-  /* the language lives in the address: /ja/page.html on the published site (copies made by build-langs.mjs, so a
-     shared link previews in its language), ?lang=ja where those copies do not exist, as in a local preview */
+  var TEXT_VERSION = '0.3.0-learning-1';
   var LANG_DIRS = !!document.querySelector('meta[name="ats-lang-dirs"]');
   function langRoot() {
     var p = location.pathname, d = p.slice(0, p.lastIndexOf('/') + 1), m = /([^/]+)\/$/.exec(d);
@@ -12,7 +11,6 @@
     return { dir: d, file: p.slice(p.lastIndexOf('/') + 1), lang: l };
   }
   if (LANG_DIRS) {
-    /* one fixed base for every relative file, whichever language folder the address shows */
     var baseEl = document.querySelector('base') || document.head.appendChild(document.createElement('base'));
     baseEl.href = location.origin + langRoot().dir;
   }
@@ -22,6 +20,11 @@
     'zh-CN': 'https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap'
   };
   var MEDIA = 'media/v4/';
+  var mediaPage = document.querySelector('[data-media-version]');
+  var mediaVersion = mediaPage && mediaPage.getAttribute('data-media-version');
+  function versionMedia(url) {
+    return mediaVersion && url.indexOf(MEDIA) === 0 ? url.split('?')[0] + '?v=' + encodeURIComponent(mediaVersion) : url;
+  }
   var PAGE = document.documentElement.getAttribute('data-page') || 'home';
   var dicts = {};
   var state = { lang: 'en', release: null, loadFailed: false, look: 'crimson', layerCount: null };
@@ -42,16 +45,13 @@
     return null;
   }
 
-  /* one look for the whole site: ?look= in a link wins, then what this browser remembered, then crimson */
   var LOOKS = ['original', 'crimson', 'frost', 'venom'];
   var HERO_LOOKS = ['crimson', 'frost', 'venom'];
   function validLook(l) { return LOOKS.indexOf(l) !== -1; }
   state.look = (function () {
     var q = /[?&]look=(\w+)/.exec(location.search);
-    /* the home page picked its look in index.html before the first paint */
     var picked = document.getElementById('hero-bg');
     if (picked && picked.getAttribute('data-pick')) return picked.getAttribute('data-look');
-    /* the gallery opens on the next edited look each visit; a shared link from outside the site still wins */
     if (document.getElementById('gal-looks')) {
       var inside = false;
       try { inside = !!document.referrer && new URL(document.referrer).host === location.host; } catch (e) {}
@@ -66,13 +66,11 @@
     var saved = store('ats-look');
     return validLook(saved) ? saved : 'crimson';
   })();
-  /* the look tints the site (style.css [data-tint]); paint.js repaints its banner */
   function tint() {
     document.documentElement.setAttribute('data-tint', state.look);
     try { window.dispatchEvent(new Event('ats-tint')); } catch (e) {}
   }
   tint();
-  /* the inline script in index.html may already have pointed the hero at the remembered look */
   state.heroShown = (function () {
     var bg = document.getElementById('hero-bg');
     var l = bg && bg.getAttribute('data-look');
@@ -91,7 +89,12 @@
   }
 
   function safeUrl(u) {
+    if (typeof u !== 'string' || !u) return null;
     try {
+      if (/^\/(?!\/)/.test(u)) {
+        var local = new URL(u, location.origin);
+        return local.origin === location.origin ? local.href : null;
+      }
       var url = new URL(u);
       return url.protocol === 'https:' ? url.href : null;
     } catch (e) { return null; }
@@ -99,7 +102,6 @@
 
   function setText(sel, text) { var el = $(sel); if (el) el.textContent = text; }
 
-  /* ---------- old anchors: the long page is now four pages ---------- */
   var OLD_HASH = {
     see: 'gallery.html#closeups', closeups: 'gallery.html#closeups', spin: 'gallery.html#spin', light: 'gallery.html#light',
     makeover: 'gallery.html#makeover', count: 'gallery.html#makeover', gallery: 'gallery.html', story: 'index.html#how',
@@ -112,7 +114,6 @@
   (function redirectOldHash() {
     var h = decodeURIComponent((location.hash || '').slice(1));
     if (!h || !OLD_HASH[h]) return;
-    /* only when this page has no such section of its own; the DOM is not ready yet, so ask the target instead */
     var here = location.pathname.split('/').pop() || 'index.html';
     var target = OLD_HASH[h];
     if (target.split('#')[0] === here) return;
@@ -121,7 +122,6 @@
     location.replace(target);
   })();
 
-  /* repository placeholders: on OWNER.github.io/REPO the links fix themselves */
   var repo = (function () {
     var m = /^([a-z0-9-]+)\.github\.io$/i.exec(location.hostname);
     var name = location.pathname.split('/')[1];
@@ -143,7 +143,6 @@
     if (og) og.setAttribute('content', sub(og.getAttribute('content')));
   }
 
-  /* ---------- language: common strings plus this page's strings, English as the fallback ---------- */
   function detectLang() {
     var dirLang = LANG_DIRS && langRoot().lang;
     if (dirLang) return dirLang;
@@ -165,7 +164,8 @@
   function loadDict(lang) {
     if (dicts[lang]) return Promise.resolve();
     function one(file) {
-      return fetch('i18n/' + lang + '/' + file + '.json')
+      var version = file === 'features' && mediaVersion ? mediaVersion : TEXT_VERSION;
+      return fetch('i18n/' + lang + '/' + file + '.json?v=' + version)
         .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
         .catch(function () { return {}; });
     }
@@ -176,7 +176,6 @@
     });
   }
 
-  /* Japanese, Korean and Chinese web fonts load only when that language is picked */
   function loadCjkFont(lang) {
     var href = FONT_LINKS[lang];
     if (!href || document.querySelector('link[data-font="' + lang + '"]')) return;
@@ -187,7 +186,6 @@
     link.onload = function () { link._loaded = true; };
     document.head.appendChild(link);
   }
-  /* when switching by hand, wait a moment for the language's font, so the words do not jump again when it arrives */
   var FONT_FAMILY = { ja: '"M PLUS Rounded 1c"', ko: '"Noto Sans KR"', 'zh-CN': '"Noto Sans SC"' };
   function fontReady(lang) {
     var link = document.querySelector('link[data-font="' + lang + '"]');
@@ -200,7 +198,6 @@
     return Promise.race([wait, new Promise(function (res) { setTimeout(res, 900); })]);
   }
 
-  /* the coral full stop on display headings (the logo's dot), then the heading's mascot emoji (data-emo) */
   function decorateHeadings() {
     $$('.h-display').forEach(function (h) {
       if (h.querySelector('.accent-dot, .emo')) return;
@@ -264,7 +261,6 @@
     renderRelease();
     updateCompareText();
     renderStepButtons();
-    renderSel();
     renderCount();
     renderLook();
     paintAllButtons();
@@ -273,7 +269,6 @@
     document.dispatchEvent(new CustomEvent('ats:lang', { detail: { lang: lang } }));
   }
 
-  /* small public surface for the other scripts on the site (ideas.js, learn.js) */
   window.ATS = {
     t: function (key) { return t(key); },
     fmt: fmt,
@@ -322,7 +317,6 @@
     } catch (e) {}
   }
 
-  /* ---------- switching language: the words on screen scramble into the new language, swapped pictures glitch ---------- */
   var langFx = null;
   var POOL = {
     en: 'ABCDEFGHJKLMNPRSTUVWXYZabcdefghkmnprstuvwxyz0123456789#%&*+=?',
@@ -340,7 +334,6 @@
     });
     return out;
   }
-  /* every text node inside the element scrambles, so styled words in a title do too */
   function scramble(el, pool) {
     var nodes = [], w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), tn, total = 0;
     while ((tn = w.nextNode())) { if (tn.nodeValue.trim() && !(tn.parentNode.closest && tn.parentNode.closest('svg'))) { nodes.push({ n: tn, fin: tn.nodeValue, last: tn.nodeValue }); total += tn.nodeValue.length; } }
@@ -350,7 +343,7 @@
       var p = Math.min(1, (now - t0) / dur), at = 0;
       for (var k = 0; k < nodes.length; k++) {
         var o = nodes[k];
-        if (o.n.nodeValue !== o.last) { at += o.fin.length; continue; } /* something else changed it: leave it */
+        if (o.n.nodeValue !== o.last) { at += o.fin.length; continue; }
         var s = '';
         for (var i = 0; i < o.fin.length; i++) {
           var c = o.fin.charAt(i);
@@ -363,20 +356,26 @@
     }
     requestAnimationFrame(frame);
   }
-  /* random letters are wider or narrower than the real ones, so lines would rewrap on every frame; the box keeps the
-     size of the finished text until the scramble is done, and nothing around it moves */
   function steady(el) {
     var cs = getComputedStyle(el);
     if (cs.display === 'inline' && el.parentElement) { el = el.parentElement; cs = getComputedStyle(el); }
-    if (el._steady) { el._steady++; return function () { if (--el._steady === 0) el._unsteady(); }; }
+    if (el._steady) {
+      var lockedRelease = el._unsteady;
+      el._steady++;
+      return function () { if (el._unsteady === lockedRelease && el._steady > 0 && --el._steady === 0) lockedRelease(); };
+    }
     var r = el.getBoundingClientRect(), st = el.style, keep = { h: st.height, w: st.width, b: st.boxSizing };
     var par = el.parentElement ? getComputedStyle(el.parentElement).display : '';
     st.boxSizing = 'border-box';
-    st.height = r.height + 'px';
-    if (cs.display !== 'block' || /flex|grid/.test(par)) st.width = r.width + 'px';
+    st.height = (el.offsetHeight || r.height) + 'px';
+    if (cs.display !== 'block' || /flex|grid/.test(par)) st.width = (el.offsetWidth || r.width) + 'px';
     el._steady = 1;
-    el._unsteady = function () { st.height = keep.h; st.width = keep.w; st.boxSizing = keep.b; el._steady = 0; };
-    return function () { if (--el._steady === 0) el._unsteady(); };
+    var release = el._unsteady = function () {
+      st.height = keep.h; st.width = keep.w; st.boxSizing = keep.b; el._steady = 0;
+      window.removeEventListener('resize', el._unsteady);
+    };
+    window.addEventListener('resize', el._unsteady, { once: true });
+    return function () { if (el._unsteady === release && el._steady > 0 && --el._steady === 0) release(); };
   }
   function flicker(el, cls, ms) {
     el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
@@ -401,7 +400,6 @@
     return v.closest('.plate-body, .vwrap, .cmp, .hero, picture') || v;
   }
 
-  /* ---------- keep going: the next page and Download, each with its share picture in this language ---------- */
   function renderNext() {
     var box = $('.next-up');
     if (!box) return;
@@ -437,7 +435,6 @@
   }
 
   function ogPic(p) { return 'media/og' + (p === 'index' ? '' : '-' + p) + (state.lang === 'en' ? '' : '-' + state.lang) + '.jpg'; }
-  /* the link text moves into a span the first time, so the translation can change it without removing the picture */
   function renderNavPics() {
     $$('.nav a, .sheet-nav a').forEach(function (a) {
       var m = /^(index|features|gallery|learn|about|download)\.html/.exec(a._h0 || a.getAttribute('href') || '');
@@ -453,7 +450,6 @@
           img.className = 'sheet-pic'; img.loading = 'lazy';
           a.appendChild(img); a.appendChild(label);
         } else {
-          /* desktop: the preview loads the first time the link is pointed at or focused */
           var peek = mk('span', 'nav-peek');
           peek.setAttribute('aria-hidden', 'true');
           peek.appendChild(img);
@@ -468,7 +464,6 @@
     });
   }
 
-  /* the home page's "Want more?" cards: the page's picture on top */
   function renderMorePics() {
     $$('.more-card').forEach(function (a) {
       var m = /^(features|gallery|about|learn|download)\.html/.exec(a._h0 || a.getAttribute('href') || '');
@@ -490,16 +485,33 @@
     });
   }
 
-  /* the Download page's release banner, in this language */
   function renderBanner() {
     var a = $('.dl-banner');
     if (!a) return;
-    var img = $('img', a), v = a.getAttribute('data-banner');
-    var src = 'media/release/' + v + '/banner' + (state.lang === 'en' ? '' : '-' + state.lang) + '.jpg';
+    var img = $('img', a), next = a.getAttribute('data-next-banner'), base = a.getAttribute('data-banner');
+    var r = state.release, v = r ? r.version : base;
+    a.hidden = v !== base && v !== next;
+    if (a.hidden) return;
+    a.href = (r && safeUrl(r.release_url)) || 'https://github.com/avistry/avistry/releases/tag/v' + v;
+    img.alt = t(v === base ? 'dl.banner.alt' : 'dl.banner.alt.' + v) || 'Avistry ' + v;
+    setText('.dl-banner-version', 'v' + v);
+    var dir = 'media/release/' + v + '/', suffix = (state.lang === 'en' ? '' : '-' + state.lang) + '.jpg';
+    var src = dir + 'banner' + suffix, picture = $('picture', a), small = $('source', a);
+    if (picture && picture.getAttribute('data-compact-banner') === v) {
+      if (!small) {
+        small = document.createElement('source');
+        small.media = '(max-width: 599px)';
+        small.width = 1200;
+        small.height = 630;
+      }
+      if (small.getAttribute('srcset') !== dir + 'share' + suffix) small.srcset = dir + 'share' + suffix;
+      if (!small.parentNode) picture.insertBefore(small, img);
+    } else if (small) {
+      small.remove();
+    }
     if (img.getAttribute('src') !== src) { if (langFx) langFx.push(a); img.setAttribute('src', src); }
   }
 
-  /* ---------- a glow beside the scrollbar while the page moves ---------- */
   function initScrollGlow() {
     if (reduced || $('.scroll-glow')) return;
     var g = document.createElement('div');
@@ -512,7 +524,6 @@
       var vh = window.innerHeight, H = document.documentElement.scrollHeight;
       if (H <= vh + 4) { g.classList.remove('is-on'); return; }
       var th = Math.max(56, vh * vh / H), top = window.scrollY / (H - vh) * (vh - th);
-      /* a little taller than the thumb so the light spills softly above and below it */
       g.style.height = Math.round(th + 120) + 'px';
       g.style.transform = 'translate3d(0,' + (top - 60).toFixed(1) + 'px,0)';
     }
@@ -526,10 +537,6 @@
     place();
   }
 
-  /* ---------- the page looks after itself ----------
-     While the page is on screen, sessionStorage keeps ats-alive set; a clean leave or a hidden tab clears it. If a
-     page finds it still set (the head script checks), the tab crashed, so the rest of the visit runs in Performance
-     mode. While scrolling, very slow frames or a nearly full memory switch it on too, unless it was turned off by hand. */
   var careShown = false, careWant = false;
   function careToast() {
     if (careShown) return;
@@ -573,7 +580,6 @@
       regs.forEach(function (r) { if (r.el && !r.el.paused && r.want !== 'on') r.el.pause(); });
       careToast();
     }
-    /* frames are only measured while scrolling, so an idle page costs nothing */
     var sampling = false, until = 0, last = 0, frames = 0, slow = 0, bad = 0, done = false;
     function tick(now) {
       if (done) return;
@@ -597,7 +603,6 @@
     }
   }
 
-  /* ---------- the language button in the top bar ---------- */
   function initLangMenu() {
     var wrap = $('#hdr-lang');
     if (!wrap) return;
@@ -628,7 +633,6 @@
     if (code) code.textContent = { en: 'EN', ja: 'JA', ko: 'KO', 'zh-CN': 'ZH' }[state.lang] || 'EN';
   }
 
-  /* ---------- release (./latest.json, written by the release workflow) ---------- */
   function normalizeRelease(d) {
     if (!d || typeof d !== 'object') return null;
     var nested = d.sha256 && typeof d.sha256 === 'object';
@@ -647,8 +651,6 @@
     };
   }
 
-  /* releases.json (written by the Pages build from GitHub Releases): every version with its files and download
-     counts. Without it, latest.json alone */
   function fromReleases(d) {
     if (!d || !d.releases || !d.releases.length) throw new Error('no releases');
     state.releases = d;
@@ -688,7 +690,6 @@
 
   function hide(sel, yes) { var el = $(sel); if (el) el.hidden = yes; }
 
-  /* every page has the install strip; only the About page has the checks table, so each lookup is optional */
   function renderRelease() {
     var r = state.release;
     var fallback = $('#release-fallback');
@@ -742,6 +743,7 @@
     var scanned = r.vt_scanned;
     var scannedDate = typeof scanned === 'string' ? (formatDate(scanned) || scanned) : (scanned === true ? releasedText : '');
     var isScanned = scanned === true || (typeof scanned === 'string' && scanned.length > 0);
+    $$('.inst-meta .js-vt').forEach(function (a) { a.toggleAttribute('data-scanned', !!vt && isScanned); });
     hide('#row-vt', !vt);
     setText('#rel-vt-text', isScanned
       ? (scannedDate ? fmt(t('release.vtScanned') || 'Scanned {date}', { date: scannedDate }) : '')
@@ -767,10 +769,10 @@
     var vs = $('#dl-ver-stat');
     if (vs) vs.hidden = !r.version;
     setText('#dl-date', releasedText);
+    renderBanner();
     renderReleases();
   }
 
-  /* the download count (all versions) counts up once when it comes into view */
   function countUp(el, n) {
     var text = function (v) { return Math.round(v).toLocaleString(state.lang); };
     if (el._n === n) { el.textContent = text(n); return; }
@@ -802,8 +804,6 @@
     if (!d) { if (none) none.hidden = false; return; }
     if (none) none.hidden = true;
     list.textContent = '';
-    /* a timeline: version, date and count on one line, the two files and the notes as small buttons; the newest few
-       show, the rest open with one button */
     var SHOW = 4, more = $('#dl-more'), open = !!list._open;
     function icon(id) { var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'), u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); s.setAttribute('class', 'ic'); s.setAttribute('aria-hidden', 'true'); u.setAttribute('href', '#' + id); s.appendChild(u); return s; }
     d.releases.forEach(function (r, i) {
@@ -815,12 +815,14 @@
       else if (r.prerelease) head.appendChild(mk('span', 'tag', t('dl.pre') || 'Pre-release'));
       var meta = mk('span', 'dl-row-d tnum', formatDate(r.date, true));
       head.appendChild(meta);
-      var n = mk('span', 'dl-row-n tnum');
-      n.appendChild(icon('i-dl'));
-      n.appendChild(document.createTextNode((r.downloads || 0).toLocaleString(state.lang)));
-      n.title = fmt(t('dl.count') || '{n} downloads', { n: (r.downloads || 0).toLocaleString(state.lang) });
-      n.setAttribute('aria-label', n.title);
-      head.appendChild(n);
+      if (typeof r.downloads === 'number') {
+        var n = mk('span', 'dl-row-n tnum'), count = r.downloads.toLocaleString(state.lang);
+        n.appendChild(icon('i-dl'));
+        n.appendChild(document.createTextNode(count));
+        n.title = fmt(t('dl.count') || '{n} downloads', { n: count });
+        n.setAttribute('aria-label', n.title);
+        head.appendChild(n);
+      }
       li.appendChild(head);
       var links = mk('div', 'dl-row-a');
       (r.files || []).slice().sort(function (a, b) { return a.kind === 'unitypackage' ? -1 : b.kind === 'unitypackage' ? 1 : 0; }).forEach(function (f) {
@@ -852,7 +854,6 @@
     }
   }
 
-  /* ---------- install: copy, send to PC ---------- */
   function copyText(text) {
     if (navigator.clipboard && window.isSecureContext) {
       return navigator.clipboard.writeText(text);
@@ -892,7 +893,6 @@
         }).catch(function () {});
       });
     });
-    /* the VCC link opens another app; if this page still has focus a moment later, offer the copy route */
     $$('a[href^="vcc://"]').forEach(function (a) {
       a.addEventListener('click', function () {
         setTimeout(function () {
@@ -903,7 +903,6 @@
     });
   }
 
-  /* on a phone, Avistry cannot run: offer to send the link to the PC */
   function initSharePc() {
     var box = $('#share-pc-box'), btn = $('#share-pc');
     if (!box || !btn) return;
@@ -922,7 +921,6 @@
     });
   }
 
-  /* ---------- theme ---------- */
   function currentTheme() {
     var attr = document.documentElement.getAttribute('data-theme');
     return attr === 'light' ? 'light' : 'dark';
@@ -940,8 +938,6 @@
     $$('meta[name="theme-color"]').forEach(function (m) { m.setAttribute('content', ground); });
   }
 
-  /* performance mode: everything moves as it does with reduced motion, without the drawing canvases or blur; the
-     page reloads so every script starts in the new mode */
   function initPerf() {
     var on = document.documentElement.classList.contains('perf');
     $$('.perf-toggle').forEach(function (b) {
@@ -966,26 +962,19 @@
     });
   }
 
-  /* ---------- header, phone menu, sticky bar ---------- */
   function initHeader() {
     var hdr = $('#hdr');
     if (!hdr) return;
     var btn = $('#menu-btn'), sheet = $('#sheet');
     var hero = $('#top.hero');
     var clearOk = hdr.classList.contains('is-clear') && !!hero;
-    /* home: the bar's look icons come in once the hero's own chips have scrolled away */
     var heroLooks = $('#looks');
     if (heroLooks && 'IntersectionObserver' in window) {
       new IntersectionObserver(function (en) { hdr.classList.toggle('show-looks', !en[0].isIntersecting); }).observe(heroLooks);
     } else hdr.classList.add('show-looks');
     var ticking = false;
-    /* home: at the very top the painted name stands in for the logo and the links sit in the middle; the first bit
-       of scrolling folds it all back into the normal bar */
     var word = clearOk && $('.hdr-word', hdr), nav = $('#nav', hdr);
     if (word) hdr.classList.add('has-word', 'is-big');
-    /* the first load plays a short entrance: the name slides in and paints, a brush swipes under it, the dot drops,
-       then the links and buttons come in one after another */
-    /* index.html started it (and picked one of four) while the bar was read; not when the page opens scrolled down */
     if (hdr.classList.contains('is-intro')) {
       if (window.scrollY >= 48) hdr.classList.remove('is-intro');
       else setTimeout(function () { hdr.classList.remove('is-intro'); }, 1700);
@@ -1041,7 +1030,6 @@
       onChange(wide, function () { if (wide.matches && !sheet.hidden) open(false, false); });
     }
 
-    /* the phone bar offers the install until the install strip, or the hero button, is on screen */
     var bar = $('#cta-bar');
     if (bar && 'IntersectionObserver' in window) {
       var seen = { install: false, hero: false };
@@ -1056,28 +1044,51 @@
     }
   }
 
-  /* ---------- jump chips: the section on screen is the active chip ---------- */
   function initJump() {
-    var links = $$('.jump a[href^="#"]');
+    var links = $$('.jump a');
     if (!links.length || !('IntersectionObserver' in window)) return;
+    var studio = !!$('.studio-nav');
     var current = null;
+    function revealCurrent() {
+      var active = links.filter(function (a) { return a.hasAttribute('aria-current'); })[0];
+      var list = active && active.closest('ul');
+      if (!list) return;
+      var frame = list.getBoundingClientRect(), chip = active.getBoundingClientRect();
+      var inset = studio ? 14 : 0;
+      if (chip.left < frame.left + inset) list.scrollLeft += chip.left - frame.left - inset;
+      else if (chip.right > frame.right - inset) list.scrollLeft += chip.right - frame.right + inset;
+    }
     function mark(id) {
       if (id === current) return;
       current = id;
       links.forEach(function (a) {
-        var on = a.getAttribute('href') === '#' + id;
-        if (on) { a.setAttribute('aria-current', 'true'); try { a.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {} }
+        var on = (a._h0 || a.getAttribute('href')) === '#' + id;
+        if (on) {
+          a.setAttribute('aria-current', 'true');
+        }
         else a.removeAttribute('aria-current');
       });
+      revealCurrent();
+    }
+    if (studio) {
+      var list = $('.studio-nav ul');
+      if (list && 'ResizeObserver' in window) new ResizeObserver(revealCurrent).observe(list);
+      document.addEventListener('ats:lang', function () { requestAnimationFrame(revealCurrent); });
+      if (document.fonts) document.fonts.ready.then(revealCurrent);
     }
     var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) { if (e.isIntersecting) mark(e.target.id); });
+      if (!studio) {
+        entries.forEach(function (entry) { if (entry.isIntersecting) mark(entry.target.id); });
+        return;
+      }
+      var onScreen = entries.filter(function (entry) { return entry.isIntersecting; });
+      var hash = location.hash.slice(1);
+      var match = onScreen.filter(function (entry) { return entry.target.id === hash; })[0];
+      if (match || onScreen.length) mark((match || onScreen[0]).target.id);
     }, { rootMargin: '-30% 0px -60% 0px', threshold: 0 });
-    /* sections without a chip (install, last) also report, so the chip of the section above is not left lit */
-    $$('main > section[id]').forEach(function (s) { io.observe(s); });
+    $$('main > section[id], .studio-flow > section[id]').forEach(function (s) { io.observe(s); });
   }
 
-  /* a link to a closed question opens it */
   function openHashTarget() {
     var id = decodeURIComponent((location.hash || '').slice(1));
     var el = id && document.getElementById(id);
@@ -1085,8 +1096,6 @@
     var d = el.tagName === 'DETAILS' ? el : el.closest('details');
     if (d && !d.open) d.open = true;
     if (el.tagName === 'DETAILS') { try { el.scrollIntoView(); } catch (e) {} }
-    /* a home thumbnail opens its close-up: centre it, so the picture is not under the header and the look chips.
-       The browser's own jump to the anchor comes later on a fresh page, so centre again once the page has loaded. */
     if (el.classList.contains('cu')) {
       var centre = function () { try { el.scrollIntoView({ block: 'center' }); } catch (e) {} };
       centre();
@@ -1094,14 +1103,11 @@
     }
   }
 
-  /* ---------- compare sliders ---------- */
   var compares = [];
   var hint = { raf: 0, timer: 0 };
   var renderStepButtons = function () {};
-  var renderSel = function () {};
   var hero = null;
 
-  /* the resting seam sits just left of the face so the first look is the saved face: phones 25%, desktop at a fixed spot in the picture (about 55% of the art, 60% on 21:9) */
   function restSeam() {
     if (!mq('(min-width: 1024px)').matches) return mq('(min-width: 640px)').matches ? 50 : 25;
     var art = $('#hero-saved .art'), drag = $('#hero-drag');
@@ -1121,8 +1127,6 @@
 
   function updateCompareText() { compares.forEach(function (c) { c.write(c.value); }); }
 
-  /* one slider: the native range input is the source of truth, the pointer writes the same value.
-     cfg: set (element carrying --seam), drag (pointer area), range (input), onwrite */
   function initCompare(cfg, initial) {
     var set = cfg.set, range = cfg.range, drag = cfg.drag;
     var c = { set: set, value: initial, label: null, anim: 0 };
@@ -1161,9 +1165,9 @@
       try { drag.setPointerCapture(e.pointerId); } catch (err) {}
       fromPointer(e);
     }
-    function off() { return set.classList.contains('is-single'); }
+    var scrollStudy = set.closest('[data-scroll-compare]');
+    function off() { return set.classList.contains('is-single') || (scrollStudy && scrollStudy.hasAttribute('data-scroll-study')); }
 
-    /* mouse and pen grab at once; a finger waits to see which way it goes: sideways moves the seam, up and down scrolls the page, a tap jumps the seam there */
     drag.addEventListener('pointerdown', function (e) {
       if (off() || (e.pointerType === 'mouse' && e.button !== 0)) return;
       cancelHint();
@@ -1182,7 +1186,6 @@
     }
     drag.addEventListener('pointerup', end);
     drag.addEventListener('pointercancel', function () { down = null; dragging = false; });
-    /* a finger is captured by the image under it first; that hand-over fires lostpointercapture on the image and must not end the drag */
     drag.addEventListener('lostpointercapture', function (e) { if (e.target === drag) dragging = false; });
 
     range.addEventListener('input', function () { cancelHint(); c.touched = true; cancelAnimationFrame(c.anim); c.write(Number(range.value)); });
@@ -1201,7 +1204,6 @@
     return c;
   }
 
-  /* gallery close-ups: each row wipes in when it reaches the screen, then the seam sweeps once to show both sides */
   function initCuReveal() {
     var rail = $('.cu-rail');
     if (!rail || reduced || !('IntersectionObserver' in window)) return;
@@ -1217,7 +1219,6 @@
         var steps = [[34, 650]], k = 0;
         c.touched = false;
         function next() {
-          /* the visitor wins: a drag, a key or a switch to a single picture ends the sweep */
           if (c.touched || k === steps.length || cmp.classList.contains('is-single')) { row.classList.remove('is-sweeping'); return; }
           var s = steps[k++];
           c.glide(s[0], s[1]);
@@ -1229,12 +1230,9 @@
     rail.querySelectorAll('.cu-row').forEach(function (r) { io.observe(r); });
   }
 
-  /* sections marked data-fx come in when they reach the screen (style.css has each one's look); the wings then
-     sweep their seam once, like the close-ups */
   function initReveals() {
     var els = $$('[data-fx]');
     if (!els.length || reduced || !('IntersectionObserver' in window)) return;
-    /* data-fx="again" plays each time the section comes back: it resets once it has left the screen */
     var away = new IntersectionObserver(function (en) {
       en.forEach(function (e) { if (!e.isIntersecting) e.target.classList.remove('is-in'); });
     });
@@ -1261,7 +1259,6 @@
     els.forEach(function (el) { el.classList.add('fx-on'); io.observe(el); if (el.getAttribute('data-fx') === 'again') away.observe(el); });
   }
 
-  /* every .cmp on the page (wings, close-ups) */
   function initCmps() {
     $$('.cmp[data-cmp]').forEach(function (cmp) {
       var view = $('.cmp-view', cmp), range = $('.cmp-range', cmp);
@@ -1273,10 +1270,8 @@
     });
   }
 
-  /* ---------- hero: hint, turn, looks ---------- */
   var heroCmp = null;
 
-  /* one small hint that the handle moves, once, only if nobody has touched it */
   function scheduleHint(c) {
     if (reduced || !hero) return;
     var imgs = $$('#hero-bg img');
@@ -1297,10 +1292,6 @@
     });
   }
 
-  /* the hero turns a little towards the pointer (or the phone's tilt). Frames were rendered in Unity around the still's
-     camera, one per degree from -12 to +12: turn-{look}-{saved|orig}-{ratio}-{00-24}.webp. Both layers always draw the same
-     frame, so the seam still compares one view. The still stays underneath and is all you see with reduced motion, on
-     Save-Data, or until the frames have loaded. */
   var turn = null;
   var TURN_N = 25, TURN_MID = 12;
 
@@ -1320,7 +1311,6 @@
     });
     var set = null, gen = 0;
     var target = TURN_MID, shown = TURN_MID, raf = 0, last = 0, inView = true, px = null;
-    /* every second frame first (2 degree steps), then the ones between */
     var order = [];
     [0, 1].forEach(function (odd) {
       for (var d = 0; d <= TURN_MID; d++) [TURN_MID - d, TURN_MID + d].forEach(function (i) { if (i % 2 === odd && order.indexOf(i) === -1) order.push(i); });
@@ -1329,7 +1319,6 @@
     function ratio() { return wideMq.matches ? '21x9' : tabMq.matches ? '16x9' : '4x5'; }
     function name(look, kind, r, i) { return 'turn-' + look + '-' + kind + '-' + r + '-' + (i < 10 ? '0' : '') + i + '.webp'; }
 
-    /* one set = one look at one ratio, four downloads at a time */
     function load() {
       var look = state.heroShown, r = ratio(), g = ++gen;
       layers.forEach(function (l) { l.cv.classList.remove('is-on'); });
@@ -1367,7 +1356,6 @@
       kick();
     }
 
-    /* the nearest loaded frame (frames still on their way are skipped) */
     function frame(kind, i) {
       var a = set.f[kind];
       for (var d = 0; d < TURN_N; d++) {
@@ -1377,7 +1365,6 @@
       return null;
     }
 
-    /* the two frames around the shown angle, the second laid over the first */
     function paint() {
       var i0 = Math.floor(shown), u = shown - i0, i1 = Math.min(TURN_N - 1, i0 + 1);
       var single = hero.classList.contains('is-single');
@@ -1390,7 +1377,6 @@
       });
     }
 
-    /* the pointer across the slider's area picks the frame: far left turns her fully left, far right fully right */
     function aim() {
       if (px === null) { target = TURN_MID; return; }
       var r = drag.getBoundingClientRect();
@@ -1416,9 +1402,6 @@
       hero.addEventListener('pointermove', function (e) { if (e.pointerType === 'touch') return; px = e.clientX; kick(); });
       hero.addEventListener('pointerleave', function () { px = null; kick(); });
     } else {
-      /* Android reports tilt straight away; iOS only after a tap on "Tilt to turn" grants it. The first reading counts as
-         straight and that rest point follows slowly, so a phone held at any angle settles back. With no readings the
-         button goes away and the seam works by touch as before. */
       var g0 = null, gs = 0, btn = null, ask = DeviceOrientationEvent.requestPermission;
       window.addEventListener('deviceorientation', function (e) {
         var a = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
@@ -1453,7 +1436,6 @@
       look: function () { if (set && set.look !== state.heroShown) load(); },
       paint: function () { if (set && set.on) paint(); }
     };
-    /* on desktop the frames load once the page has settled; on phones only when the tilt really reports */
     if (fine) {
       var idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 600); };
       var go = function () { idle(function () { if (!set) load(); }); };
@@ -1461,7 +1443,6 @@
     }
   }
 
-  /* look chips: every look has its own original shot with the same camera, so the slider works on all of them */
   var BG_SIZES = { '21x9': [1920], '16x9': [1280, 1920], '4x5': [720, 1080] };
   var POP_SIZES = { '21x9': [1920], '16x9': [1280, 1920], '4x5': [720, 1080] };
   var lookCache = {};
@@ -1500,15 +1481,16 @@
     return lookCache[look];
   }
 
-  /* ---------- one look for the whole site ---------- */
   var mediaReady = false;
 
-  /* internal links carry ?look= so the next page opens on the same look even without storage, and point into the
-     language folder so the next page keeps the language too */
   function syncLinks() {
     $$('a[href]').forEach(function (a) {
       if (a._h0 === undefined) a._h0 = a.getAttribute('href');
       var h = a._h0;
+      if (h.charAt(0) === '#' && h.length > 1) {
+        a.setAttribute('href', location.pathname + location.search + h);
+        return;
+      }
       if (!/^(?:index|features|gallery|about|glossary|skills|learn|download)\.html(?:[?#]|$)/.test(h)) return;
       var hash = '', q = '', i = h.indexOf('#');
       if (i !== -1) { hash = h.slice(i); h = h.slice(0, i); }
@@ -1536,8 +1518,6 @@
     return null;
   }
 
-  /* file names in one place (the media contract): see-{tab}-{look}, see-{tab}-original-{look} (the before side, lit like the look),
-     thumb-{tab}-{look}, light-{scene}-{look}, wings-orbit-{look}, spin-{look}. Each list ends with the crimson file */
   var names = {
     see: function (tab, look) { return look === 'original' ? ['see-' + tab + '-original'] : uniq(['see-' + tab + '-' + look, 'see-' + tab + '-crimson']); },
     before: function (tab, look) { return look === 'original' ? ['see-' + tab + '-original'] : uniq(['see-' + tab + '-original-' + look, 'see-' + tab + '-original-crimson', 'see-' + tab + '-original']); },
@@ -1548,7 +1528,6 @@
     loop: function (stem, look) { return uniq([stem + '-' + look, stem + '-crimson']); }
   };
 
-  /* point a <picture> at the first file of the chain that exists; the phone file is chosen on its own */
   function setPic(pic, chain) {
     if (!pic) return false;
     var d = firstReady(chain, '.webp'), m = firstReady(chain, '-m.webp');
@@ -1569,7 +1548,6 @@
     var v = t(key); if (v) el.textContent = v;
   }
 
-  /* captions that name the crimson colours switch to the picked look's line (or a neutral one) */
   function setLegend(el) {
     if (!el) return;
     if (!el._k0) el._k0 = el.getAttribute('data-i18n');
@@ -1578,7 +1556,6 @@
     el.setAttribute('data-i18n', key);
     var v = t(key);
     if (!v) return;
-    /* an edited look is named in a label in its own colours; the "Venom:" that opens its line moves into it */
     var name = look !== 'original' ? t('look.' + look) : '';
     var lead = name && v.indexOf(name) === 0 ? /^[^:：]+[:：]\s*/.exec(v) : null;
     el.textContent = '';
@@ -1586,7 +1563,6 @@
     el.appendChild(document.createTextNode(lead ? v.slice(lead[0].length) : v));
   }
 
-  /* a picture glitches once its new look has loaded */
   function glitchLoaded(host) {
     if (reduced || !host) return;
     var im = $('.cmp-saved img', host) || $('img', host), go = function () { glitch(host); };
@@ -1621,7 +1597,6 @@
     });
   }
 
-  /* alt texts follow the look and the phone or desktop picture: alt.* keys in common.json, one set per language */
   function altKey(base, look) {
     var phone = phoneMq.matches ? t(base + '.' + look + '.m') : null;
     return phone || t(base + '.' + look);
@@ -1653,7 +1628,6 @@
     });
   }
 
-  /* loops that follow the look (turntable, wings orbit): the first name that exists wins, the poster goes with it */
   function applyVideos(bind) {
     if (!mediaReady) return;
     $$('video[data-look-loop]').forEach(function (video) {
@@ -1715,7 +1689,6 @@
       if (state.heroShown !== look) return;
       requestAnimationFrame(function () {
         pairs.forEach(function (p) { p.pic.style.opacity = '1'; });
-        /* a quick glitch as the new look lands */
         if (hero && !reduced) {
           hero.classList.remove('is-glitch'); void hero.offsetWidth; hero.classList.add('is-glitch');
           clearTimeout(hero._glitch);
@@ -1728,7 +1701,6 @@
     });
   }
 
-  /* the single place where the look changes: chips, hero, every picture and loop, links, memory */
   function setLook(look, silent) {
     if (!validLook(look)) return Promise.resolve();
     state.look = look;
@@ -1753,7 +1725,6 @@
     });
   }
 
-  /* on phones the .unitypackage steps start folded so the install section stays short */
   function foldSteps() {
     var d = $('#unity-steps');
     if (d && !mq('(min-width: 768px)').matches) d.open = false;
@@ -1769,29 +1740,35 @@
     heroCmp.label = function () { return t('compare.label') || 'Compare original and saved'; };
     scheduleHint(heroCmp);
     onChange(mq('(min-width: 1024px)'), function () { heroCmp.write(restSeam()); });
-    /* the other two looks are fetched when the browser is idle */
     if ($('#looks')) {
       var idle = window.requestIdleCallback || function (fn) { return setTimeout(fn, 1500); };
       if (!saveData) setTimeout(function () { idle(function () { HERO_LOOKS.forEach(lookEntry); }); }, 4000);
     }
   }
 
-  /* switching looks: the new look paints over the page in a circle from the button (View Transitions); where the
-     browser has none, a ring in the new colours runs out from the button instead */
+  var lookRevision = 0, pendingLook = null;
   function lookSwitch(btn, run) {
+    var root = document.documentElement, revision = ++lookRevision;
+    pendingLook = btn.dataset.look;
+    function apply() {
+      if (revision !== lookRevision) return;
+      pendingLook = null;
+      return run();
+    }
+    function done() { if (revision === lookRevision) root.classList.remove('look-vt'); }
+    if (root.classList.contains('perf') || mq('(prefers-reduced-motion: reduce)').matches) { done(); apply(); return; }
     btn.classList.remove('is-picked'); void btn.offsetWidth; btn.classList.add('is-picked');
     setTimeout(function () { btn.classList.remove('is-picked'); }, 520);
-    if (reduced) { run(); return; }
-    var root = document.documentElement, rc = btn.getBoundingClientRect();
+    if (mq('(max-width: 767px), (pointer: coarse)').matches) { done(); apply(); return; }
+    var rc = btn.getBoundingClientRect();
     var x = rc.left + rc.width / 2, y = rc.top + rc.height / 2;
     var far = Math.ceil(Math.sqrt(Math.pow(Math.max(x, innerWidth - x), 2) + Math.pow(Math.max(y, innerHeight - y), 2)));
-    if (!document.startViewTransition) { run(); burst(x, y, far); return; }
+    if (!document.startViewTransition) { done(); apply(); burst(x, y, far); return; }
     root.style.setProperty('--vt-x', x + 'px');
     root.style.setProperty('--vt-y', y + 'px');
     root.style.setProperty('--vt-r', far + 'px');
     root.classList.add('look-vt');
-    var done = function () { root.classList.remove('look-vt'); };
-    try { document.startViewTransition(run).finished.then(done, done); } catch (e) { done(); run(); }
+    try { document.startViewTransition(apply).finished.then(done, done); } catch (e) { done(); apply(); }
   }
   function burst(x, y, far) {
     var b = mk('span', 'look-burst');
@@ -1802,16 +1779,16 @@
     b.addEventListener('animationend', function () { if (b.parentNode) b.parentNode.removeChild(b); });
   }
 
-  /* every look picker on the page (top bar, home hero, gallery bar): same state, same keys */
   function initLookChips() {
     $$('.looks').forEach(function (group) {
       var chips = $$('button[data-look]', group);
       function pick(b) {
         var look = b.getAttribute('data-look');
-        if (look === state.look) return;
-        /* the top bar paints the whole page in a circle; the hero chips and the gallery bar switch in place, so the
-           picture's own glitch shows right where you are looking and the hero seam stays where you left it */
+        if (look === (pendingLook || state.look)) return;
         if (group.classList.contains('hdr-looks')) { lookSwitch(b, function () { setLook(look); }); return; }
+        pendingLook = null;
+        lookRevision++;
+        document.documentElement.classList.remove('look-vt');
         b.classList.remove('is-picked'); void b.offsetWidth; b.classList.add('is-picked');
         setTimeout(function () { b.classList.remove('is-picked'); }, 520);
         setLook(look);
@@ -1824,7 +1801,6 @@
     });
   }
 
-  /* ---------- media: which v4 files exist yet ---------- */
   var readyList = {};
   function isReady(name) { return !!readyList[name]; }
 
@@ -1835,9 +1811,7 @@
       .catch(function () {});
   }
 
-  /* pictures of the tool, and pictures with words in them, can have a copy per language in media/v4/<lang>/ under the
-     same name; English and any copy not listed in ready.json use the plain file */
-  var LANG_MEDIA = /^(ui-|skill-tree-|ai-helper|tour|safe-files|map-)[^/\s]*$/;
+  var LANG_MEDIA = /^(?:(?:ui-|skill-tree-|ai-helper|tour|safe-files|map-)[^/\s]*|studio\/(?:(?:save|history|audit|quick-material|advanced-copy|selection-tools|paint-handoff|recolour-(?:scope|tools)|mask-picker|bake-(?:ao|normal|apply)|pen-controls|brush-(?:library|shapes))-panel|draft-browser|template-panel|style-pack-panel|select-(?:uv|part|topology|colour|paint)|body-(?:headband|cushion)|(?:select|paint)-poster)\.webp)$/;
   function langDir(name) { var l = state.lang; return l && l !== 'en' && isReady(l + '/' + name) ? l + '/' : ''; }
   var relangHow = function () {};
 
@@ -1845,14 +1819,13 @@
     if (!mediaReady) return;
     var sel = ['src', 'srcset', 'poster', 'href'].map(function (a) { return '[' + a + '^="' + MEDIA + '"]'; }).join(',');
     $$(sel).forEach(function (el) {
-      /* the tour player (tour.js) picks its own language */
       if (el.closest('[data-own-lang]')) return;
       ['src', 'srcset', 'poster', 'href'].forEach(function (a) {
         var v = el.getAttribute(a), key = '_en_' + a;
         if (!v || v.indexOf(MEDIA) !== 0) return;
-        if (el[key] == null) { var f = v.slice(MEDIA.length); el[key] = LANG_MEDIA.test(f) ? f : ''; }
-        if (!el[key]) return;
-        var nv = MEDIA + langDir(el[key]) + el[key];
+        if (el[key] == null) { var f = v.slice(MEDIA.length).split('?')[0]; el[key] = LANG_MEDIA.test(f) ? f : ''; }
+        if (!el[key] && (!mediaVersion || a === 'srcset')) return;
+        var nv = versionMedia(el[key] ? MEDIA + langDir(el[key]) + el[key] : v);
         if (nv === v) return;
         el.setAttribute(a, nv);
         if (langFx) langFx.push(mediaHost(el));
@@ -1863,7 +1836,6 @@
     relangHow();
   }
 
-  /* a still without a file yet stays out of the page; its plate shows a quiet note instead */
   function initStills() {
     $$('[data-v4]').forEach(function (el) {
       var name = el.getAttribute('data-v4');
@@ -1881,7 +1853,6 @@
     });
   }
 
-  /* tiny logo marks behind the page, drifting slower than the scroll */
   function initMarks() {
     if ($('.bg-marks')) return;
     var m = document.createElement('div');
@@ -1896,7 +1867,6 @@
     move();
   }
 
-  /* ---------- video: one frame, one rule ---------- */
   var regs = [];
   var external = null;
   var vio = null;
@@ -1912,14 +1882,12 @@
   }
   function paintAllButtons() { regs.forEach(paintButton); }
 
-  /* at most one video plays automatically: the one most in view, past 60% */
   function arbitrate() {
     var best = null, top = 0;
-    /* while a video with sound plays, loops start only when pressed */
     var ext = external && !external.paused;
     regs.forEach(function (r) {
       var score = 0;
-      if (r.ready && r.ratio > 0) {
+      if (r.ready && r.ratio > 0 && !r.el.closest('details:not([open]), [hidden]')) {
         if (r.want === 'on') score = 2 + r.ratio;
         else if (!ext && r.want === 'auto' && !noAuto && r.ratio >= r.at) score = 1 + r.ratio;
       }
@@ -1929,7 +1897,6 @@
       if (r === best) {
         if (r.el.paused) {
           var p = r.el.play();
-          /* a new file loading (a quick look switch) aborts the play; only a browser refusal means stay still */
           if (p && p.catch) p.catch(function (e) { if (e && e.name === 'NotAllowedError') r.want = 'off'; paintButton(r); });
         }
       } else if (!r.el.paused) r.el.pause();
@@ -1937,7 +1904,6 @@
     });
   }
 
-  /* every loop can open larger in a popup; its buttons sit top right, away from the window's own menus */
   var ICON_ZOOM = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
   var ICON_CLOSE = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>';
   var box = null;
@@ -1980,18 +1946,21 @@
     var txt = fig && $('.plate-cap span:not(.tag)', fig) ? $('.plate-cap span:not(.tag)', fig).textContent : '';
     cap.textContent = txt; cap.hidden = !txt;
     v.setAttribute('aria-label', r.el.getAttribute('aria-label') || '');
+    var manual = r.el.hasAttribute('data-manual-loop');
+    v.controls = manual;
     v.poster = r.el.poster || '';
     v.src = src;
     box._opener = opener;
     box.showModal();
     v.currentTime = r.el.currentTime || 0;
-    v.play().catch(function () {});
+    if (!manual || !r.el.paused) v.play().catch(function () {});
     box._paint();
   }
 
   function register(video, btn) {
     if (video._r) return video._r;
-    var r = { el: video, btn: btn || (video.parentNode && $('.pp', video.parentNode)), ratio: 0, want: 'auto', ready: false, at: parseFloat(video.getAttribute('data-play-at')) || 0.6 };
+    var r = { el: video, btn: btn || (video.parentNode && $('.pp', video.parentNode)), ratio: 0,
+      want: video.hasAttribute('data-manual-loop') ? 'off' : 'auto', ready: false, at: parseFloat(video.getAttribute('data-play-at')) || 0.6 };
     video._r = r;
     regs.push(r);
     if (!vio && 'IntersectionObserver' in window) {
@@ -2003,6 +1972,10 @@
     if (vio) vio.observe(video);
     video.addEventListener('play', function () { paintButton(r); });
     video.addEventListener('pause', function () { paintButton(r); });
+    video.addEventListener('ats:pause-loop', function () {
+      r.want = 'off';
+      arbitrate();
+    });
     if (r.btn) {
       r.btn.addEventListener('click', function () {
         r.want = r.el.paused ? 'on' : 'off';
@@ -2014,9 +1987,7 @@
     return r;
   }
 
-  /* a video with native controls (the makeover) wins over the loops while it plays */
   function initOneAtATime() {
-    /* the tour may already be playing in the mini player when this page was swapped in */
     var tour = $('video[data-own-lang]');
     if (tour && !tour.paused) external = tour;
     document.addEventListener('play', function (e) {
@@ -2031,16 +2002,15 @@
   function addSources(video, base) {
     video.textContent = '';
     ['webm:video/webm', 'mp4:video/mp4'].forEach(function (x) {
+      var file = base + '.' + x.split(':')[0];
+      if (video.hasAttribute('data-loop') && !isReady(file.slice(MEDIA.length))) return;
       var s = document.createElement('source');
-      s.src = base + '.' + x.split(':')[0]; s.type = x.split(':')[1];
+      s.src = versionMedia(file); s.type = x.split(':')[1];
       video.appendChild(s);
     });
     video.load();
   }
 
-  /* switching a look-following loop (spin, wings orbit) keeps the angle: the current frame is held on a canvas
-     while the new file loads, then the new file jumps to the same point in the turn and a recolour seam sweeps the
-     old look away, the way the tool shows a saved look over the original */
   function holdFrame(video) {
     if (!video.duration || video.readyState < 2 || !video.videoWidth) return null;
     var old = video.parentNode && $('.v-hold', video.parentNode);
@@ -2061,7 +2031,6 @@
     return { frac: (video.currentTime % video.duration) / video.duration, cv: box };
   }
 
-  /* a quick glitch on a look loop as the new look lands */
   function glitch(host) {
     if (reduced || !host) return;
     host.classList.remove('is-glitch'); void host.offsetWidth; host.classList.add('is-glitch');
@@ -2081,7 +2050,6 @@
       if (!box) return;
       if (reduced || !box.isConnected) { box.remove(); return; }
       requestAnimationFrame(function () {
-        /* by now the chips show the new look: the seam takes its colours */
         var chip = $('.looks button[aria-checked="true"]');
         if (chip) { box.style.setProperty('--a', chip.style.getPropertyValue('--a')); box.style.setProperty('--b', chip.style.getPropertyValue('--b')); }
         box.classList.add('is-wipe');
@@ -2096,11 +2064,9 @@
     });
     video.addEventListener('seeked', onSeeked);
     video.addEventListener('error', onSeeked, true);
-    /* on a slow line the held frame stays until the new file can show the same angle; this is only a last resort */
     setTimeout(drop, 20000);
   }
 
-  /* a loop: files {name}.mp4 and .webm in media/v4 (and {name}-m for phones) once they are listed in ready.json */
   function loopFile(video) {
     var name = video.getAttribute('data-loop');
     var m = phoneMq.matches && (isReady(name + '-m.mp4') || isReady(name + '-m.webm')) ? '-m' : '';
@@ -2110,6 +2076,7 @@
 
   function bindLoop(video) {
     var r = register(video);
+    if (video.closest('details:not([open]), [hidden]')) return;
     var file = loopFile(video);
     var ok = file !== null;
     video._lm = file;
@@ -2124,10 +2091,9 @@
     if (ok) {
       r.ready = true;
       var hold = video.hasAttribute('data-look-loop') ? holdFrame(video) : null;
-      /* the loop's own first frame as the still: the page's placeholder picture can be a different shape, and it
-         stays on screen whenever the loop does not play on its own (reduced motion, performance mode, data saver) */
-      var pn = file.replace(/^.*\//, '') + '-poster.webp';
-      if (isReady(pn)) video.setAttribute('poster', MEDIA + langDir(pn) + pn);
+      var poster = file + '-poster.webp';
+      if (!isReady(poster)) poster = poster.replace(/^(?:ja|ko|zh-CN)\//, '');
+      if (isReady(poster)) video.setAttribute('poster', versionMedia(MEDIA + poster));
       addSources(video, MEDIA + file);
       if (hold) resumeAt(video, hold);
       else if (video._shown && video._shown !== file && video.hasAttribute('data-look-loop')) {
@@ -2145,8 +2111,15 @@
   function initLoops() {
     var videos = $$('video[data-loop]');
     videos.forEach(bindLoop);
+    function refreshVisibleLoops() {
+      videos.forEach(function (video) {
+        if (video.closest('details:not([open]), [hidden]')) video.pause();
+        else if (!video._r.ready || video._lm !== loopFile(video)) bindLoop(video);
+      });
+    }
+    document.addEventListener('toggle', refreshVisibleLoops, true);
+    document.addEventListener('ats:loop-visibility', refreshVisibleLoops);
     onChange(phoneMq, function () { videos.forEach(bindLoop); });
-    /* chips that swap the loop in one plate (the six selection tools) */
     $$('[data-loops-for]').forEach(function (group) {
       var video = $(group.getAttribute('data-loops-for'));
       if (!video) return;
@@ -2164,7 +2137,6 @@
     });
   }
 
-  /* ---------- how it works: one video, four cuts ---------- */
   function initHow() {
     var list = $('#how-steps');
     var video = $('#how-video');
@@ -2211,59 +2183,6 @@
     setStep(0, false);
   }
 
-  /* features: the selection tools play one after another; the list picks one, back / pause / next steer it */
-  function initSel() {
-    var list = $('#sel-steps'), video = $('#sel-plate video');
-    if (!list || !video) return;
-    var steps = $$('.sel-step', list), r = register(video), cur = 0;
-    var cap = $('#sel-cap'), count = $('#sel-n'), play = $('.sel-play'), prev = $('.sel-prev'), next = $('.sel-next');
-    function stopped() { return r.want === 'off' || (r.want === 'auto' && noAuto); }
-    /* a little quicker than real time; load() resets the rate to the default, so set both */
-    video.defaultPlaybackRate = 1.3;
-    video.addEventListener('loadedmetadata', function () { video.playbackRate = 1.3; });
-    renderSel = function () {
-      if (count) count.textContent = (cur + 1) + ' / ' + steps.length;
-      if (!play) return;
-      var s = stopped();
-      play.classList.toggle('is-paused', s);
-      play.setAttribute('aria-label', t(s ? 'ui.play' : 'ui.pause') || (s ? 'Play video' : 'Pause video'));
-    };
-    function setStep(i) {
-      cur = (i + steps.length) % steps.length;
-      round = 0;
-      var li = steps[cur], key = li.getAttribute('data-cap');
-      steps.forEach(function (s, j) {
-        s.classList.toggle('is-on', j === cur);
-        s.style.setProperty('--p', '0');
-        $('button', s).setAttribute('aria-pressed', String(j === cur));
-      });
-      if (cap && key) { cap.setAttribute('data-i18n', key); var v = t(key); if (v) cap.textContent = v; }
-      video.setAttribute('data-loop', li.getAttribute('data-loop'));
-      bindLoop(video);
-      renderSel();
-    }
-    steps.forEach(function (s, i) { $('button', s).addEventListener('click', function () { r.want = 'on'; setStep(i); }); });
-    if (prev) prev.addEventListener('click', function () { setStep(cur - 1); });
-    if (next) next.addEventListener('click', function () { setStep(cur + 1); });
-    if (play) play.addEventListener('click', function () {
-      r.want = stopped() ? 'on' : 'off';
-      arbitrate();
-      renderSel();
-    });
-    /* the clips are short: each plays twice before the next tool, and the bar fills over both */
-    var round = 0;
-    video.addEventListener('timeupdate', function () { if (video.duration) steps[cur].style.setProperty('--p', String((round + video.currentTime / video.duration) / 2)); });
-    video.addEventListener('ended', function () {
-      if (r.want === 'off') return;
-      if (round === 0) { round = 1; video.currentTime = 0; arbitrate(); return; }
-      setStep(cur + 1);
-    });
-    video.addEventListener('play', renderSel);
-    video.addEventListener('pause', renderSel);
-    renderSel();
-  }
-
-  /* ---------- the honest step count ---------- */
   var foldMq = mq('(max-width: 639px)');
   function renderCount() {
     $$('[data-n-for]').forEach(function (el) {
@@ -2289,7 +2208,6 @@
     onChange(foldMq, renderCount);
   }
 
-  /* ---------- faq: one open at a time ---------- */
   function initFaq() {
     $$('.faq').forEach(function (group) {
       var all = $$('details', group);
@@ -2301,21 +2219,150 @@
     });
   }
 
-  /* stickers fetch their picture only when they come near the screen, then slap on (a tap slaps them on again);
-     the footer mascot peeks up the same way */
   function initStickers() {
-    var st = $$('.stk, .foot-lurk');
-    if (!st.length) return;
-    function slap(s) { s.classList.remove('is-in'); void s.offsetWidth; s.classList.add('is-in'); }
-    st.forEach(function (s) { s.addEventListener('click', function () { slap(s); }); });
-    if (!('IntersectionObserver' in window)) { st.forEach(slap); return; }
-    var io = new IntersectionObserver(function (en) {
-      en.forEach(function (e) { if (e.isIntersecting) { slap(e.target); io.unobserve(e.target); } });
-    }, { rootMargin: '0px 0px -12% 0px' });
-    st.forEach(function (s) { io.observe(s); });
+    var tricks = ['hop', 'skate', 'peek', 'glitch'];
+    var faces = ['e_avistry_lurk', 'e_avistry_happy', 'e_avistry_sus'];
+    var slots = $$('.stk, .studio-sticker, .foot-lurk');
+    var pageFile = langRoot().file || 'index.html';
+    var motionPreference = mq('(prefers-reduced-motion: reduce)');
+    var status = $('#mascot-status');
+    if (!status) {
+      status = document.createElement('span');
+      status.id = 'mascot-status';
+      status.className = 'sr-only';
+      status.setAttribute('role', 'status');
+      ($('main') || document.body).appendChild(status);
+    }
+    function quiet() { return motionPreference.matches || document.documentElement.classList.contains('perf'); }
+
+    function awayKey(slot) {
+      return 'ats-sticker-away:' + (slot.classList.contains('foot-lurk') ? 'footer' :
+        pageFile + ':' + (slot.dataset.stkPool || slot.dataset.stk));
+    }
+    function hideSlot(slot) {
+      slot.inert = true;
+      slot.setAttribute('aria-hidden', 'true');
+      var button = $('.mascot-play', slot);
+      if (button) button.remove();
+      if (observer) observer.unobserve(slot);
+    }
+    function alreadyAway(slot) {
+      try { return sessionStorage.getItem(awayKey(slot)) === '1'; }
+      catch (e) { return false; }
+    }
+
+    function runToEdge(button) {
+      var r = button.getBoundingClientRect(), width = document.documentElement.clientWidth;
+      if (quiet() || document.hidden || r.bottom <= 0 || r.top >= innerHeight || r.right <= 0 || r.left >= width) return;
+      var toLeft = r.right, toRight = width - r.left;
+      var left = toLeft <= toRight;
+      if (Math.min(toLeft, toRight) < Math.min(140, width / 3)) left = !left;
+      var track = document.createElement('div'), runner = document.createElement('i');
+      track.className = 'mascot-runway';
+      track.setAttribute('aria-hidden', 'true');
+      runner.style.left = r.left + 'px';
+      runner.style.top = r.top + 'px';
+      runner.style.width = r.width + 'px';
+      runner.style.height = r.height + 'px';
+      runner.style.setProperty('--dash', (left ? -r.right - 12 : width - r.left + 12) + 'px');
+      runner.style.setProperty('--lean', left ? '-14deg' : '14deg');
+      track.appendChild(runner);
+      document.body.appendChild(track);
+      setTimeout(function () { track.remove(); }, 760);
+    }
+
+    function flee(button, slot) {
+      try { sessionStorage.setItem(awayKey(slot), '1'); } catch (e) {}
+      button.dataset.mood = 'crying';
+      button.setAttribute('aria-disabled', 'true');
+      var tears = document.createElement('i');
+      tears.className = 'mascot-tears';
+      tears.setAttribute('aria-hidden', 'true');
+      button.appendChild(tears);
+      status.textContent = t('mascot.flees');
+      setTimeout(function () {
+        tears.remove();
+        if (!button.isConnected) return;
+        runToEdge(button);
+        hideSlot(slot);
+      }, 880);
+    }
+    var observer = 'IntersectionObserver' in window && new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting && entry.intersectionRatio >= .45) {
+          entry.target.classList.add('is-in');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: '-56px 0px -56px', threshold: .45 });
+
+    slots.forEach(function (slot) {
+      if (alreadyAway(slot)) { hideSlot(slot); return; }
+      if ($('.mascot-play', slot)) return;
+      var footer = slot.classList.contains('foot-lurk');
+      var pool = slot.getAttribute('data-stk-pool');
+      if (pool) {
+        var choices = pool.split(' ');
+        slot.dataset.stk = choices[Math.floor(Math.random() * choices.length)];
+      }
+      if (footer) slot.style.setProperty('--perch', [18, 50, 82][Math.floor(Math.random() * 3)] + '%');
+
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'mascot-play';
+      button.setAttribute('aria-label', t('mascot.play') || 'Play with the Avistry mascot');
+      button.setAttribute('data-i18n-attr', 'aria-label:mascot.play');
+      slot.removeAttribute('aria-hidden');
+      slot.appendChild(button);
+      if (!slot.classList.contains('studio-sticker')) {
+        if (observer) observer.observe(slot);
+        else slot.classList.add('is-in');
+      }
+      button.addEventListener('focus', function () { slot.classList.add('is-in'); });
+      button.addEventListener('pointerenter', function (event) {
+        if (event.pointerType === 'touch' || quiet()) return;
+        var r = button.getBoundingClientRect(), fromLeft = event.clientX < r.left + r.width / 2;
+        button.style.setProperty('--peek-x', fromLeft ? '11%' : '-11%');
+        button.style.setProperty('--peek-turn', fromLeft ? '11deg' : '-11deg');
+      });
+
+      var next = Math.floor(Math.random() * tricks.length), face = 0, finish;
+      var lastPress = -Infinity, quickPresses = 0;
+      button.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' && event.repeat) event.preventDefault();
+      });
+      button.addEventListener('click', function () {
+        if (button.getAttribute('aria-disabled') === 'true') return;
+        button.removeAttribute('data-mood');
+        clearTimeout(finish);
+        var now = performance.now();
+        quickPresses = now - lastPress < 400 ? quickPresses + 1 : 1;
+        lastPress = now;
+        if (quickPresses >= 3) {
+          quickPresses = 0;
+          button.removeAttribute('data-trick');
+          flee(button, slot);
+          return;
+        }
+        button.toggleAttribute('data-tilted');
+        if (footer) {
+          face = (face + 1) % faces.length;
+          slot.dataset.emo = faces[face];
+        }
+        if (quiet()) {
+          button.removeAttribute('data-trick');
+          return;
+        }
+        button.dataset.trick = tricks[next];
+        next = (next + 1) % tricks.length;
+        finish = setTimeout(function () { button.removeAttribute('data-trick'); }, 780);
+      });
+    });
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) slots.forEach(function (slot) { if (alreadyAway(slot)) hideSlot(slot); });
+    });
   }
 
-  /* ---------- start (tour.js sets ATS_SOFT when it swaps a page in and runs this file again) ---------- */
   function start() {
     initStickers();
     initCopy();
@@ -2350,7 +2397,6 @@
       applyVideos(false);
       initLoops();
       initHow();
-      initSel();
       initTurn();
       applyLangMedia();
     });

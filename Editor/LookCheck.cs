@@ -3,23 +3,18 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Finds shader features that add so much light on top of a texture that edits to it barely show on the model
-    /// (mainly Emission: a bright emission texture, or emission without a texture that glows everywhere).
-    /// </summary>
     public static class LookCheck
     {
         public class Glow
         {
-            public string label;        // "Emission", "Emission 2"
-            public string mapProperty;  // texture property of that emission
-            public Texture2D map;       // null = glows evenly everywhere
-            public float amount;        // average light it adds (0..1+, 1 = full white)
+            public string label;
+            public string mapProperty;
+            public Texture2D map;
+            public float amount;
         }
 
         static readonly Dictionary<int, (double time, List<Glow> list)> s_cache = new Dictionary<int, (double, List<Glow>)>();
 
-        /// <summary>Emissions that add at least <paramref name="min"/> light on average. Cached for a second per material.</summary>
         public static List<Glow> StrongEmissions(Material m, float min = 0.25f)
         {
             var result = new List<Glow>();
@@ -31,7 +26,6 @@ namespace Avistry.Textures
             return result;
         }
 
-        /// <summary>Drops the cached answer for a material (after its settings changed).</summary>
         public static void Forget(Material m) { if (m != null) s_cache.Remove(m.GetInstanceID()); }
 
         static IEnumerable<Glow> Emissions(Material m)

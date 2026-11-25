@@ -1,9 +1,7 @@
-// Shared helpers for the release scripts. Node 20+, no dependencies.
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
-// Only these paths ship. Everything else (Website~, .github, dotfiles) stays in the repo.
 const ROOT_FILES = ['package.json', 'README.md', 'CHANGELOG.md', 'LICENSE', 'Third Party Notices.md'];
 const ROOT_DIRS = ['Editor'];
 
@@ -17,7 +15,6 @@ function guidOf(metaPath) {
   return m[1];
 }
 
-/** Returns { name, version, files: string[] (every shipped file incl. .meta), assets: {rel, guid, isDir}[] }. */
 export function collectPackage(pkgDir) {
   const pkg = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
   const files = [];
@@ -59,7 +56,6 @@ export function collectPackage(pkgDir) {
   return { name: pkg.name, version: pkg.version, files, assets };
 }
 
-// zip (deflate, fixed timestamps so the output is reproducible)
 
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
@@ -77,10 +73,9 @@ function crc32(buf) {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-/** entries: { name: string (forward slashes), data: Buffer }[] */
 export function makeZip(entries) {
   const DOS_TIME = 0;
-  const DOS_DATE = (0 << 9) | (1 << 5) | 1; // 1980-01-01
+  const DOS_DATE = (0 << 9) | (1 << 5) | 1;
   const locals = [];
   const centrals = [];
   let offset = 0;
@@ -132,7 +127,6 @@ export function makeZip(entries) {
   return Buffer.concat([...locals, cd, end]);
 }
 
-/** Returns the bytes of one entry from a zip buffer, or null when absent. */
 export function readZipEntry(buf, entryName) {
   let eocd = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {
@@ -160,7 +154,6 @@ export function readZipEntry(buf, entryName) {
   return null;
 }
 
-// tar.gz (ustar, fixed mtime/mode so the output is reproducible)
 
 function tarHeader(name, size) {
   const h = Buffer.alloc(512);
@@ -182,7 +175,6 @@ function tarHeader(name, size) {
   return h;
 }
 
-/** entries: { name: string, data: Buffer }[] */
 export function makeTarGz(entries) {
   const parts = [];
   for (const { name, data } of entries) {

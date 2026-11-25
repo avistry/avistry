@@ -8,7 +8,6 @@ namespace Avistry.Textures
 {
     public enum TextureRole { Color, Mask, Normal }
 
-    /// <summary>One distinct texture on a material, plus every property that references it.</summary>
     public class TextureSlot
     {
         public Texture2D texture;
@@ -19,12 +18,11 @@ namespace Avistry.Textures
         public string assetPath;
         public bool importedAsSRGB;
 
-        // what the shader profiles know about it
         public ShaderFamily family;
-        public bool mixedRoles;          // used as colour by one property and as data by another
-        public string channelInfo;       // e.g. "R metallic · G occlusion · A smoothness"
-        public string featureToggle;     // property that switches the feature using this texture
-        public bool featureOff;          // that feature is switched off: the shader ignores this texture
+        public bool mixedRoles;
+        public string channelInfo;
+        public string featureToggle;
+        public bool featureOff;
         public List<string> uvProblems = new List<string>();
 
         public string Label => $"{displayName}  ({texture.name}, {RoleLabel(role)})";
@@ -39,7 +37,6 @@ namespace Avistry.Textures
 
     public static class TargetResolver
     {
-        /// <summary>Collects the distinct 2D textures assigned on a material, with roles read from the shader.</summary>
         public static List<TextureSlot> GetTextureSlots(Material mat)
         {
             var result = new List<TextureSlot>();
@@ -54,7 +51,7 @@ namespace Avistry.Textures
                 string name = shader.GetPropertyName(i);
                 var tex = mat.GetTexture(name) as Texture2D;
                 if (tex == null) continue;
-                if (ShaderProfiles.IsLookupTable(shader, i, name)) continue; // DFG/LUT data, not an image to edit
+                if (ShaderProfiles.IsLookupTable(shader, i, name)) continue;
 
                 string path = AssetDatabase.GetAssetPath(tex);
                 var importer = AssetImporter.GetAtPath(path) as TextureImporter;
@@ -65,7 +62,6 @@ namespace Avistry.Textures
                 {
                     existing.properties.Add(name);
                     if (existing.role != role) existing.mixedRoles = true;
-                    // A texture is "off" only if every feature using it is off.
                     if (existing.featureOff && !ShaderProfiles.FeatureIsOff(family, mat, name)) existing.featureOff = false;
                     continue;
                 }
@@ -88,7 +84,6 @@ namespace Avistry.Textures
                 result.Add(slot);
             }
 
-            // Main texture first, then colour textures, then masks, then normals.
             var main = mat.mainTexture;
             return result
                 .OrderBy(s => s.texture == main ? 0 : 1)
@@ -96,17 +91,15 @@ namespace Avistry.Textures
                 .ToList();
         }
 
-        /// <summary>Poiyomi/Thry descriptions look like "Texture--{reference_properties:[...]}"; keep the readable part.</summary>
         static string CleanDescription(string desc, string fallback)
         {
             if (string.IsNullOrEmpty(desc)) return fallback;
             int cut = desc.IndexOf("--", System.StringComparison.Ordinal);
             if (cut >= 0) desc = desc.Substring(0, cut);
-            desc = System.Text.RegularExpressions.Regex.Replace(desc, "<[^>]+>", "").Trim(); // strip rich-text tags
+            desc = System.Text.RegularExpressions.Regex.Replace(desc, "<[^>]+>", "").Trim();
             return string.IsNullOrEmpty(desc) ? fallback : (fallback == null ? desc : $"{desc} [{fallback}]");
         }
 
-        /// <summary>The role of a texture property from the shader alone (for slots without a texture yet).</summary>
         public static TextureRole RoleOf(Shader shader, int index, string name, ShaderFamily family) => ClassifyRole(shader, index, name, null, family);
 
         static TextureRole ClassifyRole(Shader shader, int index, string name, TextureImporter importer, ShaderFamily family)
@@ -118,7 +111,6 @@ namespace Avistry.Textures
             string lower = name.ToLowerInvariant();
             if (lower.Contains("bump") || lower.Contains("normal")) return TextureRole.Normal;
 
-            // Poiyomi/Thry: [sRGBWarning(true)] = colour texture, [sRGBWarning] = linear data (mask).
             foreach (var raw in shader.GetPropertyAttributes(index))
             {
                 string a = raw.Trim('[', ']', ' ');
@@ -134,8 +126,7 @@ namespace Avistry.Textures
             return TextureRole.Color;
         }
 
-        /// <summary>Poiyomi stores the UV set per texture as a float named "&lt;prop&gt;UV" (0..3 = UV0..UV3).</summary>
-        static int ReadUvChannel(Material mat, string prop)
+        internal static int ReadUvChannel(Material mat, string prop)
         {
             string uvProp = prop + "UV";
             if (!mat.HasProperty(uvProp)) return 0;
@@ -143,16 +134,24 @@ namespace Avistry.Textures
             return ch >= 0 && ch <= 3 ? ch : 0;
         }
 
-        /// <summary>The avatar root: the topmost transform above the renderer.</summary>
+        internal static int? CommonUvChannel(Material mat, IReadOnlyList<string> properties)
+        {
+            if (properties.Count == 0) return null;
+            int channel = ReadUvChannel(mat, properties[0]);
+            for (int i = 1; i < properties.Count; i++)
+                if (ReadUvChannel(mat, properties[i]) != channel) return null;
+            return channel;
+        }
+
         public static Transform AvatarRoot(Renderer r) => r == null ? null : (MaterialAudit.FindAvatarRoot(r) ?? r.transform.root);
 
         public struct SlotRef
         {
             public Renderer renderer;
             public int materialIndex;
+            internal int? uvChannel;
         }
 
-        /// <summary>Every renderer/material-slot under the avatar that uses this material.</summary>
         public static List<SlotRef> FindMaterialUsers(Transform root, Material mat)
         {
             var list = new List<SlotRef>();
@@ -166,23 +165,32 @@ namespace Avistry.Textures
             return list;
         }
 
-        /// <summary>A material slot of another material that shows the same texture (a mesh that can be edited along).</summary>
         public class TextureUser
         {
             public SlotRef slot;
             public Material material;
-            public List<string> properties = new List<string>(); // this material's properties holding the texture
+            public List<string> properties = new List<string>();
         }
 
-        /// <summary>
-        /// Every renderer slot under the avatar whose material is NOT <paramref name="self"/> but uses <paramref name="tex"/>
-        /// (several hair pieces with their own materials sharing one texture, for example). Hierarchy order.
-        /// </summary>
+        internal static List<string> TextureProperties(Material material, Texture texture)
+        {
+            var properties = new List<string>();
+            var shader = material != null ? material.shader : null;
+            if (shader == null || texture == null) return properties;
+            for (int i = 0; i < shader.GetPropertyCount(); i++)
+            {
+                if (shader.GetPropertyType(i) != ShaderPropertyType.Texture) continue;
+                string property = shader.GetPropertyName(i);
+                if (material.GetTexture(property) == texture) properties.Add(property);
+            }
+            return properties;
+        }
+
         public static List<TextureUser> FindTextureUsers(Transform root, Material self, Texture tex)
         {
             var list = new List<TextureUser>();
             if (root == null || tex == null) return list;
-            var propsOf = new Dictionary<Material, List<string>>();
+            var matches = new Dictionary<Material, (List<string> properties, int? uvChannel)>();
             foreach (var r in root.GetComponentsInChildren<Renderer>(true))
             {
                 if (!(r is SkinnedMeshRenderer || r is MeshRenderer)) continue;
@@ -191,25 +199,23 @@ namespace Avistry.Textures
                 {
                     var m = mats[i];
                     if (m == null || m == self || m.shader == null) continue;
-                    if (!propsOf.TryGetValue(m, out var props))
+                    if (!matches.TryGetValue(m, out var match))
                     {
-                        props = new List<string>();
-                        var s = m.shader;
-                        for (int p = 0; p < s.GetPropertyCount(); p++)
-                        {
-                            if (s.GetPropertyType(p) != ShaderPropertyType.Texture) continue;
-                            string name = s.GetPropertyName(p);
-                            if (m.GetTexture(name) == tex) props.Add(name);
-                        }
-                        propsOf[m] = props;
+                        var props = TextureProperties(m, tex);
+                        match = (props, CommonUvChannel(m, props));
+                        matches[m] = match;
                     }
-                    if (props.Count > 0) list.Add(new TextureUser { slot = new SlotRef { renderer = r, materialIndex = i }, material = m, properties = props });
+                    if (match.properties.Count > 0)
+                        list.Add(new TextureUser
+                        {
+                            slot = new SlotRef { renderer = r, materialIndex = i, uvChannel = match.uvChannel },
+                            material = m, properties = match.properties,
+                        });
                 }
             }
             return list;
         }
 
-        /// <summary>Other materials under the avatar that use the same texture (they will NOT see the edit).</summary>
         public static List<Material> FindOtherMaterialsUsingTexture(Transform root, Material self, Texture tex)
         {
             var set = new HashSet<Material>();

@@ -5,10 +5,6 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Flatten decals (1 · Pick): turns a decal the shader draws on top of the main texture into an Image layer with
-    /// the same placement, so it becomes part of the texture. The decal is switched off on the material when you save.
-    /// </summary>
     partial class AvatarTextureWindow
     {
         [SerializeField] bool _foldDecals;
@@ -21,8 +17,6 @@ namespace Avistry.Textures
 
         List<DecalReader.Decal> Decals()
         {
-            // Re-read when the material or its settings change (cheap: a handful of property reads).
-            // The CRC is only recomputed on Layout events (so Layout and Repaint see the same list); other events reuse it.
             bool refresh = Event.current == null || Event.current.type == EventType.Layout;
             if (_decals != null && _decalsFor == _material && !refresh) return _decals;
             int stamp = _material != null ? _material.ComputeCRC() : 0;
@@ -38,12 +32,12 @@ namespace Avistry.Textures
             if (_material == null || Event.current == null) return;
             var decals = Decals();
             if (decals.Count == 0) return;
-            StudioGUI.Count("maps.decalsFoldout");
-            _foldDecals = EditorGUILayout.Foldout(_foldDecals, new GUIContent(Loc.F("Flatten decals ({0})", decals.Count),
-                Loc.T("Decals are pictures the shader draws on top of the texture. Flattening makes one part of the texture itself.")), true);
-            if (!_foldDecals) return;
+            bool open = StudioGUI.BeginFoldGroup(ref _foldDecals, Loc.T("Flatten decals"), decals.Count.ToString(),
+                tooltip: Loc.T("Decals are pictures the shader draws on top of the texture. Flattening makes one part of the texture itself."),
+                infoId: "texture");
+            StudioGUI.Count("maps.decalsFoldout", GUILayoutUtility.GetLastRect());
+            if (!open) { StudioGUI.EndGroup(); return; }
 
-            StudioGUI.BeginGroup(Loc.T("Decals on this material"), infoId: "texture");
             StudioGUI.Count("maps.decalFlatten");
             GUILayout.Label(Loc.T("Flattening adds the decal as an Image layer, placed exactly where the shader draws it. When you save, the decal is switched off on the saved material, " +
                             "so it's drawn once, from the texture. Good for fewer shader features, or to paint over a decal."), StudioGUI.Hint);
@@ -77,15 +71,11 @@ namespace Avistry.Textures
         void FlattenDecal(DecalReader.Decal d)
         {
             if (d?.layer == null || _comp == null) return;
-            // A fresh copy, so the list entry stays unchanged and can be compared with the layers later.
             var layer = JsonUtility.FromJson<ImageLayer>(JsonUtility.ToJson(d.layer));
             layer.id = System.Guid.NewGuid().ToString("N");
             layer.image = d.layer.image;
             layer.mask = d.layer.mask;
-            var keepSelection = new HashSet<int>(_selection);
-            _selection.Clear();           // a flattened decal isn't limited to the selected islands
-            InsertLayer(layer, "Flatten decal");
-            foreach (int i in keepSelection) _selection.Add(i);
+            InsertLayer(layer, "Flatten decal", captureSelection: false);
             SetTab(Tab.Paint);
             Toast(Loc.F("Added “{0}” as an Image layer. Until you save, the avatar shows the decal twice (the shader's and this layer); " +
                         "saving switches the shader's decal off on the saved material.", layer.name) + (d.notes.Count > 0 ? Loc.T(" See the notes in 1 · Pick for what may look different.") : ""),

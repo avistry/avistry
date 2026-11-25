@@ -9,14 +9,81 @@ the release notes.
 
 ## [Unreleased]
 
-- Website: the tour video has a language switch (EN, 日本語, 한국어, 中文) that keeps the same second, and keeps playing in a mini player you can move and resize while you visit the other pages.
-- Website: the tour has its own controls under the picture (play, ±10 s, time line, volume, speed, full screen, keyboard keys) so the subtitles stay clear, starts centred on the screen, slows down like a tape when paused and glitches over when you switch its language.
-- Website: painted effects on every page: page heads that draw like the tool (brush, pencil, airbrush, pattern, colour match, layers), brush strokes under the titles and doodles that draw as you scroll, a painted footer, sections that come in as you reach them, the six learning tiers lighting up as you scroll, a Discord help note on Learn, and the gallery spin without a frame.
-- Website: the home page opens with the painted Avistry name in the top bar and the links in the middle, with one of four short entrances when the page opens and a different edited look on every visit or refresh, folding into the normal bar as you scroll; a smaller, tidier footer; a Performance mode switch next to Light mode that turns off the drawing and motion; the gallery spin has no title of its own (the close-ups title sits beside it), starts playing straight away and glitches as a new look sweeps across it; videos that do not play on their own show their own first frame instead of a stretched picture; a quick glitch on the home picture when you switch looks; quicker animations; the page opens straight in Japanese, Korean or Chinese when the browser asks for it; Performance mode starts on by itself on very small devices and with data saver.
-- Website: a Download page with the latest version, every older version with its files, and download counts from GitHub Releases (updated every six hours), plus a "Build it with us" section to get the source and add features with an AI coding assistant; the other pages keep a small Get it card that links there, and Download sits in the top bar in place of the Get it button. The look you pick (Crimson, Frost, Venom) now colours the whole site: buttons, links, titles, painted heads, brush strokes, doodles, the close-up captions with a label naming the look, and the tour player. Every page has the four looks as icons in the top bar (on the home page they fly in once the picture's own buttons scroll away); switching paints the new look over the page in a circle from the button, and the close-ups glitch as the new look lands. The footer has the languages on the left and the two switches on the right. The hero and gallery looks switch in place (the picture glitches where you are looking and the hero seam stays put) and the gallery spin keeps playing when you switch quickly. Features has a Scroll / Overview switch for the layers and blend modes (Overview shows every layer and every mode as cards, grouped; switching keeps your place; Performance mode always uses it),, and the selection tools play one after another in a small player with back, pause and next. Features also explains the material sliders in three steps with compact cards, shows ambient occlusion and the normal map in their own rows, plays the undo history by itself and gives "Your files stay safe" and the material audit a full row each; its Learn part has one button to the Learn page. Every page has a language button in the top bar, and switching language scrambles the words on screen into the new language and glitches the pictures that change with it. A scrollbar in the look's colours with a soft glow while you scroll. Every page has its own share picture in all four languages, and the address shows the language (/ja/, /ko/, /zh-CN/) so a shared link previews in that language; the page pictures also appear on the top-bar links, in the phone menu, on the home page's Want more cards and in a Keep going row that leads each page on towards Download. The Gallery has the same Scroll and Overview switch as Features, and links from Learn open Features in Overview. The Download page shows versions as a short timeline and has a clearer Build it with us section. Performance mode now turns itself on for weak devices or after the tab crashed or ran short of memory, never just for strong phones, and says so with a way to turn it off. Switching language no longer moves the page while the words scramble. The Download page shows the newest version's painted release banner, and the Japanese, Korean and Chinese text was checked again for meaning and terms.
-- Website: GitHub and Discord links in the top bar, a Discord community invite on the home page, the avatar's head no longer cut off on big screens or in "In any world", and the Face, Horns and Arm pictures open their own close-up.
-- Website: the Avistry mascot joins the pages: moving emoji beside the titles and lines, stickers that slap on as you scroll (tap one to slap it again) and a mascot peeking over the footer; with reduced motion or Performance mode they stand still.
-- Website: on phones the Menu button is a round + button, so the top bar no longer runs off the screen in Japanese, Korean and Chinese.
+## [0.3.0] - 2026-11-25
+
+### Highlights
+
+- **Shade a curved surface.** Draw a gradient across the model, then drag its ends or edit its colour and opacity stops in the Scene view.
+- **Paint exactly the faces you pick.** Select an earcup, a row of faces or the faces along a rim. Start a brush layer or gradient inside that selection.
+- **Give a brush its own texture.** Search for fur, scratches, stitches, rivets or drips. Stabilise a mouse stroke, or tune how a pen responds to pressure and tilt.
+- **Hand someone an editable look.** Save unfinished work as a named draft. Use Pack and Share to send layers and added artwork that another creator can preview on their own avatar.
+
+### Feature drops
+
+**Scene tools and gradients**
+
+- Switch between Select, Recolour and Paint beside the model. Isolate edited parts to reach behind clothing. On a shared renderer, isolation can hide a clothing slot with its own submesh in the shaded Built-in Scene view.
+- Place linear, circular or elliptical gradients across UV seams. Move the whole gradient, rotate it about its centre or extend it past the silhouette. When overlapping UVs would give a pixel two different colours, Avistry explains the conflict.
+
+**Selection, brushes and Fill**
+
+- Box and Lasso preview while you drag. Wand, Part and Tile show their result before you click. Select a face or boundary loop in either view. Advanced adds Face Loop, Vertex and Edge. The model and texture each have a UV wireframe switch.
+- Select, Paint and Recolour use compact icon palettes beside the model. The editor pairs the same icons with short names for brush, fill, gradient, blend and recolour tools.
+- Switch from Paint to picking and back with the current brush and layer. Recolour can highlight its own pieces while keeping your paint selection, including individual faces.
+- Hovered and selected pieces have smooth outlines in the Scene view. A softer rim shows where a piece continues behind clothing, and the selection stripes are gone.
+- Return to a recently edited part or texture to pick up its face and UV-piece selection where you left it. Clearing a selection is remembered too.
+- Connected Fill can close small gaps in outlines. Fill matching colours on the clicked piece, the selection or the whole texture. Limit new marks to a band or box, or mirror brush, eraser and mask strokes on both axes or a custom plane.
+- Set up a pen in either painting view. Try light and firm pressure on the test pad, see how the brush responds and save the range in a preset. Choose a fixed tip angle, follow the stroke or use tilt or rotation when the pen reports it.
+- Switch Bristle between Dry, Natural and Loaded to change how much paint the strands lay down. The same control works when brushing a mask.
+- Pick a brush shape by clicking its thumbnail or name. Use the arrow keys to browse the grid. The picker now recovers after Unity reloads scripts while the brush library is open.
+- Paint colour, size and strength sit together above the brush library. Click a section title, chevron or count to open its controls in the editor or Scene view. Focused headings also respond to the left and right arrow keys.
+
+**Layers and templates**
+
+- Preview a template on the current edit and selection before applying it. Group neighbouring layers, merge compatible Paint layers while keeping strokes editable, or preview a rendered merge that you can separate later.
+- Stack up to four additional RGB blend modes on a layer and set their order and strength. Copy a layer’s appearance while preserving the destination’s paint, placement and mask.
+
+**Colour and materials**
+
+- Colour Match can pair by brightness, closest colour or most-used colours. Advanced Copy lets you compare settings before creating a material copy for a compatible slot.
+- Start painting from a white texture on a textureless Unity Standard or Standard Specular material. Quick material exposes tint and glow on both. On Poiyomi, review animated settings and clear an individual mark on an unlocked copy.
+
+**Drafts and sharing**
+
+- Search drafts by name, source texture or project folder. Drop a saved edit onto the canvas to reopen it.
+- Review edits in a style pack together, see missing artwork or incompatible UVs, then open a draft or apply the checked parts. The recipient supplies the original textures, materials and meshes. One Undo restores the previous material assignments after a batch apply.
+
+**Learning in Unity and on the website**
+
+- Open **Tools → Avistry → Skill tree** to resume a lesson or explore a chapter. Open **Glossary** from the same menu to look up a term while you work.
+- Follow 24 new lessons on painting and selection, editable layers and materials, and preparing an avatar for VRChat. Practise pen pressure, trace a toggle from the Expressions Menu to the FX controller, or work through Build & Test before uploading.
+- The Learn page, skill tree and glossary cover the same 65 entries in English, Japanese, Korean and Simplified Chinese. Existing learning progress carries forward.
+
+### Editor and performance
+
+- Open Settings from the toolbar, including in narrow windows. Open the Avistry website there or choose **Reload Avistry** to refresh the tools and texture preview while keeping your layers.
+- Choose **Review support report…** in Settings to see and copy editor and graphics details for Discord or GitHub. Avistry also offers a report after a detected Avistry error or an interrupted editor session.
+- Picking a texture prepares its UV clipping while the preview opens, including at 4K. Avistry prepares the active brush during idle time and backs off when editor frames slow down. Long strokes reuse earlier marks, and unchanged layer masks and clipping reuse their prepared data.
+- Normal maps, face shadows and mask textures process pixels in the background. Ambient occlusion spreads its GPU work across editor updates. You can cancel a bake, and changing the target discards an outdated result.
+- Previewing a rendered layer merge keeps the result on the GPU until you choose **Keep merged layer**. Saving a texture moves seam padding and PNG encoding to a worker so the editor can respond during export.
+- The first brush press on a selected UV piece builds its full-resolution mask faster, including the padding around seams.
+- The Scene brush finds the surface under the pointer faster on clothed avatars. The UV canvas skips unused wireframes and empty selection overlays.
+- Spray, bristles and drips share direction and variation across each dab. On supported graphics hardware, the Scene brush now fills the padding along UV seams in one pass, even on a 4K texture.
+- Japanese, Korean and Simplified Chinese have clearer labels for selection, brushes, material settings and saving.
+- Website: Follow a leather headset through selection, painting, layers, Colour Match and baking in the Features tour. The recordings show the Scene tools beside the model and the matching editor controls in English, Japanese, Korean and Simplified Chinese. Watch a mesh selection return on both the model and its UV map.
+
+### Fixes
+
+- Scene picks and strokes follow posed and unevenly scaled parts. Round brushes cross eligible UV seams with Smooth across joins, and covered surfaces break the stroke. Switching Unity stages cancels an unfinished drag.
+- Interrupted gradients clear their temporary preview. Removing an inverted piece limit restores the whole layer. A missing Scene wireframe rebuilds when needed.
+- Applying a normal map enables it on Unity Standard materials. If you re-enable a map that was already assigned, Unity may keep it enabled after Undo. Avistry explains this when you re-enable it.
+- Textures with the same name keep separate baked files. PNG-only and cancelled saves preserve the material assignment.
+- History restores this edit’s layers independently of other Unity work. Earlier saved edits can be found again after their files move or are renamed in Unity.
+
+### Compatibility
+
+- Avistry runs in the Unity 2022.3 Editor. A pen is optional. Pen tilt and rotation depend on the information Unity receives from the device.
+- Existing saved edits still open from their original folders. New drafts go in `Assets/Avistry/Drafts` and generated edits and material copies in `Assets/Avistry/Output`. Style packs with ordinary brush layers can open without optional pen-direction samples.
 
 ## [0.2.0] - 2026-11-22
 
@@ -216,5 +283,6 @@ First public release of Avistry.
 - Changing "Only recolour existing paint" now counts as an edit, and the "Switch effect on" button acts on the right
   material.
 
-[Unreleased]: https://github.com/avistry/avistry/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/avistry/avistry/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/avistry/avistry/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/avistry/avistry/releases/tag/v0.2.0

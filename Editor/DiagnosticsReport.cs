@@ -1,8 +1,5 @@
-using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
-using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 
@@ -10,18 +7,21 @@ namespace Avistry.Textures
 {
     internal static class DiagnosticsReport
     {
-        // Harness switch: no preview window and no clipboard write.
         public static bool SkipPreview;
+        static Texture2D s_logo;
 
-        public static string Build(Renderer renderer, Material material, IReadOnlyList<TextureSlot> slots, string shaderProfile)
+        internal static Texture2D Logo => s_logo ? s_logo : s_logo = AssetDatabase.LoadAssetAtPath<Texture2D>(
+            AssetDatabase.GUIDToAssetPath("081f83aa59264406861d8a2c505ccb6a"));
+
+        public static string Build(Renderer renderer, Material material, IReadOnlyList<TextureSlot> slots)
         {
             var sb = new StringBuilder();
             sb.AppendLine("Avistry: " + AvatarTextureWindow.Version);
             sb.AppendLine("Unity: " + Application.unityVersion);
-            sb.AppendLine("OS: " + SystemInfo.operatingSystem);
-            sb.AppendLine("GPU: " + SystemInfo.graphicsDeviceName);
-            sb.AppendLine("Graphics API: " + SystemInfo.graphicsDeviceType);
-            sb.AppendLine("Graphics API version: " + SystemInfo.graphicsDeviceVersion);
+            string issue = SupportSession.LastIssue;
+            if (!string.IsNullOrEmpty(issue)) sb.AppendLine("Last event: " + issue);
+            sb.AppendLine("Operating system family: " + SystemInfo.operatingSystemFamily);
+            sb.AppendLine($"Graphics: {SystemInfo.graphicsDeviceType}, vendor {SystemInfo.graphicsDeviceVendorID:X4}, device {SystemInfo.graphicsDeviceID:X4}");
             sb.AppendLine("Compute shaders: " + SystemInfo.supportsComputeShaders);
             sb.AppendLine("Async GPU readback: " + SystemInfo.supportsAsyncGPUReadback);
             sb.AppendLine("RenderTexture ARGBHalf: " + SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBHalf));
@@ -29,53 +29,15 @@ namespace Avistry.Textures
             sb.AppendLine("Texture RGBAHalf: " + SystemInfo.SupportsTextureFormat(TextureFormat.RGBAHalf));
             sb.AppendLine("Texture RGBAFloat: " + SystemInfo.SupportsTextureFormat(TextureFormat.RGBAFloat));
             sb.AppendLine("Max texture size: " + SystemInfo.maxTextureSize);
-            sb.AppendLine("Shader profile: " + shaderProfile);
-            sb.AppendLine("Part: " + MeshName(renderer));
-            sb.AppendLine("Material: " + (material != null ? material.name : "none"));
-            sb.AppendLine("Shader: " + (material != null && material.shader != null ? material.shader.name : "none"));
-            if (slots != null)
+            sb.AppendLine("Renderer: " + (renderer is SkinnedMeshRenderer ? "Skinned mesh" : renderer is MeshRenderer ? "Mesh" : "none"));
+            var shader = material ? material.shader : null;
+            sb.AppendLine("Shader profile: " + (!shader ? "none" : shader.name == "Standard" ? "Standard" : ShaderProfiles.Detect(shader).ToString()));
+            for (int i = 0; slots != null && i < slots.Count; i++)
             {
-                for (int i = 0; i < slots.Count; i++)
-                {
-                    var t = slots[i]?.texture;
-                    if (t == null) { sb.AppendLine($"Slot {i + 1}: empty"); continue; }
-                    string file = Path.GetFileName(AssetDatabase.GetAssetPath(t));
-                    if (string.IsNullOrEmpty(file)) file = "(not an asset)";
-                    sb.AppendLine($"Slot {i + 1}: {t.width} x {t.height}, {t.format}, sRGB {t.isDataSRGB}, {file}");
-                }
+                var t = slots[i]?.texture;
+                sb.AppendLine(t ? $"Slot {i + 1}: {t.width} x {t.height}, {t.format}, sRGB {t.isDataSRGB}" : $"Slot {i + 1}: empty");
             }
-            return Scrub(sb.ToString());
-        }
-
-        static string MeshName(Renderer r)
-        {
-            Mesh m = null;
-            if (r is SkinnedMeshRenderer smr) m = smr.sharedMesh;
-            else if (r != null && r.TryGetComponent(out MeshFilter mf)) m = mf.sharedMesh;
-            return m != null ? m.name : "none";
-        }
-
-        public static string Scrub(string s)
-        {
-            if (string.IsNullOrEmpty(s)) return s;
-            string data = Application.dataPath;
-            if (!string.IsNullOrEmpty(data))
-            {
-                s = ReplaceAll(s, data);
-                string parent = Path.GetDirectoryName(data);
-                if (!string.IsNullOrEmpty(parent)) s = ReplaceAll(s, parent);
-            }
-            string user = Environment.UserName;
-            if (!string.IsNullOrEmpty(user) && user.Length >= 3) s = s.Replace(user, "<path>");
-            return Regex.Replace(s, @"(?:[A-Za-z]:[\\/]|/Users/|/home/)\S*", "<path>");
-        }
-
-        // Also catches the other slash style of the same path.
-        static string ReplaceAll(string s, string path)
-        {
-            s = s.Replace(path, "<path>");
-            s = s.Replace(path.Replace("/", "\\"),"<path>");
-            return s.Replace(path.Replace("\\", "/"), "<path>");
+            return sb.ToString();
         }
     }
 }

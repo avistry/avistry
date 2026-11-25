@@ -9,7 +9,6 @@ namespace Avistry.Textures
     {
         internal string AutoSetPadding(bool on) { Exporter.PadSeams = on; return null; }
 
-        /// <summary>Renders a colour slot with and without seam padding and compares them.</summary>
         internal string AutoPaddingCheck(int size)
         {
             var slot = CurrentSlot;
@@ -38,7 +37,6 @@ namespace Avistry.Textures
                 frontier.Add(i);
                 if (!pa[i].Equals(pb[i])) coveredEqual = false;
             }
-            // 8-connected distance from coverage, up to the padding radius.
             int radius = SeamPadding.Radius(w, h);
             var next = new List<int>();
             for (int step = 1; step <= radius && frontier.Count > 0; step++)
@@ -61,8 +59,6 @@ namespace Avistry.Textures
                 }
                 (frontier, next) = (next, frontier);
             }
-            // A zone pixel counts as filled when padding changed it, or when it already holds its nearest piece pixel's colour
-            // (layers can colour the zone themselves). A little slack covers ties between two pieces.
             int unfilled = 0, zone = 0;
             for (int i = 0; i < pa.Length; i++)
             {
@@ -77,7 +73,6 @@ namespace Avistry.Textures
                 + " unfilled=" + unfilled + " ms=" + (msB - msA) + " warning=" + (warn ?? "none");
         }
 
-        /// <summary>Bakes one slot of a test copy (PNG only) and returns the SHA-256 of the file.</summary>
         internal string AutoExportSlotHash(int slotIndex)
         {
             if (_material == null || !AssetDatabase.GetAssetPath(_material).StartsWith("Assets/_ATS_Test/")) return "refused: not a test copy";

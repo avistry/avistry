@@ -57,5 +57,6 @@
  "dl.dev.3.b2": "Open a pull request. We test every one and ship it in a normal version.",
  "dl.dev.pr": "Open a pull request",
  "dl.banner.go": "What's new",
- "dl.banner.alt": "Avistry 0.2.0, the first public release"
+ "dl.banner.alt": "Avistry 0.2.0, the first public release",
+ "dl.banner.alt.0.3.0": "Avistry 0.3.0, Surface Studio. Brown headphones with painted cherry blossoms on the earcup."
 }

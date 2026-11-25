@@ -5,10 +5,8 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>Small colour helpers for the colour palettes (gamma / file values throughout).</summary>
     static class ColourMath
     {
-        /// <summary>Approximate color axes (CLIP STUDIO PAINT cycles H, S, V, L, R, G, B).</summary>
         public enum Axis { H, S, V, L, R, G, B }
 
         public static readonly string[] AxisNames = { "Hue", "Saturation", "Value", "Lightness", "Red", "Green", "Blue" };
@@ -45,7 +43,6 @@ namespace Avistry.Textures
             return new Color(Hue2RGB(p, q, h + 1f / 3f), Hue2RGB(p, q, h), Hue2RGB(p, q, h - 1f / 3f), 1f);
         }
 
-        /// <summary>Moves one property of the colour by t (−1..1; for hue, 1 = half way round the wheel).</summary>
         public static Color Vary(Color c, Axis axis, float t)
         {
             switch (axis)
@@ -72,7 +69,6 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>Perceptual mix (OKLab), so midpoints don't go muddy or dark like plain RGB mixing.</summary>
         public static Color Mix(Color a, Color b, float t)
         {
             var c = Recolour.FromOklab(Vector3.Lerp(Recolour.ToOklab(a), Recolour.ToOklab(b), t), 1f);
@@ -93,11 +89,6 @@ namespace Avistry.Textures
         public List<ColourSet> sets = new List<ColourSet>();
     }
 
-    /// <summary>
-    /// CLIP STUDIO PAINT-style colour tools for the Paint tab: main / sub colour (X swaps), Color history, Color set,
-    /// Approximate color and Intermediate color palettes, and eyedropper settings (Reference, Average color).
-    /// The colour wheel and sliders are Unity's colour picker, opened from the main / sub swatches.
-    /// </summary>
     partial class AvatarTextureWindow
     {
         enum PaletteView { History = 0, ColourSet = 1, Approximate = 2, Intermediate = 3 }
@@ -115,9 +106,13 @@ namespace Avistry.Textures
         [SerializeField] int _pickRadius = 2;
         [SerializeField] bool _autoRegisterPicks;
         [SerializeField] bool _foldPalettes;
-        [SerializeField] int _colourSetIndex = 1; // 0 = from this texture, 1.. = the user's sets
+        [SerializeField] int _colourSetIndex = 1;
+
+        static readonly Compositor.PickSource[] PickSources = (Compositor.PickSource[])Enum.GetValues(typeof(Compositor.PickSource));
+        static readonly ColourMath.Axis[] ShadeAxes = (ColourMath.Axis[])Enum.GetValues(typeof(ColourMath.Axis));
 
         ColourSetStore _colourSets;
+        string _colourSetsSnapshot;
         List<Color> _texturePalette;
         bool _renamingSet;
 
@@ -136,46 +131,16 @@ namespace Avistry.Textures
             Repaint();
         }
 
-        /// <summary>Main and sub colour, swap, eyedropper and Scene picker, then the palettes.</summary>
         void DrawColourControls()
         {
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                StudioGUI.Count("colour.main");
-                _brush.color = EditorGUILayout.ColorField(new GUIContent("", Loc.T("Main colour. Click for the colour wheel and sliders.")), _brush.color, false, false, false, GUILayout.MinWidth(60));
-                StudioGUI.Info("tint");
-                StudioGUI.Count("colour.swap");
-                if (GUILayout.Button(new GUIContent("↔", Loc.T("Swap main and second colour (X)")), EditorStyles.miniButton, GUILayout.Width(24), GUILayout.Height(18))) SwapColours();
-                StudioGUI.Count("colour.secondColour");
-                _brush.subColor = EditorGUILayout.ColorField(new GUIContent("", Loc.T("Second colour: X swaps it with the main colour. Used by Colour variety per stroke and gradients.")), _brush.subColor, false, false, false, GUILayout.Width(40));
-                StudioGUI.Info("tint");
-                StudioGUI.Count("colour.eyedropper");
-                bool armed = GUILayout.Toggle(_eyedropperArmed, StudioGUI.Icon("Grid.PickingTool", "", Loc.T("Pick a colour from the texture or the model (I, or Ctrl+click)")), GUI.skin.button, GUILayout.Width(30), GUILayout.Height(18));
-                if (armed != _eyedropperArmed) { _eyedropperArmed = armed; Repaint(); }
-                var oldBg = GUI.backgroundColor;
-                if (_scenePickArmed) GUI.backgroundColor = StudioGUI.Accent;
-                if (GUILayout.Button(new GUIContent(Loc.T("Scene"), StudioGUI.Icon("Grid.PickingTool", "").image, Loc.T("Pick a colour from anything in the Scene view: the exact texture colour on this part, or the on-screen colour anywhere else (Shift = always on-screen)")), GUILayout.Width(64), GUILayout.Height(18)))
-                {
-                    _scenePickArmed = !_scenePickArmed;
-                    if (_scenePickArmed) { SceneView.lastActiveSceneView?.Focus(); Toast(Loc.T("Click anything in the Scene view to pick its colour. Shift+click = colour as seen on screen. Esc cancels."), MessageType.Info, 5f); }
-                    SceneView.RepaintAll();
-                }
-                GUI.backgroundColor = oldBg;
-            }
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                GUILayout.Label(Loc.T("Main"), StudioGUI.Hint, GUILayout.MinWidth(60));
-                GUILayout.Space(24);
-                GUILayout.Label(Loc.T("Second"), StudioGUI.Hint, GUILayout.Width(40));
-                GUILayout.Space(94);
-            }
+            if (Event.current.type == EventType.Layout && Advanced && _foldPalettes) CheckColourSetsSnapshot();
+            DrawPaintColourRow();
 
             GUILayout.Space(3);
-            if (!_foldPalettes || _paletteView != PaletteView.History) DrawRecentTiles();
+            if (!Advanced || !_foldPalettes || _paletteView != PaletteView.History) DrawRecentTiles();
             if (!Advanced) return;
-            _foldPalettes = EditorGUILayout.Foldout(_foldPalettes, new GUIContent(Loc.T("Colour sets, variations and eyedropper"),
-                Loc.T("Saved colour sets, colours of this texture, approximate and intermediate colours, eyedropper settings")), true);
+            _foldPalettes = StudioGUI.Foldout(_foldPalettes, new GUIContent(Loc.T("Palettes and eyedropper"),
+                Loc.T("Saved colour sets, colours of this texture, approximate and intermediate colours, eyedropper settings")));
             if (!_foldPalettes) return;
             var view = (PaletteView)GUILayout.Toolbar((int)_paletteView, new[]
             {
@@ -196,11 +161,9 @@ namespace Avistry.Textures
 
             GUILayout.Space(2);
             GUILayout.Label(new GUIContent(Loc.T("Eyedropper"), Loc.T("What the eyedropper (I / Ctrl+click) samples")), EditorStyles.miniBoldLabel);
-            // eyedropper settings
+            DrawEyedropperReference();
             {
                 EditorGUI.indentLevel++;
-                _pickSource = (Compositor.PickSource)EditorGUILayout.EnumPopup(new GUIContent(Loc.T("Reference"),
-                    Loc.T("Image: the colour you see. Original texture: before your edits. Current layer: only the paint on the selected Paint layer. Top layer: the topmost paint at that point.")), _pickSource);
                 _showPickerCircle = EditorGUILayout.Toggle(new GUIContent(Loc.T("Show picker circle"), Loc.T("While picking, a ring at the cursor shows the colour under it (top) next to the current colour (bottom)")), _showPickerCircle);
                 _pickAverage = EditorGUILayout.Toggle(new GUIContent(Loc.T("Average colour"), Loc.T("Average a small area instead of one pixel (smooths out noise and texture grain)")), _pickAverage);
                 if (_pickAverage)
@@ -208,76 +171,194 @@ namespace Avistry.Textures
                     int size = EditorGUILayout.IntSlider(new GUIContent(Loc.T("Area (px)"), Loc.T("Width of the sampled square, in pixels of the texture view")), _pickRadius * 2 + 1, 3, 25);
                     _pickRadius = Mathf.Clamp((size - 1) / 2, 1, 12);
                 }
-                _autoRegisterPicks = EditorGUILayout.Toggle(new GUIContent(Loc.T("Add to colour set"), Loc.T("Every colour you pick is also added to the selected colour set")), _autoRegisterPicks);
+                DrawPickedColourDestination();
                 EditorGUI.indentLevel--;
             }
         }
 
-        /// <summary>Eyedropper (I / Ctrl+click / the model): samples by the Reference and Average color settings.</summary>
+        void DrawEyedropperReference()
+        {
+            var label = new GUIContent(Loc.T("Reference"),
+                Loc.T("Image: the colour you see. Original texture: before your edits. Current layer: only the paint on the selected Paint layer. Top layer: the topmost paint at that point."));
+            float width = PanelContentWidth;
+            if (width < 300f)
+            {
+                GUILayout.Label(label, EditorStyles.miniLabel, GUILayout.MaxWidth(width));
+                label = GUIContent.none;
+            }
+            var names = new[] { Loc.T("Image"), Loc.T("Original texture"), Loc.T("Current layer"), Loc.T("Top layer") };
+            var current = Array.IndexOf(PickSources, _pickSource) >= 0 ? _pickSource : Compositor.PickSource.Image;
+            var next = SteppedChoice(label, current, PickSources,
+                (rect, value) => PickSources[EditorGUI.Popup(rect, Array.IndexOf(PickSources, value), names)], width);
+            var row = GUILayoutUtility.GetLastRect();
+            row.width = Mathf.Min(row.width, width);
+            StudioGUI.Count("colour.pickReference", row);
+            if (next != current) SetEyedropperReference(next);
+        }
+
+        void SetEyedropperReference(Compositor.PickSource source)
+        {
+            if (_pickSource == source) return;
+            string action = Loc.T("Change eyedropper reference");
+            Undo.FlushUndoRecordObjects();
+            Undo.IncrementCurrentGroup();
+            Undo.SetCurrentGroupName(action);
+            Undo.RecordObject(this, action);
+            _pickSource = source;
+            Undo.FlushUndoRecordObjects();
+            Undo.IncrementCurrentGroup();
+            SelectUiChanged();
+        }
+
+        void DrawPaintColourRow()
+        {
+            var row = EditorGUILayout.GetControlRect(false, 34f);
+            row.width = Mathf.Min(row.width, PanelContentWidth);
+            const float gap = 3f, infoSize = 18f, swapSize = 23f, pickerSize = 25f;
+            bool compact = PanelContentWidth < 345f;
+            float sceneSize = compact ? 26f : 64f;
+            float helpSize = Advanced || compact ? 0f : infoSize;
+            float swatchSize = (row.width - swapSize - pickerSize - sceneSize - helpSize - 4f * gap) * .5f;
+            var main = new Rect(row.x, row.y, swatchSize, 18f);
+            var swap = new Rect(main.xMax + gap, row.y, swapSize, main.height);
+            var second = new Rect(swap.xMax + gap, row.y, swatchSize, main.height);
+            var picker = new Rect(second.xMax + gap + helpSize, row.y, pickerSize, main.height);
+            var scene = new Rect(picker.xMax + gap, row.y, sceneSize, main.height);
+            HandleBrushColourCode(main, true);
+            _brush.color = EditorGUI.ColorField(main, new GUIContent("", Loc.T("Main colour. Click for the colour wheel and sliders.") + " " +
+                Loc.T("Right-click for colour codes.")), _brush.color, false, false, false);
+            StudioGUI.Count("colour.main", main);
+            GUI.Label(new Rect(main.x, main.yMax + 1f, main.width, 15f), Loc.T("Main"), StudioGUI.Hint);
+            if (GUI.Button(swap, new GUIContent("↔", Loc.T("Swap main and second colour (X)")), EditorStyles.miniButton)) SwapColours();
+            StudioGUI.Count("colour.swap", swap);
+            HandleBrushColourCode(second, false);
+            _brush.subColor = EditorGUI.ColorField(second, new GUIContent("", Loc.T("Second colour: X swaps it with the main colour. Used by Colour variety per stroke and gradients.") + " " +
+                Loc.T("Right-click for colour codes.")), _brush.subColor, false, false, false);
+            StudioGUI.Count("colour.secondColour", second);
+            GUI.Label(new Rect(second.x, second.yMax + 1f, second.width, 15f), Loc.T("Second"), StudioGUI.Hint);
+            if (helpSize > 0f) StudioGUI.Info(new Rect(second.xMax, row.y, helpSize, main.height), "tint");
+
+            bool armed = GUI.Toggle(picker, _eyedropperArmed, StudioGUI.Icon("Grid.PickingTool", "", Loc.T("Pick a colour from the texture or the model (I, or Ctrl+click)")), GUI.skin.button);
+            StudioGUI.Count("colour.eyedropper", picker);
+            if (armed != _eyedropperArmed)
+            {
+                if (armed) SetPickForPaint(false);
+                _eyedropperArmed = armed;
+                Repaint();
+            }
+            var oldBg = GUI.backgroundColor;
+            if (_scenePickArmed) GUI.backgroundColor = StudioGUI.Accent;
+            if (GUI.Button(scene, StudioGUI.Icon("SceneViewCamera", compact ? "" : Loc.T("Scene"),
+                    Loc.T("Pick a colour from anything in the Scene view: the exact texture colour on this part, or the on-screen colour anywhere else (Shift = always on-screen)"))))
+            {
+                _scenePickArmed = !_scenePickArmed;
+                if (_scenePickArmed)
+                {
+                    SetPickForPaint(false);
+                    SceneView.lastActiveSceneView?.Focus();
+                    Toast(Loc.T("Click anything in the Scene view to pick its colour. Shift+click = colour as seen on screen. Esc cancels."), MessageType.Info, 5f);
+                }
+                SceneView.RepaintAll();
+            }
+            GUI.backgroundColor = oldBg;
+        }
+
+        void DrawPickedColourDestination()
+        {
+            var set = CurrentUserSet;
+            bool enabled;
+            using (new EditorGUI.DisabledScope(set == null))
+            {
+                string name = set != null ? Loc.F("Add picks to “{0}”", set.name) : Loc.T("Add to colour set");
+                enabled = EditorGUILayout.ToggleLeft(new GUIContent(name, Loc.T("Adds colours picked in the texture or Scene view to this saved set.")), _autoRegisterPicks);
+            }
+            if (set == null)
+                GUILayout.Label(_autoRegisterPicks ? Loc.T("Adding picks is paused. Choose a saved colour set to resume.")
+                    : Loc.T("Choose a saved colour set to keep picked colours."), StudioGUI.Hint);
+            else
+            {
+                if (enabled != _autoRegisterPicks)
+                {
+                    Undo.RecordObject(this, Loc.T("Add to colour set"));
+                    _autoRegisterPicks = enabled;
+                }
+                if (enabled && set.colors.Count >= MaxColoursPerSet) GUILayout.Label(ColourSetFullHint(), StudioGUI.Hint);
+            }
+        }
+
         void PickColour(Vector2 uv)
         {
             if (_comp == null) return;
+            if (_dirty) ComposeNow();
             var layer = ActiveLayer as PaintLayer;
             int radius = _pickAverage ? _pickRadius : 0;
-            if (_pickSource == Compositor.PickSource.TopLayer)
-            {
-                // Top layer: the paint of the topmost visible Paint layer that has any at this point; else what you see.
-                Color picked = default;
-                bool found = false;
-                for (int i = _recipe.layers.Count - 1; i >= 0 && !found; i--)
-                {
-                    if (!(_recipe.layers[i] is PaintLayer pl) || !pl.enabled || pl.strokes.Count == 0) continue;
-                    var pc = _comp.Sample(Compositor.PickSource.CurrentLayer, uv, radius, pl, _uv, out float pa);
-                    if (pa >= 0.02f) { picked = pc; found = true; }
-                }
-                if (!found) picked = _comp.Sample(Compositor.PickSource.Image, uv, radius, null, _uv, out _);
-                SetMainColour(picked);
-                if (!MaskEditing) _brush.mode = BrushMode.Paint;
-                _eyedropperArmed = false;
-                if (_autoRegisterPicks) AddToColourSet(picked, quiet: true);
-                return;
-            }
-            var c = _comp.Sample(_pickSource, uv, radius, layer, _uv, out float alpha);
-            if (_pickSource == Compositor.PickSource.CurrentLayer && alpha < 0.02f)
+            if (!TrySampleBrushColour(uv, radius, layer, out var c))
             {
                 Toast(layer == null
                         ? Loc.T("The eyedropper is set to “Current layer”, but the selected layer isn't a Paint layer.")
                         : Loc.F("No paint there on “{0}” (the eyedropper is set to “Current layer”).", layer.name),
-                    MessageType.Info, 5f, Loc.T("Pick from image"), () => { _pickSource = Compositor.PickSource.Image; Repaint(); });
+                    MessageType.Info, 5f, Loc.T("Pick from image"), () => SetEyedropperReference(Compositor.PickSource.Image));
                 return;
             }
             SetMainColour(c);
             if (!MaskEditing) _brush.mode = BrushMode.Paint;
             _eyedropperArmed = false;
-            if (_autoRegisterPicks) AddToColourSet(c, quiet: true);
+            RegisterPickedColour(c);
+        }
+
+        bool TrySampleBrushColour(Vector2 uv, int radius, PaintLayer layer, out Color colour)
+        {
+            var source = _pickSource;
+            if (source == Compositor.PickSource.TopLayer)
+            {
+                for (int i = _recipe.layers.Count - 1; i >= 0; i--)
+                {
+                    if (!(_recipe.layers[i] is PaintLayer paint) || !paint.enabled || paint.strokes.Count == 0) continue;
+                    colour = _comp.Sample(Compositor.PickSource.CurrentLayer, uv, radius, paint, _uv, out float coverage);
+                    if (coverage >= 0.02f) return true;
+                }
+                source = Compositor.PickSource.Image;
+            }
+            if (source == Compositor.PickSource.Image && DisplayingOriginal) source = Compositor.PickSource.Original;
+            colour = _comp.Sample(source, uv, radius, layer, _uv, out float alpha);
+            return source != Compositor.PickSource.CurrentLayer || alpha >= 0.02f;
         }
 
         [SerializeField] bool _showPickerCircle = true;
-        Vector2 _pickerCircleAt = new Vector2(-1, -1);
+        (int x, int y, Compositor.PickSource source, int radius, PaintLayer layer, bool original)? _pickerCircleKey;
+        bool _pickerCircleHasColour;
         Color _pickerCircleColour;
 
-        /// <summary>
-        /// Clip Studio's colour picker circle: while the eyedropper is active (I, or Ctrl held), a ring at the cursor shows
-        /// the colour under it in the top half and the current colour in the bottom half.
-        /// </summary>
+        bool TryPreviewBrushColour(Vector2 uv, out Color colour)
+        {
+            int radius = _pickAverage ? _pickRadius : 0;
+            var layer = _pickSource == Compositor.PickSource.CurrentLayer ? ActiveLayer as PaintLayer : null;
+            var key = (Mathf.Min(_comp.Width - 1, Mathf.FloorToInt(uv.x * _comp.Width)),
+                       Mathf.Min(_comp.Height - 1, Mathf.FloorToInt(uv.y * _comp.Height)), _pickSource, radius, layer, DisplayingOriginal);
+            if (_pickerCircleKey != key)
+            {
+                _pickerCircleKey = key;
+                _pickerCircleHasColour = TrySampleBrushColour(uv, radius, layer, out _pickerCircleColour);
+            }
+            colour = _pickerCircleColour;
+            return _pickerCircleHasColour;
+        }
+
         void DrawPickerCircle(Vector2 mp)
         {
             if (!_showPickerCircle || _comp == null || Event.current.type != EventType.Repaint) return;
             var uv = CanvasToUV(mp);
             if (uv.x < 0 || uv.y < 0 || uv.x > 1 || uv.y > 1) return;
-            if ((uv - _pickerCircleAt).sqrMagnitude > 1e-10f) // one small read per mouse move, not per repaint
-            {
-                _pickerCircleAt = uv;
-                var src = _pickSource == Compositor.PickSource.Original ? Compositor.PickSource.Original : Compositor.PickSource.Image;
-                _pickerCircleColour = _comp.Sample(src, uv, _pickAverage ? _pickRadius : 0, null, _uv, out _);
-            }
+            bool hasColour = TryPreviewBrushColour(uv, out var colour);
             var c = new Vector3(mp.x, mp.y, 0);
             const float outer = 34f, inner = 22f;
-            // IMGUI's y axis points down: angles go clockwise from +x, so 180°..360° is the top half.
             Handles.color = new Color(0, 0, 0, 0.85f);
             Handles.DrawSolidDisc(c, Vector3.forward, outer + 2f);
-            Handles.color = new Color(_pickerCircleColour.r, _pickerCircleColour.g, _pickerCircleColour.b, 1f);
-            Handles.DrawSolidArc(c, Vector3.forward, Vector3.left, 180f, outer);
+            if (hasColour)
+            {
+                Handles.color = new Color(colour.r, colour.g, colour.b, 1f);
+                Handles.DrawSolidArc(c, Vector3.forward, Vector3.left, 180f, outer);
+            }
             Handles.color = new Color(_brush.color.r, _brush.color.g, _brush.color.b, 1f);
             Handles.DrawSolidArc(c, Vector3.forward, Vector3.right, 180f, outer);
             Handles.color = new Color(0.16f, 0.16f, 0.16f, 1f);
@@ -287,7 +368,6 @@ namespace Avistry.Textures
             Handles.DrawLine(c + Vector3.up * 4, c + Vector3.down * 4);
         }
 
-        /// <summary>Draws a colour tile. Returns 1 on left click, 2 on right click, 0 otherwise.</summary>
         static int ColourTile(Rect r, Color c, string tip, bool outline = false)
         {
             var e = Event.current;
@@ -306,11 +386,10 @@ namespace Avistry.Textures
             return 0;
         }
 
-        /// <summary>A wrapping grid of tiles. Returns the clicked index (and whether it was a right click), or -1.</summary>
-        int TileGrid(IList<Color> colours, float tile, out bool rightClick, Func<int, string> tip, int extraTiles = 0)
+        int TileGrid(IList<Color> colours, float tile, out bool rightClick, Func<int, string> tip, int extraTiles = 0, float width = -1f)
         {
             rightClick = false;
-            float width = PanelContentWidth - 18f;
+            if (width < 0f) width = PanelContentWidth - 18f;
             int perRow = Mathf.Max(1, Mathf.FloorToInt(width / (tile + 2)));
             int count = colours.Count + extraTiles;
             int rows = Mathf.Max(1, Mathf.CeilToInt(count / (float)perRow));
@@ -333,15 +412,14 @@ namespace Avistry.Textures
             return new Rect(last.x + (index % perRow) * (tile + 2), last.y + (index / perRow) * (tile + 2), tile, tile);
         }
 
-        /// <summary>One row of recent colours, always visible under the colour fields.</summary>
-        void DrawRecentTiles()
+        void DrawRecentTiles(float width = -1f, string control = "colour.recent")
         {
             if (_recentColors.Count == 0) return;
-            StudioGUI.Count("colour.recent");
-            float width = PanelContentWidth - 18f;
+            if (width < 0f) width = PanelContentWidth - 18f;
             int perRow = Mathf.Max(1, Mathf.FloorToInt(width / 18f));
             var row = _recentColors.Count > perRow ? _recentColors.GetRange(0, perRow) : _recentColors;
-            int hit = TileGrid(row, 16, out _, i => Loc.T("Recent colour: click to use"));
+            int hit = TileGrid(row, 16, out _, i => Loc.T("Recent colour: click to use"), width: width);
+            StudioGUI.Count(control, GUILayoutUtility.GetLastRect());
             if (hit >= 0) SetMainColour(row[hit]);
         }
 
@@ -374,7 +452,8 @@ namespace Avistry.Textures
             get
             {
                 if (_colourSets != null) return _colourSets;
-                try { _colourSets = JsonUtility.FromJson<ColourSetStore>(EditorPrefs.GetString(ColourSetsPref, "")); }
+                _colourSetsSnapshot = EditorPrefs.GetString(ColourSetsPref, "");
+                try { _colourSets = JsonUtility.FromJson<ColourSetStore>(_colourSetsSnapshot); }
                 catch { _colourSets = null; }
                 if (_colourSets == null) _colourSets = new ColourSetStore();
                 if (_colourSets.sets.Count == 0) _colourSets.sets.Add(new ColourSet { name = "My colours" });
@@ -388,11 +467,21 @@ namespace Avistry.Textures
         {
             try
             {
-                foreach (var s in ColourSets.sets)
-                    if (s.colors.Count > MaxColoursPerSet) s.colors.RemoveRange(MaxColoursPerSet, s.colors.Count - MaxColoursPerSet);
-                EditorPrefs.SetString(ColourSetsPref, JsonUtility.ToJson(ColourSets));
+                string json = JsonUtility.ToJson(ColourSets);
+                EditorPrefs.SetString(ColourSetsPref, json);
+                _colourSetsSnapshot = json;
             }
             catch (Exception ex) { Debug.LogWarning("Avistry: couldn't save colour sets: " + ex.Message); }
+        }
+
+        void CheckColourSetsSnapshot()
+        {
+            if (_colourSets == null || EditorPrefs.GetString(ColourSetsPref, "") == _colourSetsSnapshot) return;
+            _colourSets = null;
+            _colourSetIndex = 0;
+            _renamingSet = false;
+            _texturePalette = null;
+            Repaint();
         }
 
         string UniqueSetName(string baseName)
@@ -404,13 +493,26 @@ namespace Avistry.Textures
 
         ColourSet CurrentUserSet => _colourSetIndex >= 1 && _colourSetIndex <= ColourSets.sets.Count ? ColourSets.sets[_colourSetIndex - 1] : null;
 
-        void AddToColourSet(Color c, bool quiet = false)
+        void RegisterPickedColour(Color c)
         {
-            var set = CurrentUserSet ?? ColourSets.sets[0];
+            if (!_autoRegisterPicks) return;
+            CheckColourSetsSnapshot();
+            if (CurrentUserSet is ColourSet set) AddToColourSet(set, c, quiet: true);
+        }
+
+        static string ColourSetFullHint() => Loc.T("This colour set is full. Delete a colour or choose another set.");
+
+        void AddToColourSet(ColourSet set, Color c, bool quiet = false)
+        {
             c.a = 1f;
             if (set.colors.Exists(x => Mathf.Abs(x.r - c.r) + Mathf.Abs(x.g - c.g) + Mathf.Abs(x.b - c.b) < 0.004f))
             {
                 if (!quiet) Toast(Loc.F("That colour is already in “{0}”.", set.name), MessageType.Info, 3f);
+                return;
+            }
+            if (set.colors.Count >= MaxColoursPerSet)
+            {
+                if (!quiet) Toast(ColourSetFullHint(), MessageType.Info, 3f);
                 return;
             }
             set.colors.Add(c);
@@ -421,7 +523,7 @@ namespace Avistry.Textures
         void DrawColourSetPalette()
         {
             var sets = ColourSets.sets;
-            _colourSetIndex = Mathf.Clamp(_colourSetIndex, 0, sets.Count);
+            if (_colourSetIndex < 0 || _colourSetIndex > sets.Count) _colourSetIndex = 0;
             var names = new List<string> { TextureSetName };
             foreach (var s in sets) names.Add(NoSubmenu(s.name));
             using (new EditorGUILayout.HorizontalScope())
@@ -466,7 +568,9 @@ namespace Avistry.Textures
                                 if (!StudioDialog.Ask(Loc.T("Delete colour set"), Loc.F("Delete “{0}” ({1} colours)? This can't be undone.", cur.name, cur.colors.Count), Loc.T("Delete"), Loc.T("Cancel"))) return;
                                 sets.Remove(cur);
                                 SaveColourSets();
-                                _colourSetIndex = Mathf.Clamp(_colourSetIndex, 1, sets.Count);
+                                _colourSetIndex = 0;
+                                _renamingSet = false;
+                                _texturePalette = null;
                                 Repaint();
                             });
                     }
@@ -506,7 +610,7 @@ namespace Avistry.Textures
                 EditorGUI.DrawRect(plus, StudioGUI.HeaderLine);
                 GUI.Label(plus, "+", new GUIStyle(EditorStyles.miniBoldLabel) { alignment = TextAnchor.MiddleCenter });
             }
-            if (GUI.Button(plus, new GUIContent("", Loc.T("Add the main colour to this set")), GUIStyle.none)) AddToColourSet(_brush.color);
+            if (GUI.Button(plus, new GUIContent("", Loc.T("Add the main colour to this set")), GUIStyle.none)) AddToColourSet(set, _brush.color);
             if (clicked >= 0 && !right) SetMainColour(set.colors[clicked]);
             if (clicked >= 0 && right)
             {
@@ -525,9 +629,9 @@ namespace Avistry.Textures
         List<Color> TexturePalette()
         {
             if (_texturePalette != null) return _texturePalette;
-            if (_comp == null) return new List<Color>(); // not cached: try again once a texture is loaded
+            if (_comp == null) return new List<Color>();
             var px = _comp.ResultThumbnail(96);
-            for (int i = 0; i < px.Length; i++) px[i].a = 1f; // colour only: masks and emission maps often have no alpha
+            for (int i = 0; i < px.Length; i++) px[i].a = 1f;
             _texturePalette = Recolour.Palette(px, 16, out _);
             return _texturePalette;
         }
@@ -549,8 +653,8 @@ namespace Avistry.Textures
                 var r = new Rect(area.x + i * (tile + 2), area.y + j * (tile + 2), tile, tile);
                 if (ColourTile(r, c, centre ? Loc.T("The main colour") : Loc.T("Click to use this variation"), centre) == 1) SetMainColour(c);
             }
-            DrawApproxAxis(Loc.T("Across"), ref _approxAcross, ref _approxSpreadAcross);
-            DrawApproxAxis(Loc.T("Down"), ref _approxDown, ref _approxSpreadDown);
+            DrawApproxAxis(Loc.T("Across"), "colour.shadesAcross", ref _approxAcross, ref _approxSpreadAcross);
+            DrawApproxAxis(Loc.T("Down"), "colour.shadesDown", ref _approxDown, ref _approxSpreadDown);
             GUILayout.Label(Loc.T("Variations of the main colour (centre, white outline). Try Hue across and Value down to find shadow and highlight colours."), StudioGUI.Hint);
         }
 
@@ -560,14 +664,51 @@ namespace Avistry.Textures
             "Red" => Loc.T("Red"), "Green" => Loc.T("Green"), "Blue" => Loc.T("Blue"), _ => name,
         };
 
-        void DrawApproxAxis(string label, ref ColourMath.Axis axis, ref float spread)
+        void DrawApproxAxis(string label, string control, ref ColourMath.Axis axis, ref float spread)
         {
-            using (new EditorGUILayout.HorizontalScope())
+            var names = Array.ConvertAll(ColourMath.AxisNames, AxisLabel);
+            float width = PanelContentWidth;
+            var heading = new GUIContent(label);
+            float labelWidth = Mathf.Max(48f, EditorStyles.miniLabel.CalcSize(heading).x);
+            float choiceWidth = 122f;
+            foreach (string name in names)
+                choiceWidth = Mathf.Max(choiceWidth, EditorStyles.popup.CalcSize(new GUIContent(name)).x + 38f);
+            float spreadWidth = width - labelWidth - choiceWidth - 8f;
+            bool stacked = spreadWidth < 82f;
+            if (stacked) choiceWidth = spreadWidth = width;
+            var current = Array.IndexOf(ShadeAxes, axis) >= 0 ? axis : ColourMath.Axis.H;
+            ColourMath.Axis next;
+            float nextSpread;
+            using (IDisposable layout = stacked ? (IDisposable)new EditorGUILayout.VerticalScope() : new EditorGUILayout.HorizontalScope())
             {
-                GUILayout.Label(label, GUILayout.Width(48));
-                axis = (ColourMath.Axis)EditorGUILayout.Popup((int)axis, Array.ConvertAll(ColourMath.AxisNames, AxisLabel), GUILayout.Width(88));
-                spread = EditorGUILayout.Slider(spread, 0.02f, 1f);
+                GUILayout.Label(heading, EditorStyles.miniLabel, GUILayout.Width(stacked ? width : labelWidth));
+                using (new EditorGUILayout.VerticalScope(GUILayout.Width(choiceWidth)))
+                {
+                    next = SteppedChoice(GUIContent.none, current, ShadeAxes,
+                        (rect, value) => ShadeAxes[EditorGUI.Popup(rect, (int)value, names)], choiceWidth);
+                    StudioGUI.Count(control, GUILayoutUtility.GetLastRect());
+                }
+                nextSpread = stacked ? EditorGUILayout.Slider(Loc.T("Spread"), spread, 0.02f, 1f, GUILayout.Width(spreadWidth))
+                    : EditorGUILayout.Slider(spread, 0.02f, 1f, GUILayout.Width(spreadWidth));
             }
+            bool choiceChanged = next != current;
+            if (!choiceChanged && nextSpread == spread) return;
+            string action = Loc.T("Change colour variations");
+            if (choiceChanged)
+            {
+                Undo.FlushUndoRecordObjects();
+                Undo.IncrementCurrentGroup();
+                Undo.SetCurrentGroupName(action);
+            }
+            Undo.RecordObject(this, action);
+            if (choiceChanged) axis = next;
+            spread = nextSpread;
+            if (choiceChanged)
+            {
+                Undo.FlushUndoRecordObjects();
+                Undo.IncrementCurrentGroup();
+            }
+            Repaint();
         }
 
         void DrawIntermediatePalette()

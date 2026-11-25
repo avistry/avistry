@@ -3,12 +3,7 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Turns a stroke path into dabs and draws its coverage into a render target (GL quads, Hidden/Avistry/Paint).
-    /// Dab placement is done in UV space, so a stroke looks the same at the working size and at bake size.
-    /// Used by the compositor and by the brush preview in the panel.
-    /// </summary>
-    public sealed class BrushRenderer : IDisposable
+    public sealed partial class BrushRenderer : IDisposable
     {
         public Material Material { get; }
 
@@ -21,175 +16,129 @@ namespace Avistry.Textures
 
         public void Dispose()
         {
+            InvalidateLiveSurfaceCoverage();
+            _stampLease?.Dispose();
+            _stampLease = null;
             if (Material != null) UnityEngine.Object.DestroyImmediate(Material);
             _cmd.Release();
         }
 
-        static float SizeFactor(PaintStroke s, float pressure) => s.pressureSize ? Mathf.Lerp(0.15f, 1f, Mathf.Clamp01(pressure)) : 1f;
+        internal static float SizeFactor(PaintStroke s, float pressure) => !s.pressureSize ? 1f : s.pressureModel == 1 && s.pen != null
+            ? Mathf.Lerp(s.pen.minimumSize, 1f, s.pen.Response(pressure)) : Mathf.Lerp(.15f, 1f, Mathf.Clamp01(pressure));
 
-        /// <summary>
-        /// Clears <paramref name="target"/> and draws the stroke's coverage into it. The caller restores RenderTexture.active.
-        /// </summary>
-        /// <param name="grainCellsPerUV">Grain cells across the texture width (source width / grain size in px).</param>
+        internal static float OpacityFactor(PaintStroke s, float pressure) => !s.pressureOpacity ? 1f : s.pressureModel == 1 && s.pen != null
+            ? Mathf.Lerp(s.pen.minimumStrength, 1f, s.pen.Response(pressure)) : Mathf.Clamp01(pressure);
+
         public void RenderCoverage(PaintStroke s, RenderTexture target, float grainCellsPerUV) =>
-            Render(s, target, grainCellsPerUV, (s?.shape ?? new BrushShape()).buildUp ? 2 : 0);
+            RenderWhole(s, target, grainCellsPerUV, s?.shape?.buildUp == true ? 2 : 0);
 
-        /// <summary>
-        /// Smudge: draws the stroke's direction (pixel space, packed 0..1 in RG) under each dab, later dabs on top,
-        /// so the smudge pass knows which way the brush was moving at every pixel.
-        /// </summary>
-        public void RenderDirection(PaintStroke s, RenderTexture target) => Render(s, target, 1f, 3);
+        public void RenderDirection(PaintStroke s, RenderTexture target) => RenderWhole(s, target, 1f, 3);
 
 
         const int DabsPerBatch = 32;
         readonly Vector4[] _dabPos = new Vector4[DabsPerBatch];
         readonly Vector4[] _dabNrm = new Vector4[DabsPerBatch];
-        // Kept for the renderer's lifetime: RenderSurface runs on every compose while a stroke on the model is drawn.
         readonly UnityEngine.Rendering.CommandBuffer _cmd = new UnityEngine.Rendering.CommandBuffer { name = "Avistry 3D brush" };
         readonly MaterialPropertyBlock _mpb = new MaterialPropertyBlock();
 
-        /// <summary>
-        /// 3D brush: clears <paramref name="target"/> (R = coverage, G = mesh covers the texel) and draws the stroke as
-        /// spheres on the posed model, by drawing the mesh in texture space and measuring 3D distances per texel.
-        /// Dabs are placed along straight lines between the stroke's surface points, spaced in world units.
-        /// </summary>
         public void RenderSurface(PaintStroke s, RenderTexture target, MeshUV mesh, float grainCellsPerUV)
         {
+            if (ReferenceEquals(target, _liveCoverageTarget)) InvalidateLiveCoverage();
             int w = target.width, h = target.height;
             RenderTexture.active = target;
             GL.Viewport(new Rect(0, 0, w, h));
             GL.Clear(false, true, Color.clear);
             if (s == null || mesh == null || !s.IsSurface) return;
-            var sh = s.shape ?? new BrushShape();
+            var sh = s.shape ?? DefaultDabShape;
             float baseR = s.surfRadius * mesh.PosedSize;
             if (baseR <= 0) return;
             var surfaceMesh = mesh.SurfaceMesh();
-
-            Material.SetFloat("_Hardness", sh.hardness);
-            Material.SetFloat("_Grain", sh.grain);
-            Material.SetVector("_GrainFreq", new Vector4(grainCellsPerUV, grainCellsPerUV * h / (float)w, 0, 0));
-            Material.SetFloat("_Accumulate", sh.buildUp ? 1 : 0);
-            Material.SetFloat("_TwoSided", s.surfTwoSided ? 1 : 0);
-            int pass = sh.buildUp ? 7 : 6;
-
-            // Drawn through a command buffer with its own matrices: DrawMeshNow depends on the camera state left behind
-            // by the last render, and while the Scene view had a camera active the 3D brush painted nothing.
-            var cmd = _cmd;
-            var mpb = _mpb;
-            var uvProj = Matrix4x4.Ortho(0, 1, 0, 1, -1, 100);
-            int count = 0, site = 0;
-            Vector3 bMin = Vector3.zero, bMax = Vector3.zero;
-
-            void Flush()
-            {
-                if (count == 0) return;
-                mpb.SetVectorArray("_DabPos", _dabPos);
-                mpb.SetVectorArray("_DabNrm", _dabNrm);
-                mpb.SetFloat("_DabCount", count);
-                mpb.SetVector("_BatchMin", bMin);
-                mpb.SetVector("_BatchMax", bMax);
-                cmd.Clear();
-                cmd.SetRenderTarget(target);
-                cmd.SetViewport(new Rect(0, 0, w, h));
-                cmd.SetViewProjectionMatrices(Matrix4x4.identity, uvProj);
-                cmd.DrawMesh(surfaceMesh, Matrix4x4.identity, Material, 0, pass, mpb);
-                Graphics.ExecuteCommandBuffer(cmd);
-                count = 0;
-            }
-
-            void Emit(Vector3 pos, Vector3 nrm, float pressure)
-            {
-                var rng = new BrushRng(s.seed, site++);
-                float r = baseR * SizeFactor(s, pressure);
-                float a = s.pressureOpacity ? Mathf.Clamp01(pressure) : 1f;
-                if (sh.sizeJitter > 0) r *= 1f - sh.sizeJitter * rng.Next();
-                if (sh.opacityJitter > 0) a *= 1f - sh.opacityJitter * rng.Next();
-                if (sh.buildUp) a *= sh.flow;
-                r = Mathf.Max(r, 1e-6f);
-                var lo = pos - Vector3.one * r;
-                var hi = pos + Vector3.one * r;
-                if (count == 0) { bMin = lo; bMax = hi; }
-                else { bMin = Vector3.Min(bMin, lo); bMax = Vector3.Max(bMax, hi); }
-                _dabPos[count] = new Vector4(pos.x, pos.y, pos.z, r);
-                _dabNrm[count] = new Vector4(nrm.x, nrm.y, nrm.z, a);
-                if (++count == DabsPerBatch) Flush();
-            }
-
-            bool havePrev = false;
-            Vector3 prevPos = default, prevNrm = default;
-            float prevPressure = 1f, carry = 0f;
-            // The command buffer leaves its UV-space matrices current; callers expect the ones they had.
+            ConfigureSurface(s, target, grainCellsPerUV);
+            var batch = new SurfaceBatch(this, target, surfaceMesh, sh.buildUp ? 7 : 6, _dabPos, _dabNrm);
+            var cursor = default(SurfaceCursor);
             GL.PushMatrix();
             try
             {
-                for (int i = 0; i < s.surf.Count; i++)
-                {
-                    var sp = s.surf[i];
-                    var bary = new Vector3(1f - sp.y - sp.z, sp.y, sp.z);
-                    if (!mesh.SurfacePoint(Mathf.RoundToInt(sp.x), bary, out var pos, out var nrm)) { havePrev = false; continue; }
-                    int flags = Mathf.RoundToInt(sp.w);
-                    if ((flags & 2) != 0) nrm = -nrm; // the back of the face was painted: the brush faces the other way
-                    float pressure = s.points[i].z;
-                    if (!havePrev || (flags & 1) == 0)
-                    {
-                        Emit(pos, nrm, pressure);
-                        carry = 0f;
-                    }
-                    else
-                    {
-                        float len = Vector3.Distance(prevPos, pos);
-                        float step = Mathf.Max(baseR * 0.02f, sh.spacing * baseR * SizeFactor(s, Mathf.Min(prevPressure, pressure)));
-                        float t = step - carry;
-                        while (t <= len)
-                        {
-                            float k = len > 0 ? t / len : 1f;
-                            Emit(Vector3.Lerp(prevPos, pos, k), Vector3.Slerp(prevNrm, nrm, k), Mathf.Lerp(prevPressure, pressure, k));
-                            t += step;
-                        }
-                        carry = len - (t - step);
-                    }
-                    prevPos = pos; prevNrm = nrm; prevPressure = pressure; havePrev = true;
-                }
-                Flush();
+                StreamSurfaceDabs(s, mesh, ref cursor, ref batch);
+                batch.Draw(target);
             }
             finally { GL.PopMatrix(); }
             RenderTexture.active = target;
         }
 
-        static Vector2 s_dir; // direction of the dab being emitted (read by Corner)
+        (float offset, float radiusScale, float opacityScale)[] _bristles = Array.Empty<(float, float, float)>();
+        int _bristleSeed, _bristleCount;
 
-        void Render(PaintStroke s, RenderTexture target, float grainCellsPerUV, int pass)
+        int PrepareBristles(PaintStroke stroke, BrushShape shape)
+        {
+            if (shape.tip != BrushTip.Bristle) return 0;
+            int count = Mathf.Max(1, shape.density);
+            if (_bristleCount == count && _bristleSeed == stroke.seed) return count;
+            if (_bristles.Length < count) _bristles = new (float, float, float)[count];
+            for (int i = 0; i < count; i++)
+            {
+                var rng = new BrushRng(stroke.seed, 1000003 + i);
+                float offset = count == 1 ? 0f : (i / (count - 1f)) * 2f - 1f;
+                offset += (rng.Next() - 0.5f) * (1.6f / count);
+                _bristles[i] = (offset, Mathf.Lerp(0.05f, 0.15f, rng.Next()), Mathf.Lerp(0.35f, 1f, rng.Next()));
+            }
+            _bristleSeed = stroke.seed;
+            _bristleCount = count;
+            return count;
+        }
+
+        void RenderWhole(PaintStroke s, RenderTexture target, float grainCellsPerUV, int pass)
+        {
+            if (ReferenceEquals(target, _liveCoverageTarget)) InvalidateLiveCoverage();
+            var cursor = default(DabCursor);
+            Render(s, target, grainCellsPerUV, pass, ref cursor);
+        }
+
+        void Render(PaintStroke s, RenderTexture target, float grainCellsPerUV, int pass, ref DabCursor cursor, bool retain = false)
         {
             int w = target.width, h = target.height;
-            RenderTexture.active = target;
+            if (retain) BindLiveCoverageTarget(target, cursor.Count > 0);
+            else RenderTexture.active = target;
             GL.Viewport(new Rect(0, 0, w, h));
-            GL.Clear(false, true, Color.clear);
+            if (cursor.Count == 0) GL.Clear(false, true, Color.clear);
             if (s?.points == null || s.points.Count == 0) return;
-            var sh = s.shape ?? new BrushShape();
+            var sh = s.shape ?? DefaultDabShape;
 
             Material.SetFloat("_Hardness", sh.hardness);
             Material.SetFloat("_Tip", sh.tip == BrushTip.Square ? 1 : 0);
             Material.SetFloat("_Grain", sh.grain);
             Material.SetVector("_GrainFreq", new Vector4(grainCellsPerUV, grainCellsPerUV * h / (float)w, 0, 0));
+            ConfigureStamp(sh, PreviewStamp);
             Material.SetPass(pass);
+            bool coherentBristles = UsesCoherentBristles(s, sh);
+            int bristleCount = coherentBristles ? 0 : PrepareBristles(s, sh);
+            var bristles = coherentBristles ? BristlesFor(s, sh, retain, cursor.Count == 0) : null;
 
             GL.PushMatrix();
             GL.LoadOrtho();
             GL.Begin(GL.QUADS);
 
-            float baseR = s.radius * w; // pixels at this resolution
-            int site = 0;
-            float carry = 0f;
-            var prev = s.points[0];
-            var dir = RunDirection(s, 0, w, h);
-            EmitSite(s, sh, prev, dir, baseR, w, h, site++);
-            for (int i = 1; i < s.points.Count; i++)
+            float baseR = s.radius * w;
+            float dotRadius = sh.HasDots && s.fixedDotRadius > 0f ? s.fixedDotRadius * w : 0f;
+            int site = cursor.Site;
+            float carry = cursor.Carry;
+            int first = cursor.Count;
+            Vector2 dir = cursor.Direction;
+            var prev = s.points[Mathf.Max(0, first - 1)];
+            if (first == 0)
+            {
+                dir = RunDirection(s, 0, w, h);
+                EmitSite(s, sh, prev, dir, baseR, dotRadius, w, h, site++, bristleCount, bristles, PenAngle(s, 0));
+                first = 1;
+            }
+            for (int i = first; i < s.points.Count; i++)
             {
                 var p = s.points[i];
-                if (p.w < 0.5f) // not joined: start a new run (the brush crossed onto another UV island)
+                if (p.w < 0.5f)
                 {
                     dir = RunDirection(s, i, w, h);
-                    EmitSite(s, sh, p, dir, baseR, w, h, site++);
+                    bristles?.ResetRun();
+                    EmitSite(s, sh, p, dir, baseR, dotRadius, w, h, site++, bristleCount, bristles, PenAngle(s, i));
                     carry = 0f;
                     prev = p;
                     continue;
@@ -197,16 +146,20 @@ namespace Avistry.Textures
                 var seg = new Vector2((p.x - prev.x) * w, (p.y - prev.y) * h);
                 float len = seg.magnitude;
                 if (len > 1e-4f) dir = seg / len;
-                float step = Mathf.Max(0.5f, sh.spacing * baseR * SizeFactor(s, Mathf.Min(prev.z, p.z)));
+                float step = coherentBristles ? CoherentBristleStep(sh, baseR) :
+                    Mathf.Max(0.5f, sh.spacing * baseR * SizeFactor(s, Mathf.Min(prev.z, p.z)));
                 float t = step - carry;
                 while (t <= len)
                 {
-                    EmitSite(s, sh, Vector4.Lerp(prev, p, len > 0 ? t / len : 1f), dir, baseR, w, h, site++);
+                    float blend = len > 0 ? t / len : 1f;
+                    EmitSite(s, sh, Vector4.Lerp(prev, p, blend), dir, baseR, dotRadius, w, h, site++, bristleCount, bristles,
+                        InterpolatePenAngle(s, i - 1, i, blend));
                     t += step;
                 }
                 carry = len - (t - step);
                 prev = p;
             }
+            cursor = new DabCursor { Count = s.points.Count, Site = site, Carry = carry, Direction = dir };
 
             GL.End();
             GL.PopMatrix();
@@ -224,36 +177,66 @@ namespace Avistry.Textures
             return Vector2.right;
         }
 
-        void EmitSite(PaintStroke s, BrushShape sh, Vector4 p, Vector2 dir, float baseR, int w, int h, int site)
+        void EmitSite(PaintStroke s, BrushShape sh, Vector4 p, Vector2 dir, float baseR, float dotRadius, int w, int h, int site,
+                      int bristleCount, BristleState bristles, float penAngle)
         {
+            uint stampSeed = StampSeed(s, site);
+            GL.MultiTexCoord2(2, dir.x, dir.y);
+            GL.MultiTexCoord2(3, stampSeed & 65535u, stampSeed >> 16);
+            if (bristles != null)
+            {
+                bristles.TipAngle = penAngle;
+                var sink = new BristleDraw(w, h);
+                EmitBristleDab(s, sh, p, dir, baseR, w, h, bristles, ref sink);
+                return;
+            }
             var rng = new BrushRng(s.seed, site);
-            s_dir = dir;
-            float r = baseR * SizeFactor(s, p.z);
-            float a = s.pressureOpacity ? Mathf.Clamp01(p.z) : 1f;
-            if (sh.sizeJitter > 0) r *= 1f - sh.sizeJitter * rng.Next();
-            if (sh.opacityJitter > 0) a *= 1f - sh.opacityJitter * rng.Next();
+            float size = SizeFactor(s, p.z);
+            float r = baseR * size;
+            float footprint = r;
+            float fixedDot = dotRadius * size;
+            float a = OpacityFactor(s, p.z);
+            if (sh.sizeJitter > 0)
+            {
+                float jitter = sh.jitterVersion == 1
+                    ? Mathf.Max(.05f, 1f + (StampRandom(stampSeed, 2) * 2 - 1) * sh.sizeJitter)
+                    : 1f - sh.sizeJitter * rng.Next();
+                r *= jitter;
+                fixedDot *= jitter;
+            }
+            if (sh.opacityJitter > 0) a *= 1f - sh.opacityJitter *
+                (sh.jitterVersion == 1 ? StampRandom(stampSeed, 5) : rng.Next());
+            float angle = TipRotation(s, sh, dir, penAngle);
+            if (sh.tip == BrushTip.Stamp && FollowsDirection(s, sh)) angle -= Mathf.PI * .5f;
+            if (sh.jitterVersion == 1) angle += (StampRandom(stampSeed, 1) * 2 - 1) * sh.angleJitter * Mathf.PI;
             var c = new Vector2(p.x * w, p.y * h);
-            if (sh.scatter > 0) c += rng.InDisc() * (sh.scatter * baseR);
+            if (sh.scatter > 0)
+            {
+                if (sh.jitterVersion == 1)
+                {
+                    var along = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                    var across = new Vector2(-along.y, along.x);
+                    c += (along * (StampRandom(stampSeed, 3) * 2 - 1) + across * (StampRandom(stampSeed, 4) * 2 - 1)) *
+                        (sh.scatter * footprint);
+                }
+                else c += rng.InDisc() * (sh.scatter * baseR);
+            }
             if (sh.buildUp) a *= sh.flow;
-
-            float angle = sh.angle * Mathf.Deg2Rad + (sh.followStroke ? Mathf.Atan2(dir.y, dir.x) : 0f);
 
             switch (sh.tip)
             {
+                case BrushTip.Drips:
+                    EmitFlatDrips(s.seed, site, c, r, a, w, h);
+                    break;
                 case BrushTip.Bristle:
                 {
-                    // Bristles keep the same offset, size and strength for the whole stroke, so each one draws a streak.
                     var along = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
                     var perp = new Vector2(-along.y, along.x);
-                    int n = Mathf.Max(1, sh.density);
-                    for (int b = 0; b < n; b++)
+                    for (int b = 0; b < bristleCount; b++)
                     {
-                        var br = new BrushRng(s.seed, 1000003 + b);
-                        float off = n == 1 ? 0f : (b / (n - 1f)) * 2f - 1f;
-                        off += (br.Next() - 0.5f) * (1.6f / n);
-                        float rb = r * Mathf.Lerp(0.05f, 0.15f, br.Next());
-                        float ab = a * Mathf.Lerp(0.35f, 1f, br.Next());
-                        Quad(c + perp * (off * r * 0.9f), rb, ab, angle, 1f, w, h);
+                        var bristle = _bristles[b];
+                        var offset = perp * (bristle.offset * r * 0.9f);
+                        Quad(c + offset, r * bristle.radiusScale, a * bristle.opacityScale, angle, 1f, w, h);
                     }
                     break;
                 }
@@ -263,18 +246,19 @@ namespace Avistry.Textures
                     for (int k = 0; k < n; k++)
                     {
                         var pos = c + rng.InDisc() * r;
-                        float rr = r * Mathf.Lerp(0.03f, 0.10f, rng.Next());
+                        float variation = rng.Next();
+                        float rr = fixedDot > 0f ? fixedDot * Mathf.Lerp(0.65f, 1.35f, variation)
+                            : r * Mathf.Lerp(0.03f, 0.10f, variation);
                         Quad(pos, rr, a * Mathf.Lerp(0.5f, 1f, rng.Next()), 0f, 1f, w, h);
                     }
                     break;
                 }
                 default:
-                    Quad(c, r, a, angle, sh.roundness, w, h);
+                    Quad(c, fixedDot > 0f ? fixedDot : r, a, angle, sh.roundness, w, h);
                     break;
             }
         }
 
-        /// <summary>One dab: centre and radius in pixels, rotated by angle, squashed by roundness.</summary>
         static void Quad(Vector2 c, float r, float alpha, float angle, float roundness, int w, int h)
         {
             r = Mathf.Max(0.6f, r);
@@ -292,8 +276,6 @@ namespace Avistry.Textures
         {
             float u = px.x / w, v = px.y / h;
             GL.MultiTexCoord3(0, tx, ty, alpha);
-            GL.MultiTexCoord2(1, u, v);
-            GL.MultiTexCoord2(2, s_dir.x, s_dir.y);
             GL.Vertex3(u, v, 0);
         }
     }

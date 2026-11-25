@@ -8,18 +8,12 @@ namespace Avistry.Textures
 {
     internal enum CardMode { Popup, Detail, Row }
 
-    /// <summary>What a click on the card asks the host to do. The host acts after drawing, never inside the card.</summary>
     internal struct CardResult
     {
         public string GoTo;
         public bool Back, OpenTree, ShowMe, Close;
     }
 
-    /// <summary>
-    /// One glossary entry as a card: kicker, title, lede, coloured sections, the Try it box, links. The info popup, the
-    /// skill tree's detail pane and the A to Z rows all draw it, so the copy looks the same everywhere. Each part measures
-    /// and draws in the same function, so the height always fits.
-    /// </summary>
     internal static class ConceptCard
     {
         internal const float PopupWidth = 360f;
@@ -32,13 +26,8 @@ namespace Avistry.Textures
         const float ShowMeW = 72f, GotItW = 92f, ScrollBarW = 15f, WebRowH = 36f, WebIcon = 20f;
         static string GotItText => Loc.T("When this makes sense to you, press I've got it. It is only a note for you.");
 
-        /// <summary>
-        /// What "Show me" does with a concept id. The skill tree and the main window set it; while it is null the button is
-        /// not drawn, because the card itself never touches the main window.
-        /// </summary>
         internal static Action<string> ShowMeHandler;
 
-        /// <summary>"Open in skill tree": the glossary window scrolls to the concept.</summary>
         internal static void OpenInTree(string conceptId) => GlossaryWindow.Open(conceptId);
 
         static GUIContent s_hWhat => new GUIContent(Loc.T("What it is"));
@@ -51,7 +40,6 @@ namespace Avistry.Textures
 
         sealed class Chip { public string Id; public GUIContent Content; public float Width; public int Tier; }
 
-        /// <summary>One "Learn more online" row: the label, the address under it, and the page and full address on hover.</summary>
         sealed class WebLink { public string Url; public GUIContent Label, Shown, Hover; public bool Video; }
 
         sealed class Info
@@ -65,6 +53,7 @@ namespace Avistry.Textures
             public GUIContent WebHead;
             public bool HasBox, CanShowMe;
             public string ManualUrl;
+            public GUIContent ManualSource;
         }
 
         static readonly Dictionary<string, Info> s_simple = new Dictionary<string, Info>(), s_advanced = new Dictionary<string, Info>();
@@ -94,7 +83,6 @@ namespace Avistry.Textures
 
         static void Styles()
         {
-            // The widths below are measured from translated words, so a language change measures again.
             if (s_chip != null && s_stylesPro == EditorGUIUtility.isProSkin && s_stylesLang == Loc.Current) return;
             s_stylesPro = EditorGUIUtility.isProSkin;
             s_stylesLang = Loc.Current;
@@ -115,7 +103,6 @@ namespace Avistry.Textures
 
         static GUIContent Text(string s) => string.IsNullOrEmpty(s) ? null : new GUIContent(s);
 
-        // Rebuilt only when the entry object or the mode changes, so a redraw never builds strings.
         static Info Resolve(Glossary.Entry e)
         {
             Styles();
@@ -138,7 +125,11 @@ namespace Avistry.Textures
             i.Related = Chips(e.related);
             i.HasBox = i.TryIt != null || e.gotIt;
             i.CanShowMe = i.TryIt != null && (!string.IsNullOrEmpty(e.tryTab) || !string.IsNullOrEmpty(e.tryControl));
-            i.ManualUrl = !string.IsNullOrEmpty(e.docsUrl) && e.docsUrl.StartsWith("https://", StringComparison.Ordinal) ? e.docsUrl : null;
+            if (Uri.TryCreate(e.docsUrl, UriKind.Absolute, out var manual) && manual.Scheme == Uri.UriSchemeHttps)
+            {
+                i.ManualUrl = manual.AbsoluteUri;
+                i.ManualSource = new GUIContent(manual.Host, i.ManualUrl);
+            }
             i.Web = WebLinks(e);
             i.WebHead = new GUIContent(OnlineGuide.Label("web.heading", "Learn more online"), OnlineGuide.Tip("web.heading"));
             cache[e.id] = i;
@@ -159,7 +150,6 @@ namespace Avistry.Textures
             return list.ToArray();
         }
 
-        // The feature tour section that shows the concept (when there is one), then the concept in the online glossary.
         static WebLink[] WebLinks(Glossary.Entry e)
         {
             var list = new List<WebLink>(2);
@@ -181,7 +171,6 @@ namespace Avistry.Textures
             return list.ToArray();
         }
 
-        /// <summary>The addresses a card links to, one per line: the feature page first when there is one. For tests.</summary>
         internal static string WebLinksOf(Glossary.Entry e)
         {
             var i = Resolve(e);
@@ -190,7 +179,6 @@ namespace Avistry.Textures
             return sb.ToString();
         }
 
-        /// <summary>The sections a card draws for this entry, in order, as comma-separated names. Empty fields are skipped.</summary>
         internal static string SectionsOf(Glossary.Entry e)
         {
             var i = Resolve(e);
@@ -210,7 +198,6 @@ namespace Avistry.Textures
             return sb.ToString();
         }
 
-        /// <summary>Popup size: 360 wide, as tall as the content up to 560. The Try it box has the same height in every state.</summary>
         internal static Vector2 PopupSize(Glossary.Entry e)
         {
             var i = Resolve(e);
@@ -219,9 +206,6 @@ namespace Avistry.Textures
             return new Vector2(PopupWidth, Mathf.Min(Mathf.Ceil(h), MaxPopupHeight));
         }
 
-        /// <summary>
-        /// The popup: header and footer stay pinned, and the middle scrolls when the card is taller than the window.
-        /// </summary>
         internal static void DrawPopup(Rect rect, Glossary.Entry e, ref Vector2 scroll, ref CardResult res, bool canBack)
         {
             var i = Resolve(e);
@@ -244,7 +228,6 @@ namespace Avistry.Textures
             Footer(i, CardMode.Popup, rect.x, rect.yMax - FooterH, rect.width, true, canBack, ref res);
         }
 
-        /// <summary>Measures and, when <paramref name="draw"/>, draws a card in <paramref name="r"/> (height is ignored). Returns the height used.</summary>
         internal static float Layout(Glossary.Entry e, Rect r, CardMode mode, bool draw, bool expanded = true)
         {
             var res = default(CardResult);
@@ -286,6 +269,8 @@ namespace Avistry.Textures
 
             if (mode == CardMode.Row)
             {
+                cx += 24f;
+                cw -= 24f;
                 titleW = cw - s_pillW - 6f;
                 if (draw) Pill(new Rect(cx + cw - s_pillW, y, s_pillW, PillH), state, i.Tier);
             }
@@ -383,7 +368,6 @@ namespace Avistry.Textures
             return total + SectionGap + 2f;
         }
 
-        // Same height whether it is not done yet or done, because a popup cannot resize once it is open.
         static float TryBox(Info i, float cx, float y, float cw, bool draw, ref CardResult res)
         {
             if (!i.HasBox) return 0;
@@ -459,7 +443,6 @@ namespace Avistry.Textures
             return hh + 3f + i.Web.Length * (WebRowH + ChipGap) + SectionGap;
         }
 
-        // A play glyph marks a page with a video. The address stays visible under the label, so a click never surprises.
         static bool WebRow(Rect r, WebLink l, int tier)
         {
             bool click = Click(r, out var hover, out var focus);
@@ -483,14 +466,15 @@ namespace Avistry.Textures
         static float Footer(Info i, CardMode mode, float x, float y, float w, bool draw, bool canBack, ref CardResult res)
         {
             bool popup = mode == CardMode.Popup;
-            if (!popup && i.ManualUrl == null) return 10f;
+            bool treeLink = popup || mode == CardMode.Row;
+            if (!treeLink && i.ManualUrl == null) return 10f;
             float cx = x + Pad, cw = w - Pad * 2;
             if (draw)
             {
                 if (popup) EditorGUI.DrawRect(new Rect(cx, y, cw, 1f), StudioGUI.CardDivider);
                 float ry = y + (popup ? 8f : 0f);
                 float right = cx + cw;
-                if (popup)
+                if (treeLink)
                 {
                     right -= s_treeW;
                     if (LinkButton(new Rect(right, ry, s_treeW, LinkH), Loc.T("Open in skill tree ›"))) { res.OpenTree = true; res.Close = true; }
@@ -501,50 +485,14 @@ namespace Avistry.Textures
                 {
                     right -= s_manualW;
                     if (LinkButton(new Rect(right, ry, s_manualW, LinkH), Loc.T("Open manual"))) Application.OpenURL(i.ManualUrl);
+                    if (!canBack && right > cx + 80f)
+                        GUI.Label(new Rect(cx, ry, right - cx - 8f, LinkH), i.ManualSource, s_webUrl);
                 }
             }
             return popup ? FooterH : LinkH + 10f;
         }
 
-        // One keyboard-focusable button: mouse, Enter and Space all click it, and Tab reaches it in layout order.
-        static bool Click(Rect r, out bool hover, out bool focus)
-        {
-            int id = GUIUtility.GetControlID(ButtonHint, FocusType.Keyboard, r);
-            var e = Event.current;
-            hover = r.Contains(e.mousePosition);
-            focus = GUIUtility.keyboardControl == id;
-            bool click = false;
-            switch (e.GetTypeForControl(id))
-            {
-                case EventType.MouseDown:
-                    if (e.button == 0 && hover)
-                    {
-                        GUIUtility.hotControl = id;
-                        GUIUtility.keyboardControl = id;
-                        e.Use();
-                    }
-                    break;
-                case EventType.MouseUp:
-                    if (GUIUtility.hotControl == id)
-                    {
-                        GUIUtility.hotControl = 0;
-                        e.Use();
-                        click = hover;
-                    }
-                    break;
-                case EventType.KeyDown:
-                    if (focus && (e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter || e.keyCode == KeyCode.Space))
-                    {
-                        e.Use();
-                        click = true;
-                    }
-                    break;
-                case EventType.Repaint:
-                    EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
-                    break;
-            }
-            return click;
-        }
+        static bool Click(Rect r, out bool hover, out bool focus) => StudioGUI.KeyboardButton(r, ButtonHint, out hover, out focus);
 
         static void FocusRing(Rect r, float radius)
         {
@@ -601,7 +549,6 @@ namespace Avistry.Textures
             return click;
         }
 
-        // The "more" menu holds "Mark as not done", the undo of the I've got it button.
         static void MoreButton(Rect r, string conceptId)
         {
             bool click = Click(r, out var hover, out var focus);

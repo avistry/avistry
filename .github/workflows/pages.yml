@@ -1,8 +1,5 @@
 name: Pages
 
-# Publishes the landing page (Website~/), the VPM listing (index.json), latest.json and releases.json (every version
-# with its download counts) to GitHub Pages.
-# Repository setting required once: Settings > Pages > Source = "GitHub Actions".
 on:
   push:
     branches: [main]
@@ -11,10 +8,10 @@ on:
       - '.github/vpm/**'
       - '.github/scripts/build-listing.mjs'
       - '.github/scripts/build-releases.mjs'
+      - '.github/scripts/check-features-media.mjs'
       - '.github/scripts/lib.mjs'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
-  # keeps the download counts on the Download page fresh
   schedule:
     - cron: '23 */6 * * *'
 
@@ -39,6 +36,7 @@ jobs:
       - name: Assemble the site
         run: |
           test -f Website~/index.html || { echo "::error::Website~/index.html is missing"; exit 1; }
+          node .github/scripts/check-features-media.mjs Website~
           mkdir _site
           cp -r Website~/. _site/
           rm -f _site/latest.example.json
@@ -57,8 +55,6 @@ jobs:
         with:
           path: _site
 
-  # A separate job, as in GitHub's template: in the same job deploy-pages can look for the artifact
-  # before the artifact list shows it.
   deploy:
     needs: build
     runs-on: ubuntu-latest

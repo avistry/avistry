@@ -4,7 +4,6 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>Settings of a Hue / Saturation / Lightness layer, including giving colour to white and grey areas.</summary>
     partial class AvatarTextureWindow
     {
         static GUIContent[] ChromaModeLabels => new[]
@@ -43,7 +42,7 @@ namespace Avistry.Textures
                 {
                     colourHue = EditorGUILayout.Slider(new GUIContent(Loc.T("Colour for greys"), Loc.T("The colour given to white and grey areas (hue in degrees)")), hl.colourHue, 0f, 360f);
                     var r = GUILayoutUtility.GetRect(18f, 18f, GUILayout.Width(18f), GUILayout.Height(18f));
-                    float hr = colourHue * Mathf.Deg2Rad; // OKLCh hue, the same as the shader uses
+                    float hr = colourHue * Mathf.Deg2Rad;
                     EditorGUI.DrawRect(r, Recolour.FromOklab(new Vector3(0.72f, 0.12f * Mathf.Cos(hr), 0.12f * Mathf.Sin(hr)), 1f));
                     GUI.Label(r, new GUIContent("", Loc.T("A preview of the colour for greys")));
                 }

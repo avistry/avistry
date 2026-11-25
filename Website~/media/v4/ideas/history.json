@@ -1,1 +1,25 @@
-{"placeholder":false,"steps":[{"id":"start","img":"ideas/history/00.webp","img_m":"ideas/history/00-m.webp"},{"id":"violet","img":"ideas/history/01.webp","img_m":"ideas/history/01-m.webp"},{"id":"tips","img":"ideas/history/02.webp","img_m":"ideas/history/02-m.webp"},{"id":"vivid","img":"ideas/history/03.webp","img_m":"ideas/history/03-m.webp"},{"id":"cool","img":"ideas/history/04.webp","img_m":"ideas/history/04-m.webp"},{"id":"levels","img":"ideas/history/05.webp","img_m":"ideas/history/05-m.webp"}]}
+{
+  "placeholder": false,
+  "steps": [
+    {
+      "id": "start",
+      "img": "ideas/030/history/start.webp",
+      "img_m": "ideas/030/history/start-m.webp"
+    },
+    {
+      "id": "teal",
+      "img": "ideas/030/history/teal.webp",
+      "img_m": "ideas/030/history/teal-m.webp"
+    },
+    {
+      "id": "violet",
+      "img": "ideas/030/history/violet.webp",
+      "img_m": "ideas/030/history/violet-m.webp"
+    },
+    {
+      "id": "trim",
+      "img": "ideas/030/history/trim.webp",
+      "img_m": "ideas/030/history/trim-m.webp"
+    }
+  ]
+}

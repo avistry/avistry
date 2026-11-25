@@ -5,7 +5,6 @@ namespace Avistry.Textures
 {
     partial class AvatarTextureWindow
     {
-        // The language is a preference like Advanced mode, not an edit, so it has no Undo step.
         void AddLanguageItems(GenericMenu menu)
         {
             string root = Loc.T("Language") + (Loc.English ? "" : " (Language)") + "/";
@@ -23,7 +22,6 @@ namespace Avistry.Textures
         void SetLanguage(string code)
         {
             Loc.Setting = code;
-            // Slot names ("Main colour") are translated when the part loads; refresh just the names, not the canvas.
             if (_material != null)
             {
                 var fresh = TargetResolver.GetTextureSlots(_material);

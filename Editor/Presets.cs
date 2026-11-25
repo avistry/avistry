@@ -6,13 +6,31 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>Built-in brushes plus the user's saved brushes (stored in EditorPrefs, not in the project).</summary>
     public static class BrushLibrary
     {
         const string PrefsKey = "AvatarTextureStudio.BrushPresets.v1";
 
         static BrushPreset P(string name, float size, BrushShape shape, float opacity = 1f, bool pSize = true, bool pOpacity = false) =>
             new BrushPreset { name = name, size = size, opacity = opacity, pressureSize = pSize, pressureOpacity = pOpacity, shape = shape };
+
+        // These additional stroke recipes are adapted from TextureCraft; see Third Party Notices.md.
+        static BrushPreset Stamp(string name, string alpha, float hardness = 0.5f, float flow = 1f, float spacing = 0.1f,
+            bool follow = false, float angleJitter = 0f, float sizeJitter = 0f, float scatter = 0f) =>
+            P(name, 64f, new BrushShape
+            {
+                tip = BrushTip.Stamp, alphaId = alpha, alphaVersion = 1, jitterVersion = 1,
+                hardness = hardness, flow = flow, buildUp = true, spacing = spacing * 2f,
+                followStroke = follow, angleJitter = angleJitter, sizeJitter = sizeJitter, scatter = scatter,
+            });
+
+        internal static string CategoryOf(BrushPreset preset) => preset.name switch
+        {
+            "Basic hard" or "Basic soft" or "Soft airbrush" or "Square" or "Dots" => "Basic",
+            "Dry brush" or "Sponge chalk" or "Textured spray" or "Grunge" or "Ink splatter" or
+                "Scratches" or "Chips" or "Cracks" or "Drips" => "Wear and grunge",
+            "Stars" or "Stitches" or "Rivets" or "Fur" => "Details",
+            _ => "Everyday",
+        };
 
         public static readonly BrushPreset[] BuiltIn =
         {
@@ -23,10 +41,29 @@ namespace Avistry.Textures
             P("Marker", 40, new BrushShape { tip = BrushTip.Square, hardness = 0.85f, spacing = 0.08f, roundness = 0.35f, followStroke = true, angle = 90f }, 0.85f, false),
             P("Calligraphy", 36, new BrushShape { hardness = 0.95f, spacing = 0.06f, roundness = 0.18f, angle = 45f }),
             P("Bristle", 80, new BrushShape { tip = BrushTip.Bristle, hardness = 0.6f, spacing = 0.06f, followStroke = true, density = 12 }),
-            P("Spray", 120, new BrushShape { tip = BrushTip.Spray, hardness = 1f, spacing = 0.5f, density = 16 }, 1f, false),
+            P("Spray", 120, new BrushShape { tip = BrushTip.Spray, hardness = 1f, spacing = 0.5f, density = 16, dotSize = BrushShape.SprayDotSize }, 1f, false),
             P("Chalk", 48, new BrushShape { hardness = 0.8f, spacing = 0.1f, grain = 0.9f, grainSize = 2.5f }, 1f, true, true),
-            P("Splatter", 60, new BrushShape { hardness = 0.9f, spacing = 1.2f, scatter = 1.6f, sizeJitter = 0.85f, opacityJitter = 0.3f }, 1f, false),
+            P("Splatter", 60, new BrushShape { hardness = 0.9f, spacing = 1.2f, scatter = 1.6f, sizeJitter = 0.85f, opacityJitter = 0.3f, dotSize = BrushShape.SplatterDotSize }, 1f, false),
             P("Smooth blend", 200, new BrushShape { hardness = 0f, spacing = 0.1f }, 0.25f, false, true),
+            Stamp("Basic hard", "procedural_round", hardness: 0.95f),
+            Stamp("Basic soft", "procedural_round", hardness: 0f, flow: 0.6f),
+            Stamp("Soft airbrush", "procedural_round", hardness: 0f, flow: 0.12f, spacing: 0.04f),
+            Stamp("Square", "procedural_square", hardness: 0.9f, follow: true),
+            Stamp("Dots", "procedural_round", hardness: 0.9f, spacing: 1.6f),
+            Stamp("Dry brush", "procedural_streaks", flow: 0.5f, spacing: 0.04f, follow: true),
+            Stamp("Sponge chalk", "sponge", flow: 0.7f, spacing: 0.15f, angleJitter: 1f),
+            Stamp("Textured spray", "procedural_spray", spacing: 0.3f, angleJitter: 1f, sizeJitter: 0.3f),
+            Stamp("Grunge", "procedural_grunge", spacing: 0.4f, angleJitter: 1f, sizeJitter: 0.4f),
+            Stamp("Ink splatter", "splatter", spacing: 1.2f, angleJitter: 1f, sizeJitter: 0.5f, scatter: 1.5f),
+            Stamp("Scratches", "scratches", spacing: 0.5f, follow: true, angleJitter: 0.1f),
+            Stamp("Chips", "chips", spacing: 0.8f, angleJitter: 1f, sizeJitter: 0.5f, scatter: 1f),
+            Stamp("Cracks", "cracks", spacing: 0.9f, angleJitter: 1f),
+            P("Drips", 64f, new BrushShape
+                { tip = BrushTip.Drips, hardness = 0.7f, buildUp = true, flow = 0.6f, spacing = 0.2f, jitterVersion = 1 }),
+            Stamp("Stars", "star_5", spacing: 1.5f, angleJitter: 1f, sizeJitter: 0.6f, scatter: 2f),
+            Stamp("Stitches", "stitches", spacing: 0.9f, follow: true),
+            Stamp("Rivets", "rivet", spacing: 2f),
+            Stamp("Fur", "fur", spacing: 0.3f, follow: true, angleJitter: 0.15f),
         };
 
         [Serializable]
@@ -66,10 +103,8 @@ namespace Avistry.Textures
         }
     }
 
-    /// <summary>Layer-stack presets: built-in looks, plus recipes the user saved to the Presets folder.</summary>
     public static class LayerPresets
     {
-        // In Assets, not inside the package: an installed package folder is replaced on every update.
         public const string UserFolder = "Assets/AvatarTextureStudio Presets";
 
         static Gradient G(params (float t, Color c, float a)[] keys)
@@ -88,7 +123,6 @@ namespace Avistry.Textures
             return layer;
         }
 
-        /// <summary>Menu path ("Category/Name") and a factory for the layers, bottom first.</summary>
         public static readonly (string path, Func<List<Layer>> make)[] BuiltIn =
         {
             ("Colour/Recolour (keeps shading)", () => new List<Layer> { Named(new GradientMapLayer(), "Recolour", BlendMode.Normal) }),
@@ -158,20 +192,37 @@ namespace Avistry.Textures
             }),
         };
 
-        /// <summary>Recipes saved by the user into the Presets folder.</summary>
-        public static List<TextureRecipe> UserPresets()
+        public static List<TextureRecipe> UserPresets() => OrderUserPresets(ReadUserPresets());
+
+        internal static IEnumerable<(string path, TextureRecipe recipe)> ReadUserPresets()
         {
-            if (!AssetDatabase.IsValidFolder(UserFolder)) return new List<TextureRecipe>();
-            return AssetDatabase.FindAssets("t:TextureRecipe", new[] { UserFolder })
-                .Select(g => AssetDatabase.LoadAssetAtPath<TextureRecipe>(AssetDatabase.GUIDToAssetPath(g)))
-                .Where(r => r != null)
-                .OrderBy(r => r.name)
-                .ToList();
+            foreach (string guid in AssetDatabase.FindAssets("t:TextureRecipe", new[] { "Assets" }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                var recipe = string.IsNullOrEmpty(path) ? null : AssetDatabase.LoadAssetAtPath<TextureRecipe>(path);
+                bool preset = recipe != null && !recipe.savedAsDraft && recipe.bakedTexture == null &&
+                    recipe.bakedMaterial == null && (recipe.savedAsTemplate || IsLegacyPreset(recipe, path));
+                yield return (path, preset ? recipe : null);
+            }
         }
 
-        /// <summary>Copies of a saved preset's layers (fresh ids).</summary>
+        internal static List<TextureRecipe> OrderUserPresets(IEnumerable<(string path, TextureRecipe recipe)> entries) => entries
+            .Where(entry => entry.recipe != null)
+            .OrderBy(entry => entry.recipe.name, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(entry => entry.path, StringComparer.Ordinal)
+            .Select(entry => entry.recipe)
+            .ToList();
+
+        static bool IsLegacyPreset(TextureRecipe recipe, string path) => recipe.sourceTexture == null && recipe.sourceMaterial == null &&
+            string.IsNullOrEmpty(recipe.rendererPath) && path.StartsWith(UserFolder + "/", StringComparison.Ordinal);
+
+        internal static bool IsReusable(Layer layer) => layer != null && !(layer is PaintLayer) && !(layer is MixedMergeLayer) &&
+            !(layer is DrawnGradientLayer gradient && gradient.sceneProjection) &&
+            !(layer is ImageLayer image && (image.image == null || !EditorUtility.IsPersistent(image.image) || !string.IsNullOrEmpty(image.generated)));
+
         public static List<Layer> LayersOf(TextureRecipe preset)
         {
+            if (preset == null) return new List<Layer>();
             var copy = UnityEngine.Object.Instantiate(preset);
             var layers = copy.layers.Where(l => l != null).ToList();
             UnityEngine.Object.DestroyImmediate(copy);
@@ -179,38 +230,125 @@ namespace Avistry.Textures
             return layers;
         }
 
-        /// <summary>
-        /// Saves the given layers as a preset asset (asks for a file name). Island masks and paint strokes are
-        /// dropped, because they only make sense on the mesh they were made for.
-        /// </summary>
+        internal static int PrepareForApply(List<Layer> layers)
+        {
+            int released = ReleaseOrphanClipping(layers);
+            layers.RemoveAll(layer => !IsReusable(layer));
+            var groupIds = new Dictionary<string, string>();
+            foreach (var layer in layers)
+            {
+                if (!string.IsNullOrEmpty(layer.groupId))
+                {
+                    if (!groupIds.TryGetValue(layer.groupId, out var newId))
+                        groupIds[layer.groupId] = newId = Guid.NewGuid().ToString("N");
+                    layer.groupId = newId;
+                }
+                ClearEditSpecificSettings(layer);
+            }
+            return released;
+        }
+
+        static int ReleaseOrphanClipping(List<Layer> layers)
+        {
+            int released = 0;
+            bool baseIncluded = false;
+            foreach (var layer in layers)
+            {
+                if (layer == null) continue;
+                bool included = IsReusable(layer);
+                if (!layer.clipToBelow) baseIncluded = included;
+                else if (!baseIncluded && included)
+                {
+                    layer.clipToBelow = false;
+                    released++;
+                }
+            }
+            return released;
+        }
+
+        static void ClearEditSpecificSettings(Layer layer)
+        {
+            layer.maskMode = MaskMode.WholeTexture;
+            layer.islands = new List<int>();
+            layer.faces = new List<int>();
+            layer.faceLayout = null;
+            layer.invertMask = false;
+            layer.hasPaintMask = false;
+            layer.paintMaskStartsHidden = false;
+            layer.maskStrokes = new List<PaintStroke>();
+            if (layer is ImageLayer image)
+            {
+                image.offFloats = new List<string>();
+                image.offKeywords = new List<string>();
+                image.flattenedFrom = null;
+                if (image.mask != null && !EditorUtility.IsPersistent(image.mask)) image.mask = null;
+            }
+            if (layer is ColourMatchLayer match)
+            {
+                match.source = null;
+                match.sourceTexture = null;
+            }
+        }
+
         public static string SaveAsPreset(TextureRecipe working)
         {
-            if (!AssetDatabase.IsValidFolder(UserFolder)) AssetDatabase.CreateFolder("Assets", "AvatarTextureStudio Presets");
+            if (working == null || !working.layers.Any(IsReusable)) return null;
+            EnsureUserFolder();
             string path = StudioDialog.SaveFilePanelInProject(Loc.T("Save layer preset"), "My preset", "asset",
-                Loc.T("Layer settings are saved. Piece masks and paint strokes are not, since they belong to one part."), UserFolder);
-            if (string.IsNullOrEmpty(path)) return null;
+                Loc.T("Looks keep reusable layer settings. Paint, painted masks and selection limits stay with the edit. Clipping stays when its base is included."), UserFolder);
+            return string.IsNullOrEmpty(path) ? null : WriteTemplate(working, path);
+        }
 
+        static void EnsureUserFolder()
+        {
+            if (!AssetDatabase.IsValidFolder(UserFolder)) AssetDatabase.CreateFolder("Assets", "AvatarTextureStudio Presets");
+        }
+
+        internal static bool ValidTemplateName(string name)
+        {
+            const string invalid = "<>:\"/\\|?*";
+            return !string.IsNullOrWhiteSpace(name) && name.Any(c => c != '.' && !char.IsWhiteSpace(c)) &&
+                !name.Any(c => invalid.Contains(c) || char.IsControl(c));
+        }
+
+        internal static string SaveNamedTemplate(TextureRecipe working, string name)
+        {
+            if (working == null || !working.layers.Any(IsReusable) || !ValidTemplateName(name)) return null;
+            EnsureUserFolder();
+            return WriteTemplate(working, $"{UserFolder}/{name.Trim().TrimEnd('.').TrimEnd()}.asset");
+        }
+
+        static string WriteTemplate(TextureRecipe working, string path)
+        {
             var preset = UnityEngine.Object.Instantiate(working);
             preset.hideFlags = HideFlags.None;
-            preset.name = System.IO.Path.GetFileNameWithoutExtension(path);
             preset.sourceTexture = null;
             preset.sourceMaterial = null;
             preset.rendererPath = null;
             preset.bakedTexture = null;
+            preset.bakedMaterial = null;
+            preset.savedAsDraft = false;
+            preset.savedAsTemplate = true;
             preset.materialIndex = 0;
-            preset.layers = preset.layers.Where(l => l != null && !(l is PaintLayer)).ToList();
-            foreach (var l in preset.layers)
+            PrepareForApply(preset.layers);
+            try
             {
-                l.maskMode = MaskMode.WholeTexture;
-                l.islands = new List<int>();
-                l.invertMask = false;
-                l.hasPaintMask = false; // painted masks belong to one mesh's UVs, like island masks
-                l.paintMaskStartsHidden = false;
-                l.maskStrokes = new List<PaintStroke>();
+                path = AssetDatabase.GenerateUniqueAssetPath(path);
+                preset.name = System.IO.Path.GetFileNameWithoutExtension(path);
+                AssetDatabase.CreateAsset(preset, path);
+                if (AssetDatabase.GetAssetPath(preset) != path) return null;
+                AssetDatabase.SaveAssetIfDirty(preset);
+                return path;
             }
-            AssetDatabase.CreateAsset(preset, path);
-            AssetDatabase.SaveAssets();
-            return path;
+            catch (Exception error)
+            {
+                Debug.LogWarning($"Avistry couldn't save the template ({error.GetType().Name}).");
+                return null;
+            }
+            finally
+            {
+                if (!EditorUtility.IsPersistent(preset)) UnityEngine.Object.DestroyImmediate(preset);
+            }
         }
     }
 }

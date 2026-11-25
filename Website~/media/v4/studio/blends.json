@@ -1,0 +1,164 @@
+{
+  "adjust": [
+    {
+      "id": "hsl",
+      "img": "studio/adjust-hsl.webp"
+    },
+    {
+      "id": "levels",
+      "img": "studio/adjust-levels.webp"
+    },
+    {
+      "id": "gradient-map",
+      "img": "studio/adjust-gradient-map.webp"
+    },
+    {
+      "id": "solid-color",
+      "img": "studio/adjust-solid-color.webp"
+    },
+    {
+      "id": "brightness-contrast",
+      "img": "studio/adjust-brightness-contrast.webp"
+    },
+    {
+      "id": "color-balance",
+      "img": "studio/adjust-color-balance.webp"
+    },
+    {
+      "id": "posterize",
+      "img": "studio/adjust-posterize.webp"
+    },
+    {
+      "id": "invert",
+      "img": "studio/adjust-invert.webp"
+    },
+    {
+      "id": "threshold",
+      "img": "studio/adjust-threshold.webp"
+    },
+    {
+      "id": "tone-curve",
+      "img": "studio/adjust-tone-curve.webp"
+    },
+    {
+      "id": "root-tip-gradient",
+      "img": "studio/adjust-root-tip-gradient.webp"
+    }
+  ],
+  "base": "studio/blend-base.webp",
+  "blend": [
+    {
+      "id": "normal",
+      "img": "studio/blend-normal.webp"
+    },
+    {
+      "id": "multiply",
+      "img": "studio/blend-multiply.webp"
+    },
+    {
+      "id": "screen",
+      "img": "studio/blend-screen.webp"
+    },
+    {
+      "id": "overlay",
+      "img": "studio/blend-overlay.webp"
+    },
+    {
+      "id": "soft-light",
+      "img": "studio/blend-soft-light.webp"
+    },
+    {
+      "id": "add",
+      "img": "studio/blend-add.webp"
+    },
+    {
+      "id": "subtract",
+      "img": "studio/blend-subtract.webp"
+    },
+    {
+      "id": "color",
+      "img": "studio/blend-color.webp"
+    },
+    {
+      "id": "hue",
+      "img": "studio/blend-hue.webp"
+    },
+    {
+      "id": "saturation",
+      "img": "studio/blend-saturation.webp"
+    },
+    {
+      "id": "luminosity",
+      "img": "studio/blend-luminosity.webp"
+    },
+    {
+      "id": "darken",
+      "img": "studio/blend-darken.webp"
+    },
+    {
+      "id": "lighten",
+      "img": "studio/blend-lighten.webp"
+    },
+    {
+      "id": "color-burn",
+      "img": "studio/blend-color-burn.webp"
+    },
+    {
+      "id": "linear-burn",
+      "img": "studio/blend-linear-burn.webp"
+    },
+    {
+      "id": "color-dodge",
+      "img": "studio/blend-color-dodge.webp"
+    },
+    {
+      "id": "glow-dodge",
+      "img": "studio/blend-glow-dodge.webp"
+    },
+    {
+      "id": "add-glow",
+      "img": "studio/blend-add-glow.webp"
+    },
+    {
+      "id": "hard-light",
+      "img": "studio/blend-hard-light.webp"
+    },
+    {
+      "id": "vivid-light",
+      "img": "studio/blend-vivid-light.webp"
+    },
+    {
+      "id": "linear-light",
+      "img": "studio/blend-linear-light.webp"
+    },
+    {
+      "id": "pin-light",
+      "img": "studio/blend-pin-light.webp"
+    },
+    {
+      "id": "hard-mix",
+      "img": "studio/blend-hard-mix.webp"
+    },
+    {
+      "id": "difference",
+      "img": "studio/blend-difference.webp"
+    },
+    {
+      "id": "exclusion",
+      "img": "studio/blend-exclusion.webp"
+    },
+    {
+      "id": "divide",
+      "img": "studio/blend-divide.webp"
+    },
+    {
+      "id": "darker-color",
+      "img": "studio/blend-darker-color.webp"
+    },
+    {
+      "id": "lighter-color",
+      "img": "studio/blend-lighter-color.webp"
+    }
+  ],
+  "placeholder": false
+}

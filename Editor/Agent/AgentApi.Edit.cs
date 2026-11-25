@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
@@ -26,11 +27,8 @@ namespace Avistry.Textures
             }
             if (action == "open_window")
             {
-                // Opening picks the Hierarchy selection as the part, which would otherwise count as the person's own pick
-                // and leave an Undo step not named "AI: ...".
                 using (Learn.Suppress())
                 {
-                    // Creating the window starts Undo groups of its own, so the part is picked only once it exists.
                     AvatarTextureWindow.Open(false);
                     var opened = Window();
                     if (opened == null) return NoWindow(action);
@@ -93,7 +91,6 @@ namespace Avistry.Textures
 
         static bool CheckRange(float? v, float min, float max) => !v.HasValue || (!float.IsNaN(v.Value) && v.Value >= min && v.Value <= max);
 
-        /// <summary>Piece ids from the call, checked against the pieces this texture really has.</summary>
         static bool TryIds(AvatarTextureWindow w, int[] ids, string action, out List<int> list, out AgentResult fail)
         {
             list = new List<int>();
@@ -110,7 +107,6 @@ namespace Avistry.Textures
             return true;
         }
 
-        /// <summary>The pieces named by ids, or all pieces of the part named by part.</summary>
         static bool TryPieces(AvatarTextureWindow w, AgentArgs a, out List<int> list, out AgentResult fail)
         {
             if (a.ids != null) return TryIds(w, a.ids, a.action, out list, out fail);
@@ -174,7 +170,6 @@ namespace Avistry.Textures
                         bool missing = problem.StartsWith("No texture", StringComparison.Ordinal);
                         fail = Fail(a.action, missing ? AgentResult.Codes.NotFound : AgentResult.Codes.Unsupported, problem, missing ? "Use avistry_read parts for the texture names." : null);
                     }
-                    // The part or material may already have switched before the texture was refused.
                     if ((w.AutoRenderer, w.AutoMaterialIndex) != before)
                     {
                         fail.partial = true;
@@ -246,6 +241,8 @@ namespace Avistry.Textures
         static AgentResult EditSetLayer(AvatarTextureWindow w, AgentArgs a)
         {
             if (!FindLayer(w, a.layerId, out var layer, out int index)) return LayerNotFound(a.action, a.layerId);
+            if (layer is MixedMergeLayer && (a.opacity.HasValue || a.blend != null || a.maskMode != null || a.clip.HasValue || a.ids != null || a.fields?.Count > 0))
+                return Invalid(a.action, "A merged layer keeps its rendered settings. Separate it in Avistry to edit its source layers.");
             if (!CheckRange(a.opacity, 0, 1)) return Invalid(a.action, "opacity is a number from 0 to 1.");
             BlendMode blend = default;
             if (a.blend != null && !TryBlend(a.blend, out blend)) return Invalid(a.action, $"“{a.blend}” is not a blend mode.", "Use a name from the Blend menu, for example Multiply or Soft light.");
@@ -296,6 +293,8 @@ namespace Avistry.Textures
             if (!a.toIndex.HasValue || a.toIndex.Value < 0 || a.toIndex.Value >= count)
                 return Invalid(a.action, $"to_index is 0 to {count - 1}. 0 is the bottom layer.");
             int to = a.toIndex.Value;
+            if (index != to && (layer is MixedMergeLayer || to == 0 && w.AutoRecipe.layers[0] is MixedMergeLayer))
+                return Invalid(a.action, "A merged layer stays at the bottom of the stack.");
             return InScope(w, "Move layer", EditAnswers(null), () =>
             {
                 for (int i = index; i != to; i += to > index ? 1 : -1) w.AutoMoveLayer(i, to > index ? 1 : -1);
@@ -306,6 +305,7 @@ namespace Avistry.Textures
         static AgentResult EditDuplicateLayer(AvatarTextureWindow w, AgentArgs a)
         {
             if (!FindLayer(w, a.layerId, out var layer, out int index)) return LayerNotFound(a.action, a.layerId);
+            if (layer is MixedMergeLayer) return Invalid(a.action, "Separate the merged layer before duplicating its source layers.");
             return InScope(w, "Duplicate layer", EditAnswers(null), () =>
             {
                 w.AutoDuplicateLayer(index);
@@ -474,35 +474,102 @@ namespace Avistry.Textures
             });
         }
 
-        static AgentAccess.Activity LastUndoable()
+        delegate void ReadUndoRecords(List<string> applied, List<string> redo);
+
+        static ReadUndoRecords s_readUndoRecords = FindUndoTimeline();
+        static readonly List<string> s_appliedUndo = new List<string>();
+        static readonly List<string> s_redoUndo = new List<string>();
+        static string[] s_helperUndoSnapshot;
+        static AvatarTextureWindow s_helperUndoWindow;
+        static string s_helperUndoName;
+        static double s_checkUndoAfter;
+        static bool s_canUndoLatest;
+
+        static ReadUndoRecords FindUndoTimeline()
         {
-            var log = AgentAccess.Recent;
-            for (int i = log.Count - 1; i >= 0; i--)
-                if (log[i].undoName != null) return log[i];
-            return null;
+            try
+            {
+                var method = typeof(Undo).GetMethod("GetRecords", BindingFlags.Static | BindingFlags.NonPublic, null,
+                    new[] { typeof(List<string>), typeof(List<string>) }, null);
+                return (ReadUndoRecords)method?.CreateDelegate(typeof(ReadUndoRecords));
+            }
+            catch (Exception) { return null; }
         }
 
-        /// <summary>True while the newest Undo step is the helper's last one, so one Ctrl+Z would remove exactly that.</summary>
-        internal static bool CanUndoLast()
+        static bool ReadUndoTimeline()
         {
-            var last = LastUndoable();
-            return last != null && Undo.GetCurrentGroup() == last.undoGroup + 1;
+            if (s_readUndoRecords == null) return false;
+            s_appliedUndo.Clear();
+            s_redoUndo.Clear();
+            try { s_readUndoRecords(s_appliedUndo, s_redoUndo); }
+            catch (Exception)
+            {
+                s_readUndoRecords = null;
+                ClearHelperUndo();
+                return false;
+            }
+            return true;
         }
 
-        /// <summary>Undoes the helper's last step, only while it is still the newest step. The strip's Undo button calls it too.</summary>
+        static void TrackHelperUndo(AvatarTextureWindow w, string name)
+        {
+            ClearHelperUndo();
+            s_helperUndoWindow = w;
+            s_helperUndoName = name;
+            s_helperUndoSnapshot = s_appliedUndo.ToArray();
+            Undo.undoRedoEvent += OnUndoTimelineChanged;
+            Undo.postprocessModifications += OnUndoEditsRecorded;
+        }
+
+        static void OnUndoTimelineChanged(in UndoRedoInfo _) => ClearHelperUndo();
+
+        static UndoPropertyModification[] OnUndoEditsRecorded(UndoPropertyModification[] changes)
+        {
+            if (changes.Length > 0) ClearHelperUndo();
+            return changes;
+        }
+
+        static void ClearHelperUndo()
+        {
+            Undo.undoRedoEvent -= OnUndoTimelineChanged;
+            Undo.postprocessModifications -= OnUndoEditsRecorded;
+            s_helperUndoWindow = null;
+            s_helperUndoName = null;
+            s_helperUndoSnapshot = null;
+            s_checkUndoAfter = 0;
+        }
+
+        static bool IsLatestHelperUndo(AvatarTextureWindow w) => w != null && w == s_helperUndoWindow &&
+            s_helperUndoSnapshot != null && ReadUndoTimeline() && s_appliedUndo.SequenceEqual(s_helperUndoSnapshot);
+
+        internal static bool CanUndoLast(AvatarTextureWindow w)
+        {
+            if (w == null || w != s_helperUndoWindow) return false;
+            double now = EditorApplication.timeSinceStartup;
+            if (now >= s_checkUndoAfter)
+            {
+                s_canUndoLatest = IsLatestHelperUndo(w);
+                s_checkUndoAfter = now + 0.25;
+            }
+            return s_canUndoLatest;
+        }
+
         internal static AgentResult UndoLast(AvatarTextureWindow w, string action)
         {
-            var last = LastUndoable();
-            if (last == null) return Fail(action, AgentResult.Codes.NotFound, "There is no helper step to undo.", "Use avistry_read history to see what is there.");
-            if (!CanUndoLast())
-                return Fail(action, AgentResult.Codes.Unsupported, "Something else was done after the helper's last step, so it can't be undone from here.", "Ask the person to use Ctrl+Z.");
+            if (s_helperUndoName == null) return Fail(action, AgentResult.Codes.NotFound, "There is no helper step available to undo.");
+            var busy = BusyCheck(action, w);
+            if (busy != null) return busy;
+            Undo.FlushUndoRecordObjects();
+            if (!IsLatestHelperUndo(w))
+                return Fail(action, AgentResult.Codes.Unsupported, "Unity's latest Undo action could not be verified as the helper's edit.",
+                    "Check Unity's Edit menu to see what Undo will take back.");
+            string name = s_helperUndoName;
+            ClearHelperUndo();
             using (Learn.Suppress())
             {
                 Undo.PerformUndo();
                 w.AutoSettle();
             }
-            string name = last.undoName;
-            last.undoName = null;
             return Done(action, D(("undone", name)), "Undid " + name);
         }
     }

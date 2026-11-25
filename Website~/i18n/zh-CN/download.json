@@ -27,7 +27,7 @@
  "dl.need.2.b": "任何 VRChat Avatar 都可以。支持 Poiyomi 和 lilToon，但两者都不是必需的。",
  "dl.need.3.t": "别的都不需要",
  "dl.need.3.b": "无需注册，没有追踪。它在编辑器中运行，不会往上传内容里添加任何东西。",
- "trust.title": "安装前，请先自行确认",
+ "trust.title": "安装前核对下载文件",
  "release.download": "下载 .unitypackage",
  "install.tab.vcc": "VCC（推荐）",
  "install.tab.unity": ".unitypackage",
@@ -57,5 +57,6 @@
  "dl.dev.3.b2": "提交一个 Pull Request。我们会逐一测试，并随常规版本发布。",
  "dl.dev.pr": "提交 Pull Request",
  "dl.banner.go": "查看新内容",
- "dl.banner.alt": "Avistry 0.2.0，首个公开版本"
+ "dl.banner.alt": "Avistry 0.2.0，首个公开版本",
+ "dl.banner.alt.0.3.0": "Avistry 0.3.0「Surface Studio」。棕色头戴式耳机，耳罩上绘有樱花。"
 }

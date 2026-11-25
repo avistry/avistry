@@ -4,21 +4,18 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Colour Match helpers: the main colours of a texture (k-means in OKLab, only over the parts of the texture the
-    /// mesh uses), and pairing two palettes by brightness so light stays light and dark stays dark.
-    /// </summary>
     public static class ColourMatch
     {
+        internal enum Pairing { Brightness = 0, Closest = 1, Prominence = 2 }
+
         public struct Swatch
         {
-            public Color colour;   // gamma
-            public float share;    // 0..1 of the sampled area
+            public Color colour;
+            public float share;
         }
 
         public const int SampleSize = 96;
 
-        /// <summary>Main colours of the pixels (gamma) where mask > 0.5 (null = everywhere), darkest first.</summary>
         public static List<Swatch> MainColours(Color[] px, byte[] mask, int k)
         {
             var labs = new List<Vector3>(px?.Length ?? 0);
@@ -32,7 +29,6 @@ namespace Avistry.Textures
             if (labs.Count == 0) return new List<Swatch>();
             k = Mathf.Clamp(k, 1, Mathf.Min(8, labs.Count));
 
-            // Deterministic start: the sample nearest the average, then repeatedly the sample farthest from all centres.
             var mean = Vector3.zero;
             foreach (var l in labs) mean += l;
             mean /= labs.Count;
@@ -42,7 +38,7 @@ namespace Avistry.Textures
             {
                 int far = 0;
                 for (int i = 1; i < dist.Length; i++) if (dist[i] > dist[far]) far = i;
-                if (dist[far] < 1e-6f) break; // fewer distinct colours than asked for
+                if (dist[far] < 1e-6f) break;
                 centres.Add(labs[far]);
                 for (int i = 0; i < dist.Length; i++) dist[i] = Mathf.Min(dist[i], (labs[i] - labs[far]).sqrMagnitude);
             }
@@ -74,7 +70,6 @@ namespace Avistry.Textures
                     if ((nc - centres[c]).sqrMagnitude > 1e-8f) moved = true;
                     centres[c] = nc;
                 }
-                // Tiny clusters (a few stray pixels) aren't main colours: drop them and let the rest take their pixels.
                 if (iter == 6)
                 {
                     pruned = true;
@@ -100,7 +95,6 @@ namespace Avistry.Textures
                     counts[best]++;
                 }
                 if (pruned) break;
-                // Converged before the in-loop prune ran: prune once here, then count again.
                 pruned = true;
                 bool removed = false;
                 for (int c = centres.Count - 1; c >= 0 && centres.Count > 1; c--)
@@ -117,10 +111,6 @@ namespace Avistry.Textures
             return result.OrderBy(s => Recolour.ToOklab(s.colour).x).ToList();
         }
 
-        /// <summary>
-        /// For each colour of this texture (darkest first), the other material's colour of the same brightness rank.
-        /// Keeps the light / dark structure: highlights stay highlights, shadows stay shadows.
-        /// </summary>
         public static List<Color> PairByBrightness(List<Swatch> target, List<Swatch> source)
         {
             var result = new List<Color>();
@@ -134,17 +124,37 @@ namespace Avistry.Textures
             return result;
         }
 
-        /// <summary>The main colours of a material: its main texture (times its colour), only where its meshes use it.</summary>
+        internal static List<Color> PairColours(List<Swatch> target, List<Swatch> source, Pairing pairing)
+        {
+            if (target.Count == 0 || source.Count == 0) return new List<Color>();
+            if (pairing == Pairing.Closest)
+            {
+                var reference = source.Select(swatch => Recolour.ToOklab(swatch.colour)).ToArray();
+                return target.Select(swatch =>
+                {
+                    Vector3 lab = Recolour.ToOklab(swatch.colour);
+                    int closest = 0;
+                    for (int i = 1; i < reference.Length; i++)
+                        if ((lab - reference[i]).sqrMagnitude < (lab - reference[closest]).sqrMagnitude) closest = i;
+                    return source[closest].colour;
+                }).ToList();
+            }
+            if (pairing != Pairing.Prominence) return PairByBrightness(target, source);
+
+            var targetOrder = Enumerable.Range(0, target.Count).OrderByDescending(i => target[i].share).ToArray();
+            var sourceOrder = source.OrderByDescending(swatch => swatch.share).ToArray();
+            var colours = new Color[target.Count];
+            for (int i = 0; i < targetOrder.Length; i++)
+                colours[targetOrder[i]] = sourceOrder[Mathf.Min(i, sourceOrder.Length - 1)].colour;
+            return colours.ToList();
+        }
+
         public static List<Swatch> MaterialColours(Material m, Transform avatarRoot, int k)
         {
             if (m == null) return new List<Swatch>();
-            Color[] px = null;
-            if (m.HasProperty("_MainTex") && m.GetTexture("_MainTex") != null) px = MaterialLook.Pixels(m, SampleSize); // as the material shows it
+            var px = MaterialLook.Pixels(m, SampleSize);
             if (px == null)
-            {
-                var c = m.HasProperty("_Color") ? m.GetColor("_Color") : Color.white;
-                return new List<Swatch> { new Swatch { colour = new Color(c.r, c.g, c.b, 1f), share = 1f } };
-            }
+                return new List<Swatch> { new Swatch { colour = MaterialLook.Tint(m), share = 1f } };
             byte[] mask = null;
             var users = avatarRoot != null ? TargetResolver.FindMaterialUsers(avatarRoot, m) : null;
             if (users != null && users.Count > 0)
@@ -155,10 +165,6 @@ namespace Avistry.Textures
             return MainColours(px, mask, k);
         }
 
-        /// <summary>
-        /// Main colours of a texture on its own. Where this avatar uses it as a main texture, only the parts its meshes
-        /// cover count (no empty space between UV islands); otherwise every pixel that isn't transparent.
-        /// </summary>
         public static List<Swatch> TextureColours(Texture2D t, Transform avatarRoot, int k)
         {
             if (t == null) return new List<Swatch>();
@@ -169,7 +175,7 @@ namespace Avistry.Textures
             {
                 var users = new List<TargetResolver.SlotRef>();
                 foreach (var m in avatarRoot.GetComponentsInChildren<Renderer>(true).SelectMany(r => r.sharedMaterials).Where(m => m != null).Distinct())
-                    if (m.HasProperty("_MainTex") && m.GetTexture("_MainTex") == t) users.AddRange(TargetResolver.FindMaterialUsers(avatarRoot, m));
+                    if (MaterialLook.MainTexture(m) == t) users.AddRange(TargetResolver.FindMaterialUsers(avatarRoot, m));
                 if (users.Count > 0)
                 {
                     var uv = MeshUV.Build(users, 0);
@@ -181,7 +187,7 @@ namespace Avistry.Textures
                 mask = new byte[px.Length];
                 int opaque = 0;
                 for (int i = 0; i < px.Length; i++) if (px[i].a > 0.1f) { mask[i] = 255; opaque++; }
-                if (opaque == 0) mask = null; // fully transparent texture: use every pixel rather than nothing
+                if (opaque == 0) mask = null;
             }
             return MainColours(px, mask, k);
         }

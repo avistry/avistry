@@ -7,20 +7,14 @@ using UnityEngine;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Shows the working texture on the avatar with MaterialPropertyBlocks (nothing is written to assets).
-    /// While active, NDMF's proxy previews (Modular Avatar / Avatar Optimizer) are paused through
-    /// NDMFPreview.DisablePreviewDepth, because they render copies that would hide this preview.
-    /// </summary>
     public class AvatarPreview
     {
         struct Entry
         {
             public Renderer renderer;
             public int index;
-            public bool hadOtherOverrides;
-            public Texture original;
-            public List<string> props;   // this slot's material properties that show the texture
+            public MaterialPropertyBlock originalBlock;
+            public List<string> props;
         }
 
         readonly List<Entry> _entries = new List<Entry>();
@@ -31,7 +25,6 @@ namespace Avistry.Textures
         public void Apply(List<TargetResolver.SlotRef> slots, List<string> props, Texture original, Texture preview) =>
             Apply(slots.Select(s => (s, props)).ToList(), original, preview);
 
-        /// <summary>Shows the preview on every slot, each with its own material's properties (meshes sharing one texture).</summary>
         public void Apply(List<(TargetResolver.SlotRef slot, List<string> props)> slots, Texture original, Texture preview)
         {
             if (Active && !SameSlots(slots)) Clear();
@@ -42,11 +35,13 @@ namespace Avistry.Textures
                 foreach (var (s, props) in slots)
                 {
                     if (s.renderer == null) continue;
-                    s.renderer.GetPropertyBlock(mpb, s.materialIndex);
+                    var originalBlock = new MaterialPropertyBlock();
+                    s.renderer.GetPropertyBlock(originalBlock, s.materialIndex);
                     _entries.Add(new Entry
                     {
-                        renderer = s.renderer, index = s.materialIndex, hadOtherOverrides = !mpb.isEmpty,
-                        original = original, props = new List<string>(props),
+                        renderer = s.renderer, index = s.materialIndex,
+                        originalBlock = originalBlock.isEmpty ? null : originalBlock,
+                        props = new List<string>(props),
                     });
                 }
                 PauseNdmf(true);
@@ -55,7 +50,8 @@ namespace Avistry.Textures
             foreach (var e in _entries)
             {
                 if (e.renderer == null) continue;
-                e.renderer.GetPropertyBlock(mpb, e.index);
+                if (e.originalBlock == null) e.renderer.GetPropertyBlock(mpb);
+                else e.renderer.GetPropertyBlock(mpb, e.index);
                 foreach (var p in e.props) mpb.SetTexture(p, preview);
                 e.renderer.SetPropertyBlock(mpb, e.index);
             }
@@ -69,28 +65,16 @@ namespace Avistry.Textures
 
         public void Clear()
         {
-            var mpb = new MaterialPropertyBlock();
             foreach (var e in _entries)
             {
                 if (e.renderer == null) continue;
-                if (!e.hadOtherOverrides)
-                {
-                    e.renderer.SetPropertyBlock(new MaterialPropertyBlock(), e.index);
-                }
-                else
-                {
-                    // Another tool also uses a property block here: only put our properties back.
-                    e.renderer.GetPropertyBlock(mpb, e.index);
-                    foreach (var p in e.props) if (e.original != null) mpb.SetTexture(p, e.original);
-                    e.renderer.SetPropertyBlock(mpb, e.index);
-                }
+                e.renderer.SetPropertyBlock(e.originalBlock, e.index);
             }
             _entries.Clear();
             PauseNdmf(false);
             SceneView.RepaintAll();
         }
 
-        // NDMF is optional and reached via reflection.
 
         static PropertyInfo _ndmfDepth;
         static bool _ndmfLookedUp;

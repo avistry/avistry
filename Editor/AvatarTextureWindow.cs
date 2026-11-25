@@ -7,24 +7,17 @@ using UnityEngine.Scripting.APIUpdating;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Avistry window. Split over several files:
-    ///   AvatarTextureWindow.cs        state, lifecycle, compositing, painting and layer operations
-    ///   AvatarTextureWindow.Canvas.cs toolbar, texture canvas, status bar, canvas input
-    ///   AvatarTextureWindow.Panel.cs  side panel sections
-    ///   AvatarTextureWindow.Scene.cs  Scene view highlight, picking and painting
-    /// </summary>
     [MovedFrom(false, sourceNamespace: "AvatarTextureStudio", sourceAssembly: "AvatarTextureStudio.Editor")]
     public partial class AvatarTextureWindow : EditorWindow
     {
         enum Tool { Select = 0, Paint = 1 }
 
-        const float MinPanelWidth = 260f;  // the narrowest panel; rows wrap or shorten to fit down to here
+        const float MinPanelWidth = 260f;
         const float MinCanvasWidth = 280f;
         static readonly int[] WorkSizes = { 512, 1024, 2048, 4096 };
 
         [SerializeField] Renderer _renderer;
-        [SerializeField] string _rendererId; // GlobalObjectId: finds the mesh again after Unity restarts or the scene reopens
+        [SerializeField] string _rendererId;
         [SerializeField] int _materialIndex;
         [SerializeField] int _slotIndex;
         [SerializeField] TextureRecipe _recipe;
@@ -44,7 +37,7 @@ namespace Avistry.Textures
         [SerializeField] bool _paintInScene = true;
         [SerializeField] OutputMode _outputMode = OutputMode.DuplicateMaterial;
         [SerializeField] bool _dither = true;
-        [SerializeField] bool _foldHelp; // "Advanced" output options in 5 · Save
+        [SerializeField] bool _foldHelp;
         [SerializeField] bool _foldBrushAdvanced;
         [SerializeField] bool _focusWhilePainting = true;
         [SerializeField] float _panelWidth = 300f;
@@ -52,6 +45,9 @@ namespace Avistry.Textures
         [SerializeField] string _newBrushName = "";
 
         Material _material;
+        Renderer _builtRenderer;
+        Mesh _builtTargetMesh;
+        int _builtMaterialIndex, _builtSlotIndex;
         List<TextureSlot> _slots = new List<TextureSlot>();
         MeshUV _uv;
         Compositor _comp;
@@ -66,33 +62,30 @@ namespace Avistry.Textures
         float _panelContentWidth = 300f;
         int _splitterId;
 
-        // guided workflow (tabs = steps), unsaved-work tracking, last bake result
-        enum Tab { Target = 0, Select = 1, Paint = 2, Layers = 3, Save = 4, Colour = 5 } // values are saved; display order is TabDefs
+        enum Tab { Target = 0, Select = 1, Paint = 2, Layers = 3, Save = 4, Colour = 5 }
         [SerializeField] Tab _tab = Tab.Target;
         [SerializeField] bool _unsaved;
         [SerializeField] bool _foldMoreBrushes, _foldOutputOptions;
         [SerializeField] string _lastBakePng, _lastBakeMaterial, _lastBakeRecipe, _lastSavedEdit;
         [SerializeField] bool _lastBakeClearedLayers;
-        TextureRecipe _pendingRecipe;
         Texture _pendingTexture;
-        TextureRecipe _editThatMadeTexture; // set when the current texture is itself a bake output
-        string _transparencyNote;            // main texture transparency vs the material render mode
+        TextureRecipe _editThatMadeTexture;
+        string _transparencyNote;
         bool _eyedropperArmed;
-        bool _scenePickArmed; // next click in the Scene view picks a colour (texture colour on this mesh, else what you see)
+        bool _scenePickArmed;
 
-        // live brush stroke (not yet committed to its layer)
         PaintStroke _liveStroke;
         PaintLayer _liveLayer;
-        Layer _liveMaskLayer;       // set instead of _liveLayer while painting a layer mask
+        Layer _liveMaskLayer;
         int _strokeUndoGroup;
 
-        // Layer mask editing: brush strokes go to the mask of this layer (only while it is the active layer).
         [SerializeField] string _maskEditLayerId;
         [SerializeField] bool _maskFillHides = true;
         [SerializeField] bool _showMaskOverlay = true;
 
-        bool MaskEditing => _tool == Tool.Paint && !string.IsNullOrEmpty(_maskEditLayerId) && _maskEditLayerId == _activeLayerId &&
-                            ActiveLayer != null && ActiveLayer.hasPaintMask;
+        bool MaskSelectedForEditing => !string.IsNullOrEmpty(_maskEditLayerId) && _maskEditLayerId == _activeLayerId &&
+            ActiveLayer != null && ActiveLayer.hasPaintMask;
+        bool MaskEditing => _tool == Tool.Paint && MaskSelectedForEditing;
 
         TextureSlot CurrentSlot => _slots != null && _slotIndex >= 0 && _slotIndex < _slots.Count ? _slots[_slotIndex] : null;
         int ActiveIndex => _recipe == null ? -1 : _recipe.layers.FindIndex(l => l != null && l.id == _activeLayerId);
@@ -101,7 +94,6 @@ namespace Avistry.Textures
         [MenuItem("Tools/Avistry/Textures")]
         public static void Open() => Open(true);
 
-        /// <param name="pickSelection">False lets the AI helper pick the Hierarchy selection itself, inside its own Undo step.</param>
         internal static void Open(bool pickSelection)
         {
             var inspector = typeof(Editor).Assembly.GetType("UnityEditor.InspectorWindow");
@@ -119,10 +111,6 @@ namespace Avistry.Textures
             if (r != null) SetRenderer(r);
         }
 
-        /// <summary>
-        /// Accepts whatever the user points at (Postel's law): the renderer itself, its GameObject, a parent
-        /// (e.g. the avatar root: first mesh with materials below it) or a child. Only mesh renderers qualify.
-        /// </summary>
         static Renderer ResolveRenderer(UnityEngine.Object o)
         {
             if (o is Renderer r0) return IsMeshRenderer(r0) ? r0 : null;
@@ -138,7 +126,6 @@ namespace Avistry.Textures
 
         static bool IsMeshRenderer(Renderer r) => r is SkinnedMeshRenderer || r is MeshRenderer;
 
-        /// <summary>The mesh the user has selected in the Hierarchy, if it isn't the current target.</summary>
         Renderer SuggestedRenderer
         {
             get
@@ -150,19 +137,16 @@ namespace Avistry.Textures
 
         void OnSelectionChange() => Repaint();
 
-        static string s_version;
-        /// <summary>The installed package version (from package.json), shown so testers can say which build they have.</summary>
-        internal static string Version => s_version ??=
-            UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(AvatarTextureWindow).Assembly)?.version ?? "dev";
+        internal static string Version => UpdateCheck.InstalledVersion();
 
         void OnEnable()
         {
-            titleContent = StudioGUI.Icon("Grid.PaintTool", _automationSandbox ? Loc.T("Avistry Textures (test)") : Loc.T("Avistry Textures"), Loc.F("Avistry {0}", Version));
+            RefreshWindowTitle();
+            SupportSession.Open(this);
             wantsMouseMove = true;
             HookUpdateCheck();
-            saveChangesMessage = Loc.T("Avistry has edits that aren't baked yet.\n\n" +
-                                 "Save keeps them as a saved edit (a small file next to the texture) that you can open again later. " +
-                                 "It does not bake or change your texture.");
+            saveChangesMessage = Loc.T("Avistry has layers you haven't saved yet.\n\n" +
+                                 "Save keeps them as a draft you can reopen from Browse drafts.");
             if (_brush == null) _brush = new BrushSettings();
             if (_brush.shape == null) _brush.shape = new BrushShape();
             if (_recipe == null)
@@ -173,6 +157,7 @@ namespace Avistry.Textures
             }
             _needsRebuild = true;
             TryRestoreRenderer();
+            ClearHistory();
             EditorApplication.hierarchyChanged -= OnHierarchyChanged;
             EditorApplication.hierarchyChanged += OnHierarchyChanged;
             SceneView.duringSceneGui += OnSceneGUI;
@@ -183,10 +168,13 @@ namespace Avistry.Textures
             Learn.ConceptDone += OnLearnConceptDone;
             EditorApplication.playModeStateChanged += OnPlayMode;
             AssemblyReloadEvents.beforeAssemblyReload += Teardown;
+            ObserveEditorActivity();
+            EditorApplication.update += ObserveEditorActivity;
         }
 
         void OnDisable()
         {
+            SupportSession.Close(this);
             EditorApplication.hierarchyChanged -= OnHierarchyChanged;
             UpdateCheck.Changed -= Repaint;
             SceneView.duringSceneGui -= OnSceneGUI;
@@ -195,6 +183,7 @@ namespace Avistry.Textures
             Undo.undoRedoEvent -= OnUndoRedoEvent;
             EditorApplication.playModeStateChanged -= OnPlayMode;
             AssemblyReloadEvents.beforeAssemblyReload -= Teardown;
+            EditorApplication.update -= ObserveEditorActivity;
             EditorApplication.update -= ToastTick;
             Learn.ConceptDone -= OnLearnConceptDone;
             EditorApplication.update -= LearnToastTick;
@@ -208,7 +197,17 @@ namespace Avistry.Textures
 
         void Teardown()
         {
+            _pixelJob?.Dispose();
+            StopOcclusionBake();
+            ClearPreparedInteraction();
+            ForgetSlotIsolation(true);
+            CancelMixedMergePreview();
+            CancelGradientDrag();
+            CancelSceneGradient();
+            CancelImageDrag();
+            ClearSceneStrokeControl();
             CancelStroke();
+            _cancelledSceneStrokePreview = null;
             _preview.Clear();
             _comp?.Dispose();
             _comp = null;
@@ -226,92 +225,90 @@ namespace Avistry.Textures
 
         void OnUndoRedo()
         {
-            if (AlsoSignature() != _alsoSignature) _needsRebuild = true; // a mesh was included or left out
-            if (_renderer != null) // Undo of "Make an editable copy" puts the original material back on the part
+            _recallSelection = false;
+            bool interruptedSceneStroke = _sceneStrokeDraft != null;
+            if (interruptedSceneStroke) CancelStroke();
+            _comp?.InvalidateLivePrefix();
+            _comp?.InvalidateLiveStrokeCoverage();
+            CancelMixedMergePreview();
+            CancelGradientDrag();
+            CancelSceneGradient();
+            CancelImageDrag();
+            if (AlsoSignature() != _alsoSignature) _needsRebuild = true;
+            if (_renderer != _builtRenderer || _materialIndex != _builtMaterialIndex || _slotIndex != _builtSlotIndex)
+                _needsRebuild = true;
+            if (PreviewSizeChanged()) _needsRebuild = true;
+            if (_renderer != null && !_needsRebuild)
             {
                 var slotMats = _renderer.sharedMaterials;
-                if (_materialIndex < slotMats.Length && slotMats[_materialIndex] != _material) _needsRebuild = true;
+                var material = _materialIndex >= 0 && _materialIndex < slotMats.Length ? slotMats[_materialIndex] : null;
+                var slot = CurrentSlot;
+                if (material != _material || (material != null && slot != null &&
+                    slot.properties.Any(prop => !material.HasProperty(prop) || material.GetTexture(prop) != slot.texture)))
+                    _needsRebuild = true;
             }
             _dirty = true;
             _savedBlockVisible = false;
             _emptyMasks = null;
-            _selectionVisualsDirty = true; // GoToHistory fires this many times in a row: rebuild once on the next Layout
-            if (_renderer != null) Learn.Did(LearnEvents.UndoUsed); // other windows' undos reach here too
+            _selectionVisualsDirty = true;
+            _animatedSettings = null;
+            if (_renderer != null) Learn.Did(LearnEvents.UndoUsed);
+            if (interruptedSceneStroke) _cancelledSceneStrokePreview = _comp;
             Repaint();
         }
 
-        /// <summary>Unity's own "unsaved changes" prompt (window close / editor quit) calls this when the user picks Save.</summary>
         public override void SaveChanges()
         {
             EndStroke();
-            SaveEditAsset();
-            base.SaveChanges();
+            if (_recipe == null || _recipe.layers.Count == 0 || (SaveEditAsset() != null && !_unsaved)) base.SaveChanges();
         }
 
-        /// <summary>Marks the layer stack as changed: recomposite, and remember there is unbaked work.</summary>
-        void MarkEdited()
+        void MarkEdited(int? historyGroup = null)
+        {
+            RefreshEditedRecipe();
+            RecordHistory(historyGroup);
+        }
+
+        void RefreshEditedRecipe(bool affectsImage = true)
         {
             _unsaved = true;
             _savedBlockVisible = false;
-            ShowEditsIfBeforeOn();
-            _dirty = true;
-            RecordHistory();
+            if (affectsImage)
+            {
+                _comp?.InvalidateLivePrefix();
+                ShowEditsIfBeforeOn();
+                _dirty = true;
+            }
             Repaint();
         }
 
-        /// <summary>Saves the working layers as a "saved edit" asset next to the texture (no bake).</summary>
-        string SaveEditAsset()
-        {
-            var slot = CurrentSlot;
-            if (_recipe == null || _recipe.layers.Count == 0) return null;
-            string dir = Exporter.WritableFolder(slot?.assetPath);
-            string baseName = slot != null ? slot.texture.name : "Texture";
-            var copy = Instantiate(_recipe);
-            copy.hideFlags = HideFlags.None;
-            copy.bakedTexture = null;
-            string path = AssetDatabase.GenerateUniqueAssetPath($"{dir}/{baseName}_edit.asset");
-            copy.name = System.IO.Path.GetFileNameWithoutExtension(path);
-            AssetDatabase.CreateAsset(copy, path);
-            AssetDatabase.SaveAssets();
-            _unsaved = false;
-            _lastSavedEdit = path;
-            hasUnsavedChanges = false;
-            Toast(Loc.F("Saved edit: {0}. Open it again from 1 · Pick.", System.IO.Path.GetFileName(path)), MessageType.Info);
-            Learn.Did(LearnEvents.EditSaved);
-            return path;
-        }
-
-        /// <summary>
-        /// Before switching mesh/material/texture with layers in the stack: ask whether to keep them (applied to the
-        /// new texture) or start fresh. Returns false if the user cancelled.
-        /// </summary>
         bool ConfirmTargetChange(string what)
         {
-            if (_recipe == null || _recipe.layers.Count == 0) { NoteTargetChange(what); return true; }
+            if (!PlanTargetChange(what, out var apply)) return false;
+            apply();
+            return true;
+        }
+
+        bool PlanTargetChange(string what, out Action apply)
+        {
+            apply = () => _savedBlockVisible = false;
+            if (_recipe == null || _recipe.layers.Count == 0) return true;
             int n = _recipe.layers.Count;
             string tex = CurrentSlot != null ? CurrentSlot.texture.name : Loc.T("this texture");
             int c = StudioDialog.AskComplex(Loc.F("Switch {0}?", what), Msg.M4TargetChange(n, tex, _unsaved),
                 Msg.BtnMoveLayers, Msg.BtnCancel, Msg.BtnStartEmpty);
             if (c == 1) return false;
-            NoteTargetChange(what);
-            ClearHistory(); // a different texture: the old steps no longer belong to this edit
             if (c == 2)
-            {
-                Undo.RecordObject(_recipe, "Start fresh");
-                Undo.RecordObject(this, "Start fresh");
-                _recipe.layers.Clear();
-                _activeLayerId = null;
-                _unsaved = false;
-            }
+                apply = () =>
+                {
+                    Undo.RecordObject(_recipe, "Start fresh");
+                    Undo.RecordObject(this, "Start fresh");
+                    _savedBlockVisible = false;
+                    _recipe.layers.Clear();
+                    _activeLayerId = null;
+                    _unsaved = false;
+                };
             return true;
-        }
-
-        /// <summary>A confirmed target change: the "Saved" state no longer describes what is shown, and a texture picked by hand must survive the next Rebuild's auto-pick.</summary>
-        void NoteTargetChange(string what)
-        {
-            _savedBlockVisible = false;
-            if (what == "texture") _slotChosenByUser = true;
-            else if (what == "material") _slotChosenByUser = false;
         }
 
         void SetRendererChecked(Renderer r)
@@ -324,6 +321,7 @@ namespace Avistry.Textures
         void SetRenderer(Renderer r)
         {
             if (r == _renderer) return;
+            RememberSelectionBeforeSwitch();
             Undo.RecordObject(this, "Change target");
             _renderer = r;
             _rendererId = r != null ? GlobalObjectId.GetGlobalObjectIdSlow(r).ToString() : null;
@@ -332,15 +330,31 @@ namespace Avistry.Textures
             _slotChosenByUser = false;
             _savedBlockVisible = false;
             _selection.Clear();
-            _alsoRenderers.Clear(); // included meshes belong to the old texture
+            ClearFaceSelection();
+            _alsoRenderers.Clear();
             _alsoSlots.Clear();
+            _alsoUvs.Clear();
             _needsRebuild = true;
             if (r != null) LearnTargetPicked(r);
         }
 
-        /// <summary>Resolves material, textures, UVs and builds the compositor for the current target.</summary>
-        void Rebuild()
+        void Rebuild() => RebuildUsing(null);
+
+        void RebuildUsing(MeshUV prepared)
         {
+            _pixelJob?.Cancel();
+            ClearPreparedInteraction();
+            ReleaseSceneSelectionCaches();
+            ForgetSlotIsolation(true);
+            CancelMixedMergePreview();
+            _pickForPaint = false;
+            CancelGradientDrag();
+            CancelSceneGradient();
+            CancelImageDrag();
+            var oldRenderer = _builtRenderer;
+            var oldMesh = _builtTargetMesh;
+            var oldMaterial = _material;
+            var oldSlot = _builtSlotIndex >= 0 && _builtSlotIndex < _slots.Count ? _slots[_builtSlotIndex] : null;
             _needsRebuild = false;
             CancelStroke();
             _preview.Clear();
@@ -348,15 +362,23 @@ namespace Avistry.Textures
             _comp = null;
             _uv?.ReleaseSurfaceMesh();
             _uv = null;
+            _builtRenderer = _renderer;
+            _builtTargetMesh = _renderer != null ? MeshOf(_renderer) : null;
+            _builtMaterialIndex = _materialIndex;
+            _builtSlotIndex = _slotIndex;
+            _material = null;
+            _users.Clear();
+            _alsoUsers.Clear();
+            _editThatMadeTexture = null;
             _slots = new List<TextureSlot>();
             _status = "";
             _statusFix = StatusFix.None;
-            if (_renderer == null) return;
-
             try
             {
+                if (_renderer == null) return;
                 var mats = _renderer.sharedMaterials;
                 _materialIndex = Mathf.Clamp(_materialIndex, 0, Mathf.Max(0, mats.Length - 1));
+                _builtMaterialIndex = _materialIndex;
                 _material = mats.Length > 0 ? mats[_materialIndex] : null;
                 if (_material == null) { _status = Msg.M25SlotStatus(false); _statusFix = StatusFix.PickAnotherMesh; return; }
 
@@ -368,16 +390,15 @@ namespace Avistry.Textures
                     if (pi >= 0) { _slotIndex = pi; _slotChosenByUser = true; }
                     _pendingTexture = null;
                 }
-                // The main colour texture is almost always the one to paint: don't start on a mask or normal map.
                 if (!_slotChosenByUser)
                 {
                     int ci = _slots.FindIndex(s => s.role == TextureRole.Color);
                     if (ci >= 0) _slotIndex = ci;
                 }
                 _slotIndex = Mathf.Clamp(_slotIndex, 0, _slots.Count - 1);
+                _builtSlotIndex = _slotIndex;
                 var slot = CurrentSlot;
                 _editThatMadeTexture = FindEditThatMade(slot.texture);
-                // Main texture transparency vs render mode (checked from the pixels once per rebuild, not every frame).
                 _transparencyNote = null;
                 var mainTex = _material.HasProperty("_MainTex") ? _material.GetTexture("_MainTex") : null;
                 if (mainTex != null)
@@ -389,31 +410,31 @@ namespace Avistry.Textures
 
                 var root = TargetResolver.AvatarRoot(_renderer);
                 _users = TargetResolver.FindMaterialUsers(root, _material);
-                // Every mesh using this material contributes UVs (one material is often split over several meshes), then
-                // the meshes included from other materials that show the same texture (1 · Pick › Meshes on this texture).
-                _uv = MeshUV.Build(ResolveIncludedMeshes(root, slot), slot.uvChannel);
+                var includedSlots = ResolveIncludedMeshes(root, slot);
+                _uv = prepared ?? MeshUV.Build(includedSlots, slot.uvChannel);
                 if (_uv == null) { _status = Msg.M25SlotStatus(true); _statusFix = StatusFix.PickAnotherMesh; }
                 else ClaimSceneBar();
+                RecallSelectionAfterSwitch(slot);
                 _selection.RemoveAll(i => _uv == null || i >= _uv.islandCount);
 
-                _comp = new Compositor(slot, _workSize);
+                bool prepareBrush = CanPreparePickedBrush(slot) && !EditorApplication.isCompiling && !EditorApplication.isUpdating;
+                _comp = new Compositor(slot, _workSize, prepareBrush ? _uv : null, _preparationPacing.Busy);
                 LearnTextureLoaded();
                 _recipe.sourceTexture = slot.texture;
                 _recipe.sourceMaterial = _material;
                 _recipe.materialIndex = _materialIndex;
                 _recipe.rendererPath = root != null ? AnimationUtility.CalculateTransformPath(_renderer.transform, root) : _renderer.name;
-                _zoom = 0; // frame on next draw
+                _zoom = 0;
                 if (slot.role == TextureRole.Normal && _tool == Tool.Paint) _tool = Tool.Select;
                 if (slot.role == TextureRole.Normal && (_tab == Tab.Paint || _tab == Tab.Layers)) _tab = Tab.Target;
                 RebuildSelectionVisuals();
                 _dirty = true;
-
-                if (_pendingRecipe != null)
-                {
-                    var r = _pendingRecipe;
-                    _pendingRecipe = null;
-                    LoadRecipe(r);
-                }
+            }
+            catch (Compositor.PreviewShaderException e)
+            {
+                _statusFix = StatusFix.RetryPreview;
+                _status = Loc.T("The texture preview shader didn't load. Check the Console for shader errors. If Avistry files are missing, reinstall Avistry.");
+                Debug.LogWarning(e.Message);
             }
             catch (Exception e)
             {
@@ -422,56 +443,137 @@ namespace Avistry.Textures
                 _comp?.Dispose();
                 _comp = null;
             }
+            finally
+            {
+                if (prepared != null && prepared != _uv) prepared.ReleaseSurfaceMesh();
+                if (!ReferenceEquals(oldRenderer, _renderer) || oldMesh != _builtTargetMesh || oldMaterial != _material ||
+                    oldSlot?.texture != CurrentSlot?.texture)
+                    ClearHistory();
+            }
         }
 
-        /// <summary>The saved edit (recipe) whose bake produced this texture, or null if it's an original.</summary>
+        static Dictionary<(string guid, long localId), string> s_bakedReceipts;
+        static int s_bakedReceiptStamp;
+
         static TextureRecipe FindEditThatMade(Texture tex)
         {
-            if (tex == null) return null;
-            // Cheap path first: "<name>_ats.png" sits next to "<name>_ats_recipe.asset".
+            if (tex == null || !AssetDatabase.TryGetGUIDAndLocalFileIdentifier(tex, out string guid, out long localId)) return null;
             string path = AssetDatabase.GetAssetPath(tex);
-            string guess = null;
+            TextureRecipe nearby = null;
             if (!string.IsNullOrEmpty(path))
             {
-                guess = $"{System.IO.Path.GetDirectoryName(path).Replace('\\', '/')}/{tex.name}_recipe.asset";
-                var g = AssetDatabase.LoadAssetAtPath<TextureRecipe>(guess);
-                if (g != null && g.bakedTexture == tex) return g;
+                string guess = $"{System.IO.Path.GetDirectoryName(path).Replace('\\', '/')}/{tex.name}_recipe.asset";
+                nearby = AssetDatabase.LoadAssetAtPath<TextureRecipe>(guess);
+                if (nearby != null && nearby.bakedTexture == tex) return nearby;
             }
-            foreach (var guid in AssetDatabase.FindAssets("t:TextureRecipe"))
+
+            if (s_bakedReceipts == null || s_bakedReceiptStamp != _envStamp) IndexBakedReceipts();
+            var key = (guid, localId);
+            if (s_bakedReceipts.TryGetValue(key, out string receiptGuid))
             {
-                var r = AssetDatabase.LoadAssetAtPath<TextureRecipe>(AssetDatabase.GUIDToAssetPath(guid));
-                if (r != null && r.bakedTexture == tex) return r;
+                var receipt = AssetDatabase.LoadAssetAtPath<TextureRecipe>(AssetDatabase.GUIDToAssetPath(receiptGuid));
+                if (receipt != null && receipt.bakedTexture == tex) return receipt;
+                s_bakedReceipts.Remove(key);
             }
-            // Bakes from before the link existed (no bakedTexture): trust the name guess.
-            if (guess == null) return null;
-            return System.Text.RegularExpressions.Regex.IsMatch(tex.name, @"_ats(_\d+)?$") ? AssetDatabase.LoadAssetAtPath<TextureRecipe>(guess) : null;
+            return nearby != null && nearby.bakedTexture == null &&
+                System.Text.RegularExpressions.Regex.IsMatch(tex.name, @"_ats(_\d+)?$") ? nearby : null;
         }
 
-        /// <summary>
-        /// Opens a saved edit. If it was made for a different texture (typically: you're on the baked copy and the
-        /// edit belongs to the original), offer to put the original back first so the edit isn't applied twice.
-        /// </summary>
+        static void IndexBakedReceipts()
+        {
+            var index = new Dictionary<(string guid, long localId), string>();
+            foreach (var receiptGuid in AssetDatabase.FindAssets("t:TextureRecipe"))
+            {
+                var receipt = AssetDatabase.LoadAssetAtPath<TextureRecipe>(AssetDatabase.GUIDToAssetPath(receiptGuid));
+                if (receipt == null || receipt.bakedTexture == null) continue;
+                if (AssetDatabase.TryGetGUIDAndLocalFileIdentifier(receipt.bakedTexture, out string guid, out long localId))
+                    index.TryAdd((guid, localId), receiptGuid);
+            }
+            s_bakedReceipts = index;
+            s_bakedReceiptStamp = _envStamp;
+        }
+
         void OpenSavedEdit(TextureRecipe r)
         {
             if (r == null) return;
             var slot = CurrentSlot;
-            if (r.sourceTexture == null || slot == null || slot.texture == r.sourceTexture) { if (ConfirmReplaceLayers(r)) LoadRecipe(r); return; }
+            if (slot == null || _comp == null)
+            {
+                Toast(Loc.T("Pick the part first, then open the edit."), MessageType.Info);
+                return;
+            }
 
-            int c = StudioDialog.AskComplex(Loc.T("Open saved edit"), Msg.M7OpenSavedEdit(r.sourceTexture.name, slot.texture.name),
-                $"{Msg.BtnGoBack} \"{r.sourceTexture.name}\"", Msg.BtnCancel, Msg.BtnOpenHere);
-            if (c == 1) return;
-            if (c == 2) { if (ConfirmReplaceLayers(r)) LoadRecipe(r); return; }
-            RestoreOriginalAndOpen(r);
+            EndStroke();
+            var stillMatches = CaptureSavedEditContext(r, slot);
+            if (!CheckSavedEditContext(stillMatches)) return;
+            if (r.includedLayout != null)
+            {
+                OpenIncludedEdit(r, _renderer, _materialIndex, stillMatches);
+                return;
+            }
+            bool canOpenHere = slot.role != TextureRole.Normal;
+            if (r.sourceTexture == null || slot.texture == r.sourceTexture)
+            {
+                if (!canOpenHere) ReopenNeedsEditableTexture();
+                else if (r.sourceTexture == null && IsProjectDraft(r, AssetDatabase.GetAssetPath(r)))
+                    OpenDraftWithReplacement(r, slot, stillMatches);
+                else if (ConfirmReplaceSavedEdit(r, stillMatches)) LoadRecipeOnCurrentTarget(r, asCopy: r.sourceTexture == null);
+                return;
+            }
+
+            bool isBake = r.bakedTexture == slot.texture || r == _editThatMadeTexture;
+            bool CanRestoreMaterial() => r.sourceMaterial == null || r.sourceMaterial == _material ||
+                TargetResolver.GetTextureSlots(r.sourceMaterial).Any(s => s.texture == r.sourceTexture);
+            if (isBake && IsMaterialFromBake(r) && CanRestoreMaterial())
+            {
+                string body = Msg.M7OpenSavedEdit(r.sourceTexture.name, slot.texture.name);
+                string back = $"{Msg.BtnGoBack} \"{r.sourceTexture.name}\"";
+                int c = canOpenHere ? StudioDialog.AskComplex(Loc.T("Open saved edit"), body, back, Msg.BtnCancel, Msg.BtnOpenHere)
+                    : StudioDialog.Ask(Loc.T("Open saved edit"), body, back, Msg.BtnCancel) ? 0 : 1;
+                bool RestoreContextStillMatches()
+                {
+                    if (!stillMatches()) return false;
+                    if (c == 2) return true;
+                    if (!_users.SequenceEqual(TargetResolver.FindMaterialUsers(TargetResolver.AvatarRoot(_renderer), _material)))
+                    {
+                        _needsRebuild = true;
+                        return false;
+                    }
+                    return CanRestoreMaterial();
+                }
+                if (c == 1 || !ConfirmReplaceSavedEdit(r, RestoreContextStillMatches)) return;
+                if (c == 2) LoadRecipeOnCurrentTarget(r, asCopy: true);
+                else RestoreOriginalAndOpen(r);
+                return;
+            }
+
+            int sourceIndex = _slots.FindIndex(s => s.texture == r.sourceTexture && s.role != TextureRole.Normal);
+            if (sourceIndex >= 0) OpenSavedEditOnSource(r, slot, sourceIndex, stillMatches);
+            else if (!canOpenHere) ReopenNeedsEditableTexture();
+            else if (StudioDialog.Ask(Loc.T("Open saved edit"),
+                Loc.F("This edit was made for ‘{0}’. Apply its layers to ‘{1}’?", r.sourceTexture.name, slot.texture.name),
+                Msg.BtnOpenHere, Msg.BtnCancel) && ConfirmReplaceSavedEdit(r, stillMatches)) LoadRecipeOnCurrentTarget(r, asCopy: true);
         }
 
-        void RestoreOriginalAndOpen(TextureRecipe r)
+        bool IsMaterialFromBake(TextureRecipe recipe)
         {
-            EndStroke();
-            Undo.IncrementCurrentGroup();
-            int group = Undo.GetCurrentGroup();
+            if (_material == null) return false;
+            if (_material == recipe.sourceMaterial || _material == recipe.bakedMaterial) return true;
+            if (recipe.bakedMaterial != null || recipe.sourceMaterial == null || !Exporter.IsToolCopy(_material)) return false;
+
+            string sourceDir = Exporter.WritableFolder(AssetDatabase.GetAssetPath(recipe.sourceMaterial), false);
+            string materialPath = AssetDatabase.GetAssetPath(_material);
+            return System.IO.Path.GetDirectoryName(materialPath)?.Replace('\\', '/') == sourceDir &&
+                Exporter.StripAts(_material.name) == Exporter.StripAts(recipe.sourceMaterial.name);
+        }
+
+        void RestoreOriginalAndOpen(TextureRecipe r) => WithTargetUndo("Switch back to original texture", () =>
+        {
+            Undo.RecordObject(this, "Switch back to original texture");
+            var originalMaterial = _material;
             if (r.sourceMaterial != null && r.sourceMaterial != _material)
             {
-                // "New PNG + duplicate material" bake: put the original material back on every slot using the copy.
+                originalMaterial = r.sourceMaterial;
                 foreach (var u in _users)
                 {
                     if (u.renderer == null) continue;
@@ -484,42 +586,64 @@ namespace Avistry.Textures
             }
             else if (_material != null && CurrentSlot != null)
             {
-                // "Update this material" bake: point the material back at the original texture.
                 Undo.RecordObject(_material, "Restore original texture");
                 foreach (var p in CurrentSlot.properties) _material.SetTexture(p, r.sourceTexture);
                 EditorUtility.SetDirty(_material);
             }
-            Undo.SetCurrentGroupName("Switch back to original texture");
-            Undo.CollapseUndoOperations(group);
-            _pendingTexture = r.sourceTexture;
-            _pendingRecipe = r;
+            var originalSlots = TargetResolver.GetTextureSlots(originalMaterial);
+            int sourceIndex = originalSlots.FindIndex(s => s.texture == r.sourceTexture);
+            _selection.Clear();
+            ClearFaceSelection();
+            LoadRecipe(r);
+            if (sourceIndex >= 0) { _slotIndex = sourceIndex; _slotChosenByUser = true; }
             _needsRebuild = true;
-            Repaint();
-        }
+        });
 
         void ComposeNow()
         {
+            if (_sceneStrokeDraft != null && !SceneStrokeTargetCurrent(_sceneStrokeDraft)) CancelStroke();
             _dirty = false;
+            _pickerCircleKey = null;
             if (_comp == null) return;
             var slot = CurrentSlot;
-            if (slot.role == TextureRole.Normal) _comp.Compose(Array.Empty<Layer>(), _uv); // normal maps: view only
-            else _comp.Compose(_recipe.layers, _uv);
+            if (slot.role == TextureRole.Normal) _comp.Compose(Array.Empty<Layer>(), _uv);
+            else
+            {
+                var layers = MixedMergePreviewLayers() ?? LayersForPreview();
+                var liveLayer = _liveMaskLayer ?? (Layer)_liveLayer;
+                if (_sceneStrokeDraft != null && ReferenceEquals(layers, _recipe.layers))
+                    ComposeSceneStrokePreview(liveLayer);
+                else if (_liveStroke != null && ReferenceEquals(layers, _recipe.layers))
+                    _comp.ComposeLivePreview(layers, _uv, liveLayer, _envStamp);
+                else _comp.Compose(layers, _uv);
+            }
+            _sceneGradientPose = _uv?.PoseVersion ?? 0;
 
             if (_previewOnAvatar && _users.Count + _alsoUsers.Count > 0)
-                _preview.Apply(PreviewSlots(slot), slot.texture, _showOriginal ? _comp.SourcePreview : _comp.Preview);
+                _preview.Apply(PreviewSlots(slot), slot.texture, DisplayingOriginal ? _comp.SourcePreview : _comp.Preview);
             else _preview.Clear();
             Repaint();
+        }
+
+        void OnLostFocus()
+        {
+            _panning = false;
+            CancelImageDrag();
         }
 
         void OnGUI()
         {
             var e = Event.current;
-            // The texture being edited was deleted (or the asset replaced): look at the material again instead of drawing a dead reference.
-            if (e.type == EventType.Layout && CurrentSlot != null && CurrentSlot.texture == null) _needsRebuild = true;
-            if (_needsRebuild && e.type == EventType.Layout) Rebuild();
+            if (e.type == EventType.Layout) _drawEditorActivity = _editorActivity;
+            if (e.type == EventType.Layout && ((_renderer == null && _material != null) ||
+                (CurrentSlot != null && CurrentSlot.texture == null))) _needsRebuild = true;
+            if (_needsRebuild && e.type == EventType.Layout && !WaitingForPreview) Rebuild();
+            if (_imgDrag != null && (SelectedImage != _imgOriginal || GUIUtility.hotControl != _imgDragControl)) CancelImageDrag();
             if (_selectionVisualsDirty && e.type == EventType.Layout) { _selectionVisualsDirty = false; RebuildSelectionVisuals(); }
             if (_dirty && e.type == EventType.Layout) ComposeNow();
             HandleShortcuts(e);
+            ReleaseGradientDragControl();
+            ReleaseImageDragControl();
             LearnToastInput(e);
             LearnPulse.Latch();
 
@@ -530,7 +654,6 @@ namespace Avistry.Textures
             bool sideBySide = position.width >= MinPanelWidth + MinCanvasWidth;
             if (sideBySide)
             {
-                // Canvas left, panel right. Drag the divider to resize the panel.
                 float pw = Mathf.Clamp(_panelWidth, MinPanelWidth, position.width - MinCanvasWidth);
                 canvas = new Rect(0, toolbarH, position.width - pw, bodyH);
                 panel = new Rect(canvas.xMax + 1, toolbarH, pw - 1, bodyH);
@@ -538,7 +661,6 @@ namespace Avistry.Textures
             }
             else
             {
-                // Narrow (e.g. docked beside the Inspector): canvas on top, panel below. Drag the divider to resize.
                 float h = Mathf.Clamp(bodyH * _canvasHeightFraction, 140f, Mathf.Max(140f, bodyH - 160f));
                 canvas = new Rect(0, toolbarH, position.width, h);
                 panel = new Rect(0, canvas.yMax + 1, position.width, bodyH - h - 1);
@@ -546,7 +668,7 @@ namespace Avistry.Textures
             }
 
             DrawToolbar(toolbar);
-            HandleSplitter(splitter, sideBySide, toolbarH, bodyH); // before the canvas, so the canvas doesn't grab the drag
+            HandleSplitter(splitter, sideBySide, toolbarH, bodyH);
             DrawCanvas(canvas);
             if (e.type == EventType.Repaint)
             {
@@ -560,7 +682,6 @@ namespace Avistry.Textures
             hasUnsavedChanges = _unsaved && _recipe != null && _recipe.layers.Count > 0;
         }
 
-        /// <summary>The splitter's rule: at least MinPanelWidth, and always leave MinCanvasWidth for the texture view.</summary>
         void SetPanelWidth(float w) => _panelWidth = Mathf.Clamp(w, MinPanelWidth, Mathf.Max(MinPanelWidth, position.width - MinCanvasWidth));
 
         void HandleSplitter(Rect r, bool sideBySide, float top, float bodyH)
@@ -588,20 +709,20 @@ namespace Avistry.Textures
             }
         }
 
+        static bool CanUseShortcuts(Event e) =>
+            e.type == EventType.KeyDown && !EditorGUIUtility.editingTextField && !e.control && !e.command && !e.alt;
+
         void HandleShortcuts(Event e)
         {
-            if (e.type != EventType.KeyDown || EditorGUIUtility.editingTextField || e.control || e.command || e.alt) return;
+            if (!CanUseShortcuts(e) || HandlePaintToolShortcut(e)) return;
             switch (e.keyCode)
             {
+                case KeyCode.Escape when PickingForPaint && !_marqueeActive: SetPickForPaint(false); e.Use(); break;
                 case KeyCode.S: SetTool(Tool.Select); e.Use(); break;
-                case KeyCode.B: SetTool(Tool.Paint); SetPaintTool(0); e.Use(); break;
-                case KeyCode.G: SetTool(Tool.Paint); SetPaintTool(e.shift ? 3 : 2); e.Use(); break; // Shift+G = gradient
-                case KeyCode.E: SetTool(Tool.Paint); SetPaintTool(1); e.Use(); break;
-                case KeyCode.J: SetTool(Tool.Paint); SetPaintTool(4); e.Use(); break; // Blend (blur / smudge), CSP's shortcut
-                case KeyCode.X: SwapColours(); e.Use(); break; // main ⇄ sub colour
+                case KeyCode.X: SwapColours(); e.Use(); break;
                 case KeyCode.LeftBracket: ResizeBrush(1f / 1.2f); e.Use(); break;
                 case KeyCode.RightBracket: ResizeBrush(1.2f); e.Use(); break;
-                case KeyCode.I when _tool == Tool.Paint:
+                case KeyCode.I when CanvasPainting:
                     _eyedropperArmed = !_eyedropperArmed;
                     if (_eyedropperArmed) Toast(Loc.T("Eyedropper: click the texture or the model to pick a colour."), MessageType.Info, 3f);
                     e.Use();
@@ -610,14 +731,67 @@ namespace Avistry.Textures
             }
         }
 
-        /// <summary>Tabs are the workflow steps. Select and Paint also switch the canvas tool.</summary>
+        bool HandlePaintToolShortcut(Event e, SceneView scene = null)
+        {
+            int index = e.keyCode switch
+            {
+                KeyCode.B => 0,
+                KeyCode.E => 1,
+                KeyCode.G => e.shift ? 3 : 2,
+                KeyCode.J => 4,
+                _ => -1,
+            };
+            if (index < 0) return false;
+            bool texturePlacement = _gradDrag != null || _imgDrag != null;
+            if (_liveStroke != null || _marqueeActive || (scene != null && (texturePlacement || _sceneGradientDraft != null)))
+            {
+                e.Use();
+                return true;
+            }
+            if (GUIUtility.hotControl != 0 && !texturePlacement) return false;
+
+            CanPaint(out string problem);
+            if (problem == null && index >= 3 && MaskSelectedForEditing)
+                problem = Loc.T("Finish editing the mask before using Gradient or Blend.");
+            if (problem != null)
+            {
+                Toast(problem, MessageType.Info, 4f);
+                if (scene != null) scene.ShowNotification(new GUIContent(problem), 3.0);
+            }
+            else if (_tab != Tab.Paint || _tool != Tool.Paint || PaintToolIndex != index || texturePlacement || PickingForPaint)
+            {
+                SetTool(Tool.Paint);
+                SetPaintTool(index);
+            }
+            e.Use();
+            return true;
+        }
+
         void SetTab(Tab t)
         {
             if (!TabAvailable(t, out var why)) { Toast(why, MessageType.Warning); return; }
+            if (_tab == Tab.Paint && t != Tab.Paint)
+            {
+                EndStroke();
+                _eyedropperArmed = false;
+                SetPickForPaint(false);
+            }
+            if (t != _tab)
+            {
+                if (t == Tab.Colour)
+                    _paintLayerBeforeRecolour = ActiveLayer is PaintLayer paint ? paint.id : null;
+                else if (_tab == Tab.Colour)
+                    RestorePaintLayerAfterRecolour();
+                CancelGradientDrag();
+                CancelImageDrag();
+                CancelMixedMergePreview();
+            }
+            if (t != Tab.Paint) CancelSceneGradient();
             _tab = t;
             if (t == Tab.Select) SetTool(Tool.Select);
             else if (t == Tab.Paint) SetTool(Tool.Paint);
-            else if (t == Tab.Colour && ByPart && _tool == Tool.Paint) SetTool(Tool.Select); // clicks pick parts there, not paint
+            else if (t == Tab.Colour && ByPart && _tool == Tool.Paint) SetTool(Tool.Select);
+            if (_highlightedColourPart != VisibleColourPart) RebuildSelectionVisuals();
             GUI.FocusControl(null);
             _panelScroll = Vector2.zero;
             Repaint();
@@ -627,6 +801,7 @@ namespace Avistry.Textures
         {
             why = null;
             if (t == Tab.Target) return true;
+            if (WaitingForPreview) { why = PreviewWaitText; return false; }
             if (t == Tab.Colour)
             {
                 if (_material == null) { why = Loc.T("Pick a part in 1 · Pick first."); return false; }
@@ -648,12 +823,16 @@ namespace Avistry.Textures
                 Toast(Loc.T("Normal maps can't be painted. Pick a colour or mask texture in 1 · Pick."), MessageType.Warning);
                 return;
             }
-            // Keep the panel tab in step with the tool (the toolbar buttons and B/S/E keys switch tabs too).
+            if (t == Tool.Select) SetPickForPaint(false);
+            if (_tab == Tab.Colour && t == Tool.Paint) { SetTab(Tab.Paint); return; }
             if (t == Tool.Paint) _tab = Tab.Paint;
             else if (_tab == Tab.Paint) _tab = Tab.Select;
             if (_tool == t) { Repaint(); return; }
+            ClearSceneTopologyFeedback();
+            CancelSceneGradient();
             EndStroke();
-            EndGradientDrag();
+            CancelGradientDrag();
+            CancelImageDrag();
             CancelMarquee();
             _tool = t;
             _hoverIsland = -1;
@@ -672,6 +851,7 @@ namespace Avistry.Textures
         void ApplySelection(List<int> islands, bool add, bool remove)
         {
             Undo.RecordObject(this, "Select pieces");
+            ClearFaceSelection();
             if (!add && !remove) _selection.Clear();
             if (remove) { var gone = new HashSet<int>(islands); _selection.RemoveAll(gone.Contains); }
             else
@@ -687,6 +867,7 @@ namespace Avistry.Textures
         void SetSelection(IEnumerable<int> islands)
         {
             Undo.RecordObject(this, "Select pieces");
+            ClearFaceSelection();
             _selection = islands.Distinct().ToList();
             RebuildSelectionVisuals();
             if (_selection.Count > 0) Learn.Did(LearnEvents.PiecesSelected);
@@ -695,11 +876,34 @@ namespace Avistry.Textures
 
         void RebuildSelectionVisuals()
         {
-            _focusKey = null; // islands may have changed: rebuild the focus overlay on next draw
-            if (_uv == null || _comp == null) { _selSegments = Array.Empty<Vector3>(); return; }
-            var set = new HashSet<int>(_selection);
-            _selSegments = _uv.SegmentsForIslands(set);
+            _highlightedColourPart = VisibleColourPart;
+            _focusKey = null;
+            _canvasSelectionPixelsDirty = _canvasSelectionWireDirty = true;
+            if (_comp == null || _uv == null || HighlightElements.Count == 0)
+            {
+                _selSegments = Array.Empty<Vector3>();
+                if (_selOverlay != null) DestroyImmediate(_selOverlay);
+                _selOverlay = null;
+                if (_uv == null || _comp == null) return;
+            }
+            if (_uv.PoseChanged()) _uv.RefreshPose();
+            BuildSelectionHighlight();
+            SceneView.RepaintAll();
+        }
 
+        bool _canvasSelectionPixelsDirty, _canvasSelectionWireDirty;
+
+        void PrepareCanvasSelection(bool wire)
+        {
+            if (!_canvasSelectionPixelsDirty && (!wire || !_canvasSelectionWireDirty)) return;
+            bool faces = HighlightUsesFaces;
+            var set = new HashSet<int>(HighlightElements);
+            if (wire && _canvasSelectionWireDirty)
+            {
+                _selSegments = faces ? _uv.SegmentsForTriangles(set.Contains) : _uv.SegmentsForIslands(set);
+                _canvasSelectionWireDirty = false;
+            }
+            if (!_canvasSelectionPixelsDirty) return;
             int ow = Mathf.Min(1024, _comp.Width);
             int oh = Mathf.Max(1, Mathf.RoundToInt(_comp.Height * (ow / (float)_comp.Width)));
             if (_selOverlay == null || _selOverlay.width != ow || _selOverlay.height != oh)
@@ -707,49 +911,99 @@ namespace Avistry.Textures
                 if (_selOverlay != null) DestroyImmediate(_selOverlay);
                 _selOverlay = new Texture2D(ow, oh, TextureFormat.RGBA32, false, true) { hideFlags = HideFlags.HideAndDontSave, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
             }
-            _selOverlay.SetPixels32(_uv.SelectionOverlay(ow, oh, set, new Color32(255, 140, 20, 90)));
+            var color = new Color32(255, 140, 20, 90);
+            _selOverlay.SetPixels32(faces ? _uv.FaceSelectionOverlay(ow, oh, set, color) : _uv.SelectionOverlay(ow, oh, set, color));
             _selOverlay.Apply(false);
-
-            if (_uv.PoseChanged()) _uv.RefreshPose(); // re-bake only if the pose moved, so the highlight matches
-            BuildSelectionHighlight();
-            SceneView.RepaintAll();
+            _canvasSelectionPixelsDirty = false;
         }
 
-        static float Pressure(Event e) => e.pointerType == PointerType.Pen && e.pressure > 0 ? e.pressure : 1f;
+        static float Pressure(Event e) => BrushPointerInput.Pressure(e.pointerType, e.pressure);
 
         bool CanPaint(out string why)
         {
             why = null;
-            if (_comp == null) why = Loc.T("Pick a renderer and texture first.");
+            if (WaitingForPreview) why = PreviewWaitText;
+            else if (_comp == null) why = Loc.T("Pick a renderer and texture first.");
             else if (CurrentSlot?.role == TextureRole.Normal) why = Loc.T("Normal maps can't be painted.");
             return why == null;
         }
 
-        /// <summary>Starts a stroke on the active Paint layer (one is created if needed).</summary>
-        void BeginStroke(Vector2 uv, float pressure, int island, MeshUV.SurfaceHit? hit = null)
+        static bool IsInsideTexture(Vector2 uv) => uv.x >= 0f && uv.x <= 1f && uv.y >= 0f && uv.y <= 1f;
+
+        string FillPlacementProblem(Vector2 uv, int hitPiece)
         {
-            if (!CanPaint(out var why)) { Toast(why, MessageType.Warning); return; }
-            if (MaskEditing) { BeginMaskStroke(uv, pressure, island, hit); return; }
+            if (_uv == null) return Loc.T("Fill needs a UV map. Use the brush on this texture, or pick a part with a UV map.");
+            if (!IsInsideTexture(uv)) return Loc.T("This point is outside the open texture. Click a piece inside the texture.");
+            var pieces = _uv.IslandsAtUV(uv);
+            if (hitPiece < 0 && pieces.Count == 0)
+                return Loc.T("Click a piece of the texture to fill it. Empty space between pieces can't be filled.");
+
+            int seedPiece = _comp.ScopedFillSeedPiece(_uv, uv);
+            if (hitPiece >= 0 && seedPiece == hitPiece) return null;
+            if (pieces.Contains(seedPiece))
+                return hitPiece < 0 ? null : Loc.T("Two pieces share this spot. Fill the shared area from the texture view.");
+            return Loc.T("No fill pixel on this piece. Click farther inside or raise Preview size in Advanced Pick settings.");
+        }
+
+        string BeginStroke(Vector2 uv, float pressure, int island, MeshUV.SurfaceHit? hit = null) =>
+            BeginBrushStroke(uv, pressure, island, hit, fromScene: false);
+
+        string BeginBrushStroke(Vector2 uv, float pressure, int island, MeshUV.SurfaceHit? hit, bool fromScene)
+        {
+            if (!CanPaint(out var why)) { Toast(why, MessageType.Warning); return why; }
+            RequestPaintPreparation(fromScene);
+            var active = ActiveLayer;
+            if (ActiveFaceLimitNeedsUpdate(active))
+            {
+                why = Loc.T("This face limit does not match the current UV mesh. Pick new faces or choose Everything.");
+                Toast(why, MessageType.Info, 6f, Loc.T("Pick faces"), () => PickFacesForLayer(active));
+                return why;
+            }
+            PaintFillRegion fill = null;
+            if (_brush.fillTool && PlanFill(uv, island, hit?.triangle ?? -1, out fill) is string problem)
+            {
+                bool pickSelection = FillScope == PaintFillScope.Selection && !HasFaceSelection && !_selection.Exists(IsCurrentPiece);
+                Toast(problem, MessageType.Info, 6f, pickSelection ? FillSelectionAction : Msg.BtnUseBrush,
+                    pickSelection ? (Action)PickFillSelection : () => SetPaintTool(0));
+                return problem;
+            }
+            if (MaskEditing) { BeginMaskStroke(uv, pressure, island, hit, fill, fromScene); return null; }
             if (_brush.mode == BrushMode.Erase)
             {
-                // The eraser only removes paint strokes: don't silently create an empty layer to "erase" on.
                 if (!(ActiveLayer is PaintLayer target))
                 {
-                    Toast(Msg.M14EraserNeedsPaint(), MessageType.Warning, 6f, Msg.BtnUseBrush, () => SetPaintTool(0));
-                    return;
+                    why = Msg.M14EraserNeedsPaint();
+                    Toast(why, MessageType.Warning, 6f, Msg.BtnUseBrush, () => SetPaintTool(0));
+                    return why;
                 }
                 if (target.strokes.Count == 0)
                 {
-                    Toast(Msg.M14EraserNeedsPaint(), MessageType.Info, 4f, Msg.BtnUseBrush, () => SetPaintTool(0));
-                    return;
+                    why = Msg.M14EraserNeedsPaint();
+                    Toast(why, MessageType.Info, 4f, Msg.BtnUseBrush, () => SetPaintTool(0));
+                    return why;
+                }
+                if (!MatchesFaceSelection(target))
+                {
+                    why = Loc.T("Use the selected faces as this layer's limit before erasing.");
+                    Toast(why, MessageType.Info, 5f, Loc.T("Use selection"), () => CaptureSelection(target));
+                    return why;
                 }
             }
             EndStroke();
-            Undo.IncrementCurrentGroup();
-            _strokeUndoGroup = Undo.GetCurrentGroup();
-            ShowEditsIfBeforeOn(); // painting while "Before" is on would look like nothing happens
-            _liveLayer = BlendToolActive ? EnsureBlendLayer() : EnsurePaintLayer();
+            var paint = BlendToolActive ? null : PaintDestination();
+            if (BrushOrFillAddsColour && EmptyLockedPaint(paint))
+            {
+                var recipe = _recipe;
+                var compositor = _comp;
+                why = EmptyPaintLockMessage;
+                Toast(why, MessageType.Info, 7f, Loc.T("Allow new paint"), () => AllowNewPaint(recipe, compositor, paint));
+                return why;
+            }
+            StartStrokeEdit(fromScene, fill != null);
+            _liveLayer = BlendToolActive ? EnsureBlendLayer() : EnsurePaintLayer(paint);
             _liveStroke = _brush.NewStroke(_comp.SourceWidth);
+            CapturePaintUvLimit(_liveStroke);
+            _liveStroke.fillRegion = fill;
             _liveStroke.lockAlpha = _liveLayer.lockTransparent;
             _comp.LiveStroke = _liveStroke;
             _comp.LiveLayerId = _liveLayer.id;
@@ -757,32 +1011,28 @@ namespace Avistry.Textures
             StartMirrorStroke();
             if (_liveStroke.isFill)
             {
-                // Fill: one click, applied straight away (CSP Fill tool).
                 _liveStroke.points.Add(new Vector4(uv.x, uv.y, 1f, 0f));
                 MirrorStrokePoint(uv, 1f, false, island);
                 EndStroke();
-                return;
+                return null;
             }
             AddStrokePoint(uv, pressure, false, island, hit, false);
+            return null;
         }
 
-        /// <summary>
-        /// A stroke on the active layer's mask. Brush = reveal, Eraser = hide, Fill = hide or reveal (its setting).
-        /// Mask strokes store the change from the mask's starting state, so the stroke's mode depends on that state.
-        /// </summary>
-        void BeginMaskStroke(Vector2 uv, float pressure, int island, MeshUV.SurfaceHit? hit = null)
+        void BeginMaskStroke(Vector2 uv, float pressure, int island, MeshUV.SurfaceHit? hit, PaintFillRegion fill, bool fromScene)
         {
             var layer = ActiveLayer;
             EndStroke();
-            Undo.IncrementCurrentGroup();
-            _strokeUndoGroup = Undo.GetCurrentGroup();
-            ShowEditsIfBeforeOn();
-            if (!layer.enabled) { Undo.RecordObject(_recipe, "Show layer"); layer.enabled = true; }
+            StartStrokeEdit(fromScene, fill != null);
+            ShowStrokeLayerImmediately(layer);
             bool reveal = _brush.fillTool ? !_maskFillHides : _brush.mode == BrushMode.Paint;
             _liveMaskLayer = layer;
             _liveStroke = _brush.NewStroke(_comp.SourceWidth);
+            CapturePaintUvLimit(_liveStroke);
+            _liveStroke.fillRegion = fill;
             _liveStroke.mode = reveal == layer.paintMaskStartsHidden ? BrushMode.Paint : BrushMode.Erase;
-            _liveStroke.tool = StrokeTool.Brush; // masks are painted, never blurred
+            _liveStroke.tool = StrokeTool.Brush;
             _liveStroke.color = Color.white;
             _liveStroke.lockAlpha = false;
             _comp.LiveStroke = _liveStroke;
@@ -799,23 +1049,54 @@ namespace Avistry.Textures
             AddStrokePoint(uv, pressure, false, island, hit, false);
         }
 
-        /// <summary>Starts or stops painting on a layer's mask (adds a mask first if it has none).</summary>
         void SetMaskEditing(Layer layer, bool on)
         {
+            if (on && layer != null) BeginMaskEditing(layer, false);
+            else if (_maskEditLayerId != null)
+                ChangeMaskSession("Finish painting layer mask", () => _maskEditLayerId = null);
+        }
+
+        void BeginMaskEditing(Layer layer, bool startHidden)
+        {
+            if (layer is MixedMergeLayer) return;
+            if (_needsRebuild || _recipe == null || !_recipe.layers.Contains(layer) || !CanPaint(out _)) return;
+            if (MaskEditing && _maskEditLayerId == layer.id && _tab == Tab.Paint) return;
+            SetPickForPaint(false);
+            CancelGradientDrag();
+            CancelSceneGradient();
+            CancelImageDrag();
+            var id = layer.id;
+            ChangeMaskSession(layer.hasPaintMask ? "Edit layer mask" : "Add layer mask", () =>
+            {
+                SetTab(Tab.Paint);
+                _activeLayerId = id;
+                _maskEditLayerId = id;
+                if (_brush.gradientTool || _brush.blendTool) SetPaintTool(0);
+                if (!layer.hasPaintMask) AddPaintMask(layer, startHidden);
+            });
+            Toast(Msg.M12MaskPainting(layer.name), MessageType.Info, 5f, Msg.BtnDone, () =>
+            {
+                if (MaskEditing && _maskEditLayerId == id) SetMaskEditing(null, false);
+            });
+        }
+
+        void ChangeMaskSession(string action, Action change)
+        {
             EndStroke();
-            if (!on || layer == null) { _maskEditLayerId = null; Repaint(); SceneView.RepaintAll(); return; }
-            if (!layer.hasPaintMask) AddPaintMask(layer, false);
-            _activeLayerId = layer.id;
-            _maskEditLayerId = layer.id;
-            if (_brush.gradientTool) SetPaintTool(0); // gradients aren't drawn on masks
-            if (_tool != Tool.Paint) SetTab(Tab.Paint);
-            Toast(Msg.M12MaskPainting(layer.name), MessageType.Info, 5f, Msg.BtnDone, () => SetMaskEditing(null, false));
+            Undo.FlushUndoRecordObjects();
+            Undo.IncrementCurrentGroup();
+            Undo.SetCurrentGroupName(action);
+            Undo.RecordObject(this, action);
+            change();
+            Undo.FlushUndoRecordObjects();
+            Undo.IncrementCurrentGroup();
             Repaint();
             SceneView.RepaintAll();
         }
 
         void AddPaintMask(Layer layer, bool startHidden)
         {
+            if (layer is MixedMergeLayer) return;
             Undo.RecordObject(_recipe, "Add layer mask");
             layer.hasPaintMask = true;
             layer.paintMaskStartsHidden = startHidden;
@@ -827,20 +1108,24 @@ namespace Avistry.Textures
         void InvertPaintMask(Layer layer)
         {
             Undo.RecordObject(_recipe, "Invert layer mask");
-            layer.paintMaskStartsHidden = !layer.paintMaskStartsHidden; // stored strokes are relative, so this inverts it
+            layer.paintMaskStartsHidden = !layer.paintMaskStartsHidden;
             MarkEdited();
             Learn.Did(LearnEvents.MaskMade);
         }
 
         void DeletePaintMask(Layer layer)
         {
-            EndStroke();
-            Undo.RecordObject(_recipe, "Delete layer mask");
-            layer.hasPaintMask = false;
-            layer.paintMaskStartsHidden = false;
-            layer.maskStrokes = new List<PaintStroke>();
-            if (_maskEditLayerId == layer.id) _maskEditLayerId = null;
-            MarkEdited();
+            if (_needsRebuild || layer == null || !layer.hasPaintMask || _recipe == null || !_recipe.layers.Contains(layer)) return;
+            const string action = "Delete layer mask";
+            ChangeMaskSession(action, () =>
+            {
+                Undo.RecordObject(_recipe, action);
+                layer.hasPaintMask = false;
+                layer.paintMaskStartsHidden = false;
+                layer.maskStrokes = new List<PaintStroke>();
+                if (_maskEditLayerId == layer.id) _maskEditLayerId = null;
+                MarkEdited();
+            });
         }
 
         void SetClipToBelow(Layer layer, bool on)
@@ -851,26 +1136,20 @@ namespace Avistry.Textures
             if (on) Learn.Did(LearnEvents.LayerClip);
         }
 
-        /// <param name="joined">False starts a new run (no dabs between this and the previous point).</param>
         void AddStrokePoint(Vector2 uv, float pressure, bool joined, int island, MeshUV.SurfaceHit? hit = null, bool surfJoined = true)
         {
             if (_liveStroke == null) return;
             if (_liveStroke.surface)
             {
-                if (hit == null) return; // a 3D stroke only takes points from the model
+                if (hit == null) return;
                 var h = hit.Value;
                 _liveStroke.surf.Add(new Vector4(h.triangle, h.bary.y, h.bary.z, (surfJoined ? 1 : 0) + (h.backFace ? 2 : 0)));
             }
             _liveStroke.points.Add(new Vector4(uv.x, uv.y, pressure, joined ? 1 : 0));
-            if (_liveStroke.clip && _uv != null)
-            {
-                // Islands touched by the brush centre (plus anything overlapping them in UV, e.g. mirrored parts).
-                if (island >= 0 && !_liveStroke.clipIslands.Contains(island)) _liveStroke.clipIslands.Add(island);
-                foreach (int i in _uv.IslandsAtUV(uv))
-                    if (!_liveStroke.clipIslands.Contains(i)) _liveStroke.clipIslands.Add(i);
-            }
-            MirrorStrokePoint(uv, pressure, joined, island, surfJoined, hit.HasValue && hit.Value.backFace);
-            // Scene-view strokes may not get an OnGUI: coalesce to one compose per editor update (EndStroke composes the final state).
+            RecordPenAngle(_liveStroke, hit);
+            AddBrushClipPieces(_liveStroke, _liveStroke.clipIslands, uv, island, pressure,
+                hit?.triangle ?? -1, hit?.bary ?? default);
+            MirrorStrokePoint(uv, pressure, joined, island, surfJoined, hit.HasValue && hit.Value.backFace, hit);
             _dirty = true;
             if (!_strokeFlushQueued)
             {
@@ -887,6 +1166,13 @@ namespace Avistry.Textures
         void EndStroke()
         {
             if (_liveStroke == null) return;
+            bool sceneDraft = _sceneStrokeDraft != null;
+            if (sceneDraft && !BeginSceneStrokeCommit(_sceneStrokeDraft, _liveMaskLayer ?? (Layer)_liveLayer))
+            {
+                CancelStroke();
+                if (_dirty && !_needsRebuild) ComposeNow();
+                return;
+            }
             var s = _liveStroke;
             var layer = _liveLayer;
             var maskLayer = _liveMaskLayer;
@@ -896,30 +1182,29 @@ namespace Avistry.Textures
             {
                 if (s.points.Count > 0 && _recipe.layers.Contains(maskLayer))
                 {
-                    Undo.RecordObject(_recipe, "Paint layer mask");
+                    string undoName = s.isFill ? "Fill layer mask" : "Paint layer mask";
+                    Undo.RecordObject(_recipe, undoName);
                     maskLayer.maskStrokes.Add(s);
                     AddMirror(maskLayer.maskStrokes, s, mirror);
-                    Undo.SetCurrentGroupName("Paint layer mask");
-                    Undo.CollapseUndoOperations(_strokeUndoGroup);
-                    RecordHistory();
+                    Undo.SetCurrentGroupName(undoName);
+                    RecordHistory(_strokeUndoGroup);
+                    if (!sceneDraft) Undo.CollapseUndoOperations(_strokeUndoGroup);
                     _unsaved = true;
                     _savedBlockVisible = false;
                     Learn.Did(LearnEvents.MaskMade);
                     if (s.clip && s.clipIslands.Count == 0)
                         Toast(Msg.M13EmptySpaceStroke(), MessageType.Warning, 6f, Msg.BtnPaintAnywhere, PaintAnywhere);
                 }
-                ComposeNow();
-                return;
             }
-            if (layer != null && s.points.Count > 0 && _recipe.layers.Contains(layer))
+            else if (layer != null && s.points.Count > 0 && _recipe.layers.Contains(layer))
             {
-                string undoName = s.mode == BrushMode.Erase ? "Erase stroke" : s.tool == StrokeTool.Blur ? "Blur stroke" : s.tool == StrokeTool.Smudge ? "Smudge stroke" : "Paint stroke"; // (the colour mixing brush counts as painting)
+                string undoName = s.isFill ? "Fill" : s.mode == BrushMode.Erase ? "Erase stroke" : s.tool == StrokeTool.Blur ? "Blur stroke" : s.tool == StrokeTool.Smudge ? "Smudge stroke" : "Paint stroke";
                 Undo.RecordObject(_recipe, undoName);
                 layer.strokes.Add(s);
                 AddMirror(layer.strokes, s, mirror);
                 Undo.SetCurrentGroupName(undoName);
-                Undo.CollapseUndoOperations(_strokeUndoGroup);
-                RecordHistory();
+                RecordHistory(_strokeUndoGroup);
+                if (!sceneDraft) Undo.CollapseUndoOperations(_strokeUndoGroup);
                 if (s.mode == BrushMode.Paint && (!s.IsBlend || s.tool == StrokeTool.Mix)) RememberColour(s.color);
                 _unsaved = true;
                 _savedBlockVisible = false;
@@ -927,21 +1212,17 @@ namespace Avistry.Textures
                 if (s.IsSurface) Learn.Did(LearnEvents.SeamSmoothStroke);
                 ExplainIfNothingVisible(s, layer);
             }
+            if (sceneDraft)
+            {
+                Undo.FlushUndoRecordObjects();
+                Undo.IncrementCurrentGroup();
+            }
             ComposeNow();
         }
 
-        /// <summary>
-        /// Dead-end prevention: if a stroke can't have changed anything visible, say why and offer the fix
-        /// instead of leaving the user wondering why nothing happened.
-        /// </summary>
         void ExplainIfNothingVisible(PaintStroke s, PaintLayer layer)
         {
             if (s.mode != BrushMode.Paint || _uv == null) return;
-            if (s.isFill && s.points.Count > 0 && _uv.IslandsAtUV(new Vector2(s.points[0].x, s.points[0].y)).Count == 0)
-            {
-                Toast(Msg.M13EmptySpaceStroke(), MessageType.Warning, 6f);
-                return;
-            }
             if (s.clip && s.clipIslands.Count == 0)
             {
                 Toast(Msg.M13EmptySpaceStroke(), MessageType.Warning, 7f, Msg.BtnPaintAnywhere, PaintAnywhere);
@@ -952,6 +1233,7 @@ namespace Avistry.Textures
                 Toast(Msg.M15ZeroOpacity(layer.name), MessageType.Warning, 7f, Msg.BtnSet100, () => SetOpacity100(layer));
                 return;
             }
+            if (s.isFill && s.fillRegion != null) return;
             if (layer.maskMode == MaskMode.SelectedIslands)
             {
                 var touched = s.clip ? new HashSet<int>(s.clipIslands) : IslandsUnderStroke(s);
@@ -986,39 +1268,97 @@ namespace Avistry.Textures
 
         void CancelStroke()
         {
+            if (_sceneStrokeDraft != null)
+            {
+                _sceneStrokeDraft = null;
+                _dirty = true;
+            }
             _liveStroke = null;
             _liveLayer = null;
             _liveMaskLayer = null;
             _liveMirror = null;
-            if (_comp != null) { _comp.LiveStroke = null; _comp.LiveMirror = null; }
+            _advancedMirrorRuns = null;
+            if (_comp != null)
+            {
+                _comp.LiveStroke = null;
+                _comp.LiveMirror = null;
+                _comp.InvalidateLivePrefix();
+                _comp.InvalidateLiveStrokeCoverage();
+            }
         }
 
-        /// <summary>
-        /// Blur / Smudge need a Normal Paint layer (their result is "what you see, softened", laid on top). Use the selected
-        /// one if it fits, otherwise add a "Blending" layer above it.
-        /// </summary>
         PaintLayer EnsureBlendLayer()
         {
-            if (ActiveLayer is PaintLayer p && p.blend == BlendMode.Normal)
+            if (ActiveLayer is PaintLayer p && p.blend == BlendMode.Normal && !p.HasActiveAdditionalBlends && MatchesFaceSelection(p))
             {
-                if (!p.enabled) { Undo.RecordObject(_recipe, "Show layer"); p.enabled = true; }
+                ShowStrokeLayerImmediately(p);
                 return p;
             }
             var layer = new PaintLayer { name = "Blending" };
-            InsertLayer(layer, "Add blending layer");
-            Toast(Loc.T("Added a “Blending” layer for blur and smudge, so the original stays untouched. Hide or delete it to undo the blending."), MessageType.Info, 5f);
+            if (_sceneStrokeDraft != null) StageScenePaintLayer(layer, captureSelection: true, blending: true);
+            else
+            {
+                InsertLayer(layer, "Add blending layer");
+                ExplainNewBlendLayer();
+            }
             return layer;
         }
 
-        PaintLayer EnsurePaintLayer()
+        void ExplainNewBlendLayer() =>
+            Toast(Loc.T("Added a “Blending” layer for blur and smudge, so the original stays untouched. Hide or delete it to undo the blending."), MessageType.Info, 5f);
+
+        void ShowStrokeLayerImmediately(Layer layer)
         {
-            if (ActiveLayer is PaintLayer p)
+            if (_sceneStrokeDraft != null || layer.enabled) return;
+            Undo.RecordObject(_recipe, "Show layer");
+            layer.enabled = true;
+        }
+
+        PaintLayer PaintDestination()
+        {
+            if (_brush.fillTool) return FillDestination() as PaintLayer;
+            return ActiveLayer is PaintLayer paint && MatchesFaceSelection(paint) ? paint : null;
+        }
+
+        bool BrushOrFillAddsColour => !MaskEditing && !BlendToolActive && !GradientToolActive && _brush.mode == BrushMode.Paint;
+
+        static bool EmptyLockedPaint(PaintLayer paint) => paint?.lockTransparent == true &&
+            !paint.strokes.Exists(stroke => stroke != null && stroke.mode == BrushMode.Paint && !stroke.lockAlpha);
+
+        PaintLayer EmptyLockedPaintDestination => CanvasPainting && !_needsRebuild && CanPaint(out _) && BrushOrFillAddsColour &&
+            PaintDestination() is PaintLayer paint && EmptyLockedPaint(paint) ? paint : null;
+
+        static string EmptyPaintLockMessage => Loc.T("No paint on this layer to recolour.");
+
+        void AllowNewPaint(TextureRecipe recipe, Compositor compositor, PaintLayer paint)
+        {
+            if (recipe != _recipe || compositor != _comp || paint == null || paint != EmptyLockedPaintDestination) return;
+            Undo.FlushUndoRecordObjects();
+            Undo.IncrementCurrentGroup();
+            int group = Undo.GetCurrentGroup();
+            string action = Loc.T("Allow new paint");
+            Undo.SetCurrentGroupName(action);
+            Undo.RecordObject(recipe, action);
+            paint.lockTransparent = false;
+            RefreshEditedRecipe(affectsImage: false);
+            RecordHistory(group);
+            Undo.FlushUndoRecordObjects();
+            Undo.IncrementCurrentGroup();
+            if (_toastText == EmptyPaintLockMessage) _toastUntil = 0d;
+            SceneView.RepaintAll();
+        }
+
+        PaintLayer EnsurePaintLayer(PaintLayer paint)
+        {
+            if (paint != null)
             {
-                if (!p.enabled) { Undo.RecordObject(_recipe, "Show layer"); p.enabled = true; }
-                return p;
+                ShowStrokeLayerImmediately(paint);
+                return paint;
             }
             var layer = new PaintLayer();
-            InsertLayer(layer, "Add paint layer");
+            bool captureSelection = !_brush.fillTool || FillScope != PaintFillScope.WholeTexture;
+            if (_sceneStrokeDraft != null) StageScenePaintLayer(layer, captureSelection, blending: false);
+            else InsertLayer(layer, "Add paint layer", captureSelection);
             return layer;
         }
 
@@ -1030,33 +1370,67 @@ namespace Avistry.Textures
             if (_recentColors.Count > 10) _recentColors.RemoveRange(10, _recentColors.Count - 10);
         }
 
-        /// <summary>Adds a layer above the active one (or on top). It takes the current island selection as its mask.</summary>
-        void InsertLayer(Layer layer, string undoName = "Add layer")
+        void InsertLayer(Layer layer, string undoName = "Add layer", bool captureSelection = true, int? insertionIndex = null)
         {
             Undo.RecordObject(_recipe, undoName);
             Undo.RecordObject(this, undoName);
-            if (_selection.Count > 0)
-            {
-                layer.maskMode = MaskMode.SelectedIslands;
-                layer.islands = new List<int>(_selection);
-            }
-            int idx = ActiveIndex;
-            if (idx < 0) _recipe.layers.Add(layer);
-            else _recipe.layers.Insert(idx + 1, layer);
+            if (captureSelection) CaptureInsertedLayerSelection(layer);
+            int index = LayerInsertionIndex(insertionIndex);
+            InheritLayerGroupAtInsertion(layer, index);
+            _recipe.layers.Insert(index, layer);
             _activeLayerId = layer.id;
-            if (!(layer is PaintLayer)) _openLayerSettings = true; // a new adjustment layer shows its controls
+            if (!(layer is PaintLayer)) _openLayerSettings = true;
             MarkEdited();
             Learn.Did(LearnEvents.LayerAdded);
             Learn.Did(LearnEvents.LayerAddedOf(layer.GetType().Name));
-            Repaint(); // may be called from a GenericMenu callback, outside OnGUI
+            Repaint();
+        }
+
+        void CaptureInsertedLayerSelection(Layer layer)
+        {
+            if (CaptureFaceSelection(layer) || _selection.Count == 0) return;
+            layer.maskMode = MaskMode.SelectedIslands;
+            layer.islands = new List<int>(_selection);
+        }
+
+        int LayerInsertionIndex(int? insertionIndex)
+        {
+            int active = ActiveIndex;
+            int index = insertionIndex ?? (active < 0 ? _recipe.layers.Count : active + 1);
+            return index == 0 && _recipe.layers.Count > 0 && _recipe.layers[0] is MixedMergeLayer ? 1 : index;
+        }
+
+        void InheritLayerGroupAtInsertion(Layer layer, int index)
+        {
+            if (index > 0 && index < _recipe.layers.Count && SameLayerGroup(_recipe.layers[index - 1], _recipe.layers[index]))
+                CopyLayerGroup(_recipe.layers[index - 1], layer);
+        }
+
+        bool CanMoveLayer(int i, int dir)
+        {
+            int j = i + dir;
+            var layers = _recipe?.layers;
+            if (layers == null || i < 0 || i >= layers.Count || j < 0 || j >= layers.Count || layers[i] == null || layers[i] is MixedMergeLayer)
+                return false;
+            return dir > 0 || !(layers[0] is MixedMergeLayer) || j != 0 && (SameLayerGroup(layers[i], layers[j]) || LayerGroupBounds(layers, j).first > 0);
         }
 
         void MoveLayer(int i, int dir)
         {
+            if (!CanMoveLayer(i, dir)) return;
             int j = i + dir;
-            if (i < 0 || j < 0 || j >= _recipe.layers.Count) return;
+            var layers = _recipe.layers;
             Undo.RecordObject(_recipe, "Move layer");
-            (_recipe.layers[i], _recipe.layers[j]) = (_recipe.layers[j], _recipe.layers[i]);
+            var layer = layers[i];
+            var adjacent = layers[j];
+            if (SameLayerGroup(layer, adjacent)) (layers[i], layers[j]) = (adjacent, layer);
+            else
+            {
+                var (first, last) = LayerGroupBounds(layers, j);
+                CopyLayerGroup(null, layer);
+                layers.RemoveAt(i);
+                layers.Insert(dir > 0 ? last : first, layer);
+            }
             MarkEdited();
         }
 
@@ -1075,7 +1449,8 @@ namespace Avistry.Textures
         void DuplicateLayer(int i)
         {
             if (i < 0 || i >= _recipe.layers.Count) return;
-            var copy = Instantiate(_recipe); // deep copy through Unity serialisation (keeps gradients and strokes)
+            if (_recipe.layers[i] is MixedMergeLayer) return;
+            var copy = Instantiate(_recipe);
             var dup = copy.layers[i];
             DestroyImmediate(copy);
             dup.id = Guid.NewGuid().ToString("N");
@@ -1087,27 +1462,29 @@ namespace Avistry.Textures
             MarkEdited();
         }
 
-        /// <summary>Adds a preset's layers (bottom first) above the selected layer as one undo step.</summary>
         void ApplyLayerPreset(List<Layer> layers, string name)
         {
             if (layers == null || layers.Count == 0) return;
+            if (_needsRebuild) { ShowLookTargetChanged(); return; }
+            if (!CanPaint(out var problem)) { Toast(problem, MessageType.Info); return; }
+            int omitted = layers.Count;
+            int released = LayerPresets.PrepareForApply(layers);
+            omitted -= layers.Count;
+            if (layers.Count == 0) { Toast(Loc.T("This template has no reusable layers."), MessageType.Info); return; }
+            if (layers.Any(l => l is ColourMatchLayer) && !CanAddColourMatchLayer(out var why)) { ShowColourMatchBlocked(why); return; }
             EndStroke();
-            Undo.IncrementCurrentGroup();
-            int group = Undo.GetCurrentGroup();
-            foreach (var l in layers) InsertLayer(l, "Add preset");
-            Undo.SetCurrentGroupName("Add preset " + name);
-            Undo.CollapseUndoOperations(group);
-            Toast(Loc.F("Added the “{0}” look ({1} layer{2})", name, layers.Count, layers.Count == 1 ? "" : "s") +
-                  (_selection.Count > 0 ? Loc.F(", limited to the {0} selected piece(s).", _selection.Count) : Loc.T(". Tweak it in the layer settings below.")),
-                MessageType.Info, 4f);
+            AddPreparedTemplate(PrepareTemplatePlacement(layers, released, omitted), name);
         }
 
-        void CaptureSelection(Layer layer)
+        void CaptureSelection(Layer layer) => CaptureLayerLimitSelection(layer, HasFaceSelection,
+            !HasFaceSelection && LayerLimitExcludesSelection(layer));
+
+        void CaptureLayerLimitSelection(Layer layer, bool faces, bool invert)
         {
-            Undo.RecordObject(_recipe, "Set layer mask");
-            layer.maskMode = MaskMode.SelectedIslands;
-            layer.islands = new List<int>(_selection);
-            MarkEdited();
+            if (layer is MixedMergeLayer) { Toast(Loc.T("Separate the merged layer to change its original settings."), MessageType.Info, 4f); return; }
+            var mode = faces ? MaskMode.SelectedFaces : MaskMode.SelectedIslands;
+            if (TryPlanLayerLimit(layer, mode, invert, true, out var apply))
+                CommitLayerLimit(layer, apply, "Set layer mask");
         }
 
         void ClearPaint(PaintLayer layer)
@@ -1117,7 +1494,6 @@ namespace Avistry.Textures
             MarkEdited();
         }
 
-        /// <summary>Opening a saved edit replaces the layer stack: ask first if there are unbaked layers.</summary>
         bool ConfirmReplaceLayers(TextureRecipe source)
         {
             if (_recipe == null || _recipe.layers.Count == 0 || !_unsaved) return true;
@@ -1126,23 +1502,44 @@ namespace Avistry.Textures
                 Msg.BtnReplace, Msg.BtnCancel, null) == 0;
         }
 
-        void LoadRecipe(TextureRecipe source)
+        void LoadRecipe(TextureRecipe source, bool asCopy = false) => LoadRecipeLayers(source, asCopy);
+
+        void LoadRecipeLayers(TextureRecipe source, bool asCopy, int? pausedDraftLayers = null, bool verifiedIncludedLayout = false)
         {
+            if (source.includedLayout != null && !verifiedIncludedLayout)
+            {
+                ShowIncludedEditMismatch();
+                return;
+            }
+            CancelGradientDrag();
+            CancelImageDrag();
+            CancelSceneGradient();
             EndStroke();
+            Undo.RecordObject(this, "Load saved edit");
             Undo.RecordObject(_recipe, "Load saved edit");
             var copy = Instantiate(source);
             _recipe.layers = copy.layers;
             DestroyImmediate(copy);
-            foreach (var l in _recipe.layers) if (l != null) l.id = Guid.NewGuid().ToString("N");
-            _activeLayerId = _recipe.layers.LastOrDefault()?.id;
+            foreach (var layer in _recipe.layers)
+            {
+                if (layer == null) continue;
+                layer.id = Guid.NewGuid().ToString("N");
+                if (pausedDraftLayers.HasValue && NeedsVerifiedDraftLayout(layer)) layer.enabled = false;
+            }
+            var active = pausedDraftLayers.HasValue ? _recipe.layers.LastOrDefault(layer => layer?.enabled == true) :
+                _recipe.layers.LastOrDefault();
+            _activeLayerId = active?.id;
             MarkEdited();
-            _unsaved = false; // it's already saved on disk
-            Toast(Loc.F("Opened saved edit “{0}” ({1} layer{2}).", source.name, _recipe.layers.Count, (_recipe.layers.Count == 1 ? "" : "s")), MessageType.Info, 4f);
-            if (_tab == Tab.Target) SetTab(Tab.Paint); // where the layers are
+            _unsaved = asCopy;
+            string message = pausedDraftLayers > 0
+                ? Loc.F("Opened draft “{0}”. Layers with unverified UV layouts are paused ({1}).",
+                    ProjectDraftName(AssetDatabase.GetAssetPath(source)), pausedDraftLayers)
+                : Loc.F("Opened saved edit “{0}” ({1} layer{2}).", source.name, _recipe.layers.Count, _recipe.layers.Count == 1 ? "" : "s");
+            Toast(message, MessageType.Info, pausedDraftLayers > 0 ? 7f : 4f);
+            if (_tab == Tab.Target) SetTab(Tab.Paint);
             Learn.Did(LearnEvents.EditReopened);
         }
 
-        /// <summary>Plain-language description of what Save/Bake will write, with the predicted file names.</summary>
         string BakeSummary(TextureSlot slot)
         {
             var p = Exporter.PredictPaths(slot, _material, _outputMode);
@@ -1178,62 +1575,6 @@ namespace Avistry.Textures
                                                           : Loc.T("\n\nYour original texture is not changed. Ctrl+Z puts the material back."));
         }
 
-        void Bake()
-        {
-            EndStroke();
-            var slot = CurrentSlot;
-            if (slot == null || _material == null) return;
-            // M3 is the standard wording; it only fits the default copy-the-material save at 2048 px with nothing else to say.
-            bool plain = _outputMode == OutputMode.DuplicateMaterial && _alsoUsers.Count == 0 && SharedMaterialNote() == null && (_comp?.SourceWidth ?? 0) == 2048;
-            string body = plain ? Msg.M3BakeConfirm(System.IO.Path.GetFileNameWithoutExtension(Exporter.PredictPaths(slot, _material, _outputMode).pngPath)) : BakeSummary(slot);
-            if (!StudioDialog.Ask(Loc.T("Save your edit"), body, Msg.BtnSave, Msg.BtnCancel)) return;
 
-            _preview.Clear();
-            _saving = true;
-            try
-            {
-                var res = Exporter.Bake(slot, _material, _users, _recipe, _uv, _outputMode, _dither, _alsoUsers,
-                    (step, f) => EditorUtility.DisplayCancelableProgressBar(Loc.T("Avistry"), $"{step} ({slot.texture.name})", f));
-                if (res.pngPath == null)
-                {
-                    Toast(Loc.T("Save cancelled. Nothing was written."), MessageType.Info, 4f);
-                    return;
-                }
-                _lastBakePng = res.pngPath;
-                _lastBakeMaterial = res.materialPath;
-                _lastBakeRecipe = res.recipePath;
-                _lastBakeClearedLayers = _outputMode != OutputMode.PngOnly;
-                _unsaved = false;
-                _savedBlockVisible = true;
-                Learn.Did(LearnEvents.SaveDone);
-                EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<Texture2D>(res.pngPath));
-                if (_lastBakeClearedLayers)
-                {
-                    // The edit now lives in the new texture: start a fresh stack on top of it.
-                    Undo.RecordObject(_recipe, "Bake");
-                    ClearHistory(); // the edit now lives in the new texture
-                    _recipe.layers.Clear();
-                    _activeLayerId = null;
-                }
-                _tab = Tab.Save;
-                string saved = Msg.M1Saved(System.IO.Path.GetFileNameWithoutExtension(res.pngPath), _outputMode == OutputMode.PngOnly);
-                if (res.paddingWarning != null) saved += "\n" + res.paddingWarning;
-                string pngPath = res.pngPath;
-                Toast(saved, MessageType.Info, 5f, Msg.BtnShowFile, () => ShowFileAndLearn(pngPath));
-            }
-            catch (Exception e)
-            {
-                _lastBakePng = null;
-                EditorUtility.ClearProgressBar(); // not behind the error dialog
-                ShowErrorDialog(Msg.M2SaveFailed(), e);
-            }
-            finally
-            {
-                _saving = false;
-                EditorUtility.ClearProgressBar();
-                _needsRebuild = true;
-                Repaint();
-            }
-        }
     }
 }

@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Avistry glossary: Unity words in plain language</title>
-<meta name="description" content="41 words from Unity, textures and VRChat avatars, explained in plain language, with where to find each one in Unity." data-i18n-attr="content:gl.meta.description">
+<meta name="description" content="Find Unity and VRChat terms, examples and the settings to try in your avatar project." data-i18n-attr="content:gl.meta.description">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#141218">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Avistry glossary: Unity words in plain language">
 <meta property="og:url" content="https://avistry.github.io/avistry/glossary.html">
-<meta property="og:image" content="https://avistry.github.io/avistry/media/og-glossary.jpg">
+<meta property="og:image" content="https://avistry.github.io/avistry/media/og-glossary.jpg?v=030-learning-1">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:alt" content="The Avistry glossary: Unity words in plain language.">
 <meta property="og:site_name" content="Avistry">
-<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-glossary.jpg">
+<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-glossary.jpg?v=030-learning-1">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://avistry.github.io/avistry/glossary.html">
 <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
@@ -32,8 +32,6 @@
   try {
     var theme = localStorage.getItem('ats-theme');
     root.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
-    /* Performance mode by itself: on weak devices, with data saver, or after this tab crashed or ran short of memory
-       (app.js keeps ats-alive set while the page is on screen); never just for being a phone on strong hardware */
     var perf = localStorage.getItem('ats-perf'), nav = navigator, mem = nav.deviceMemory, cores = nav.hardwareConcurrency, con = nav.connection || {};
     var ss = sessionStorage, sick = ss.getItem('ats-sick') === '1' || ss.getItem('ats-alive') === '1';
     if (sick) ss.setItem('ats-sick', '1');
@@ -62,7 +60,8 @@
 })();
 </script>
 <style>html{background:#141218}html[data-theme="light"]{background:#F3F1F6}html.i18n-wait body{visibility:hidden}</style>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=030-paper-3">
+<link rel="stylesheet" href="learn.css?v=030-workshop-1">
 </head>
 <body class="v4 sub-page page-learn">
 
@@ -149,17 +148,20 @@
 
 <main id="main">
   <section class="stage surface-dark pg-hero" id="top">
-    <span class="stk stk-corner" data-stk="my_uvs" aria-hidden="true"></span>
     <div class="wrap pg-hero-in">
-      <h1 class="h-display" data-i18n="gl.title" data-emo="e_avistry_think">Unity words, in plain language.</h1>
-      <p class="sub" data-i18n="gl.lead">Every word Avistry uses, and where to find it in Unity. Also in the tool under ? Help.</p>
+      <div class="sticker-heading">
+        <h1 class="h-display" data-i18n="gl.title" data-emo="e_avistry_think">Unity words, in plain language.</h1>
+        <span class="stk stk-placed" data-stk="my_uvs" aria-hidden="true"></span>
+      </div>
+      <p class="sub" data-i18n="gl.lead">Look up a term, see where it lives in Unity, then try it on your avatar.</p>
       <div class="pg-tools">
         <label class="pg-search"><span class="sr-only" data-i18n="gl.search.label">Search the glossary</span>
           <input type="search" id="gl-search" autocomplete="off" spellcheck="false" placeholder="Search, for example mipmap" data-i18n-attr="placeholder:gl.search.ph">
         </label>
+        <label class="topic-select"><span class="sr-only" data-i18n="sk.chapters">Chapters</span><select id="gl-topic"><option value="" data-i18n="gl.any">All chapters</option></select></label>
         <div class="ps-views" role="group" aria-label="Order" data-i18n-attr="aria-label:gl.order">
           <button type="button" class="ps-btn" id="gl-az" aria-pressed="true" data-i18n="gl.az">A to Z</button>
-          <button type="button" class="ps-btn" id="gl-tier" aria-pressed="false" data-i18n="gl.bytier">By tier</button>
+          <button type="button" class="ps-btn" id="gl-tier" aria-pressed="false" data-i18n="gl.bytier">By chapter</button>
         </div>
       </div>
       <p class="pg-count" id="gl-count" role="status" aria-live="polite"></p>
@@ -168,9 +170,9 @@
 
   <section class="sec">
     <div class="wrap">
-      <p class="pg-note" id="gl-note" hidden data-i18n="gl.note.en">The glossary text is only written in English so far. The page around it is translated.</p>
+      <p class="pg-note" id="gl-note" hidden data-i18n="gl.note.en">The English edition is shown while this language is unavailable.</p>
       <div class="gl-list" id="gl-list" aria-label="Glossary" data-i18n-attr="aria-label:gl.list">
-        <noscript><p data-i18n="gl.nojs">This page needs JavaScript to show the glossary. The same words are in the tool under Help.</p></noscript>
+        <noscript><p data-i18n="gl.nojs">Open Tools → Avistry → Glossary in Unity to read these entries offline.</p></noscript>
       </div>
       <p class="pg-empty" id="gl-empty" hidden data-i18n="gl.empty">No word matches. Try a shorter search.</p>
       <div class="pg-cta">
@@ -183,7 +185,10 @@
 
 <section class="sec next-up" data-next="about,download" aria-labelledby="next-title">
   <div class="wrap">
-    <h2 class="next-h" id="next-title"><span data-i18n="next.title">Keep going</span><i class="emo" data-emo="ship_it_go" aria-hidden="true"></i></h2>
+    <div class="sticker-heading">
+      <h2 class="next-h" id="next-title"><span data-i18n="next.title">Keep going</span><i class="emo" data-emo="ship_it_go" aria-hidden="true"></i></h2>
+      <span class="stk stk-placed" data-stk="need_help" data-stk-pool="need_help ship_it" aria-hidden="true"></span>
+    </div>
     <div class="next-grid"></div>
   </div>
 </section>
@@ -231,9 +236,10 @@
 
 <p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
 
-<script src="tour.js" defer></script>
-<script src="paint.js" defer></script>
-<script src="app.js" defer></script>
-<script src="learn.js" defer></script>
+<script src="tour.js?v=030-paper-3" defer></script>
+<script src="ink-effects.js?v=030-paper-3" defer></script>
+<script src="paint.js?v=030-paper-3" defer></script>
+<script src="app.js?v=030-learning-1" defer></script>
+<script src="learn.js?v=030-workshop-1" defer></script>
 </body>
 </html>

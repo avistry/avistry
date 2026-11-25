@@ -7,10 +7,6 @@ using UnityEngine.Rendering;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Mask builder: finds the mask slots a material's shader offers that have no texture yet (emission mask, rim mask,
-    /// matcap mask…), and creates a correctly set-up mask texture for one so it can be painted in the tool.
-    /// </summary>
     public static class MaskBuilder
     {
         public const string Tag = "AvatarTextureStudio:mask";
@@ -19,15 +15,14 @@ namespace Avistry.Textures
         {
             public string property;
             public string displayName;
-            public string channelInfo;     // e.g. "R matcap · G rim · B emission"
-            public string featureToggle;   // the property that switches the feature on
-            public bool featureOff;        // the feature is off, so the mask won't show until it's switched on
-            public bool known;             // a mask this tool has a plain name for
-            public bool startsWhite;       // the shader treats "no texture" as white (effect everywhere)
+            public string channelInfo;
+            public string featureToggle;
+            public bool featureOff;
+            public bool known;
+            public bool startsWhite;
             public int uvChannel;
         }
 
-        /// <summary>Mask slots without a texture. Masks of features that are switched on come first.</summary>
         public static List<EmptySlot> EmptySlots(Material mat)
         {
             var result = new List<EmptySlot>();
@@ -42,7 +37,7 @@ namespace Avistry.Textures
                 if ((shader.GetPropertyFlags(i) & (ShaderPropertyFlags.HideInInspector | ShaderPropertyFlags.PerRendererData)) != 0) continue;
                 string name = shader.GetPropertyName(i);
                 if (!mat.HasProperty(name) || mat.GetTexture(name) != null) continue;
-                if (family == ShaderFamily.Poiyomi && (name.Contains("Set_") || name == "_MetallicGlossMap" || name == "_SmoothnessTex")) continue; // fallback-shader leftovers
+                if (family == ShaderFamily.Poiyomi && (name.Contains("Set_") || name == "_MetallicGlossMap" || name == "_SmoothnessTex")) continue;
                 if (ShaderProfiles.IsLookupTable(shader, i, name)) continue;
                 if (TargetResolver.RoleOf(shader, i, name, family) != TextureRole.Mask) continue;
                 bool known = ShaderProfiles.HasFriendlyName(name);
@@ -70,58 +65,82 @@ namespace Avistry.Textures
                 .ToList();
         }
 
-        /// <summary>
-        /// Creates the mask PNG next to the reference texture and assigns it to the material. Filled with the shader's
-        /// "no texture" value (so nothing looks different yet), or white on the given islands and black elsewhere.
-        /// </summary>
         public static Texture2D Create(Material mat, EmptySlot slot, Texture reference, MeshUV uv, ICollection<int> onlyIslands)
+            => Create(mat, slot, reference, uv, onlyIslands, null, null, out _);
+
+        internal static Texture2D Create(Material mat, EmptySlot slot, Texture reference, MeshUV uv, ICollection<int> onlyIslands,
+            System.Func<bool> canAssign, System.Action beginAssignment, out bool assigned)
         {
+            assigned = false;
             if (mat == null || slot == null) return null;
+            var size = Dimensions(reference);
+            var png = EncodeMask(size.x, size.y, slot.startsWhite, uv, onlyIslands, default);
+            return ImportAndAssign(mat, slot, reference, size, png, canAssign, beginAssignment, out assigned);
+        }
+
+        internal static Vector2Int Dimensions(Texture reference)
+        {
             int rw = reference != null ? reference.width : 1024, rh = reference != null ? reference.height : 1024;
             int w = Mathf.Clamp(Mathf.NextPowerOfTwo(Mathf.Min(2048, rw)), 256, 2048);
             int h = Mathf.Clamp(Mathf.NextPowerOfTwo(Mathf.Max(1, Mathf.RoundToInt(w * (rh / (float)rw)))), 256, 2048);
+            return new Vector2Int(w, h);
+        }
 
+        internal static byte[] EncodeMask(int w, int h, bool startsWhite, MeshUV uv, ICollection<int> onlyIslands,
+            System.Threading.CancellationToken cancel)
+        {
+            var px = new Color32[w * h];
+            if (onlyIslands != null && onlyIslands.Count > 0 && uv != null)
+            {
+                var bytes = uv.RasterIslandMaskWithCancellation(w, h, new HashSet<int>(onlyIslands), Mathf.Max(2, w / 256), cancel);
+                for (int i = 0; i < px.Length; i++)
+                {
+                    if ((i & 16383) == 0) cancel.ThrowIfCancellationRequested();
+                    px[i] = new Color32(bytes[i], bytes[i], bytes[i], 255);
+                }
+            }
+            else
+            {
+                byte v = startsWhite ? (byte)255 : (byte)0;
+                var c = new Color32(v, v, v, 255);
+                System.Array.Fill(px, c);
+            }
+            cancel.ThrowIfCancellationRequested();
+            return MapPixels.EncodeRgba(px, w, h);
+        }
+
+        internal static Texture2D ImportAndAssign(Material mat, EmptySlot slot, Texture reference, Vector2Int size, byte[] png,
+            System.Func<bool> canAssign, System.Action beginAssignment, out bool assigned)
+        {
+            assigned = false;
             string refPath = reference != null ? AssetDatabase.GetAssetPath(reference) : AssetDatabase.GetAssetPath(mat);
             string dir = Exporter.WritableFolder(refPath);
             string baseName = reference != null ? reference.name : mat.name;
             string path = AssetDatabase.GenerateUniqueAssetPath($"{dir}/{baseName}_{slot.property.TrimStart('_')}.png");
 
-            var px = new Color32[w * h];
-            if (onlyIslands != null && onlyIslands.Count > 0 && uv != null)
-            {
-                var bytes = uv.RasterIslandMask(w, h, new HashSet<int>(onlyIslands), Mathf.Max(2, w / 256));
-                for (int i = 0; i < px.Length; i++) px[i] = new Color32(bytes[i], bytes[i], bytes[i], 255);
-            }
-            else
-            {
-                byte v = slot.startsWhite ? (byte)255 : (byte)0;
-                var c = new Color32(v, v, v, 255);
-                for (int i = 0; i < px.Length; i++) px[i] = c;
-            }
-            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false, true);
-            tex.SetPixels32(px);
-            tex.Apply(false);
-            File.WriteAllBytes(path, tex.EncodeToPNG());
-            Object.DestroyImmediate(tex);
+            File.WriteAllBytes(path, png);
 
             AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
             if (AssetImporter.GetAtPath(path) is TextureImporter imp)
             {
                 imp.userData = Tag;
                 imp.textureType = TextureImporterType.Default;
-                imp.sRGBTexture = false;                       // masks are data, not colour
+                imp.sRGBTexture = false;
                 imp.alphaSource = TextureImporterAlphaSource.FromInput;
                 imp.alphaIsTransparency = false;
                 imp.mipmapEnabled = true;
-                imp.maxTextureSize = Mathf.Max(w, h);
+                imp.maxTextureSize = Mathf.Max(size.x, size.y);
                 imp.textureCompression = TextureImporterCompression.CompressedHQ;
                 imp.SaveAndReimport();
             }
             var created = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
             if (created == null) return null;
+            if (mat == null || !mat.HasProperty(slot.property) || mat.GetTexture(slot.property) != null ||
+                (canAssign != null && !canAssign())) return created;
 
-            MaterialWriter.EnsureEditable(new[] { mat });
+            beginAssignment?.Invoke();
             Undo.RecordObject(mat, "Add mask texture");
+            MaterialWriter.EnsureEditable(new[] { mat });
             mat.SetTexture(slot.property, created);
             EditorUtility.SetDirty(mat);
             switch (ShaderProfiles.Detect(mat.shader))
@@ -129,6 +148,7 @@ namespace Avistry.Textures
                 case ShaderFamily.Poiyomi: MaterialWriter.FixPoiyomiKeywords(new[] { mat }); break;
                 case ShaderFamily.LilToon: MaterialWriter.AfterLilToonEdit(new[] { mat }); break;
             }
+            assigned = true;
             return created;
         }
     }

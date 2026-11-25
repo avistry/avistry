@@ -1,7 +1,3 @@
-// Writes releases.json for the website: every published release with its files, download counts and checksums,
-// plus the total downloads across all versions. Node 20+, no dependencies.
-// Usage: node build-releases.mjs --out _site/releases.json [--repo owner/name]
-// Reads GITHUB_TOKEN (optional, raises the API rate limit) and GITHUB_REPOSITORY.
 import fs from 'node:fs';
 
 const args = process.argv.slice(2);
@@ -19,7 +15,6 @@ async function api(url) {
   return r.json();
 }
 
-// the files people download: the VCC zip (VCC itself fetches this one) and the .unitypackage
 function kind(name) {
   if (name.endsWith('.unitypackage')) return 'unitypackage';
   if (name.endsWith('.zip')) return 'zip';
@@ -39,11 +34,13 @@ for (const r of all) {
   const files = r.assets.filter((a) => kind(a.name)).map((a) => ({
     kind: kind(a.name), name: a.name, url: a.browser_download_url, size: a.size, downloads: a.download_count
   }));
-  // the release workflow attaches latest.json with the checksums and the VirusTotal links of that version
   let sums = null;
   const meta = r.assets.find((a) => a.name === 'latest.json');
   if (meta) {
-    try { const m = await (await fetch(meta.browser_download_url)).json(); sums = { sha256: m.sha256 || null, virustotal: m.virustotal || null }; } catch (e) { /* the list still works without them */ }
+    try {
+      const m = await (await fetch(meta.browser_download_url)).json();
+      sums = { sha256: m.sha256 || null, virustotal: m.virustotal || null };
+    } catch (e) {}
   }
   releases.push({
     version: String(r.tag_name || '').replace(/^v/, ''),

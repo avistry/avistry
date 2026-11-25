@@ -1,10 +1,3 @@
-// Avistry: generated maps (ambient occlusion bake, normal map helpers). Used by MapBaker.cs.
-//
-// AO works like shadow mapping from many directions: the model is drawn in texture space (vertex = UV) to get a
-// world position and normal per texel, then for each direction the occluders are drawn as a "height along the
-// direction" map, and every texel checks whether something sits above it along that direction.
-// Light-space maps are drawn under GL.LoadOrtho with the vertex at (lx, ly, 0), the same way texture-space maps
-// are, so writing and reading agree on every graphics API.
 Shader "Hidden/Avistry/Maps"
 {
     Properties
@@ -18,15 +11,15 @@ Shader "Hidden/Avistry/Maps"
     float4 _MainTex_TexelSize;
     sampler2D _PosTex;
     sampler2D _NrmTex;
-    sampler2D _DepthTex, _DepthTex1, _DepthTex2, _DepthTex3; // peeled occluder layers, top surface first
+    sampler2D _DepthTex, _DepthTex1, _DepthTex2, _DepthTex3;
     float4 _DepthTex_TexelSize;
 
-    float4 _LightDir;     // xyz = unit direction towards the "sky" sample
-    float4 _LightRight;   // xyz = unit vector across the light map
-    float4 _LightUp;      // xyz = unit vector up the light map
-    float4 _LightCentre;  // xyz = centre of the framed area, w = 1 / (2 * half width)
-    float4 _AoParams;     // x = normal offset (world), y = depth bias (world), z = spread (world), w = unused
-    float4 _BlurParams;   // x = radius (taps each side), y = step (texels), z = 1 / sigma^2 (world), w = unused
+    float4 _LightDir;
+    float4 _LightRight;
+    float4 _LightUp;
+    float4 _LightCentre;
+    float4 _AoParams;
+    float4 _BlurParams;
 
     float2 LightUV(float3 wp)
     {
@@ -39,8 +32,6 @@ Shader "Hidden/Avistry/Maps"
     {
         Cull Off ZWrite Off ZTest Always
 
-        // 0: texture-space world position (rgb) and coverage (a). The mesh's vertex is (u, v, 0), TEXCOORD0 the posed
-        //    world position.
         Pass
         {
             CGPROGRAM
@@ -54,7 +45,6 @@ Shader "Hidden/Avistry/Maps"
             ENDCG
         }
 
-        // 1: texture-space world normal (rgb, -1..1) and coverage (a).
         Pass
         {
             CGPROGRAM
@@ -68,9 +58,6 @@ Shader "Hidden/Avistry/Maps"
             ENDCG
         }
 
-        // 2: occluder height along _LightDir, keeping the highest (closest to the sky) surface per light-map texel.
-        //    Depth peeling: with _Peel.x = 1, only surfaces lower than the previous layer (_PrevTex) minus _Peel.y
-        //    count, so layer k holds the k-th surface from the top. The mesh's vertices are world positions.
         Pass
         {
             BlendOp Max
@@ -98,7 +85,6 @@ Shader "Hidden/Avistry/Maps"
             ENDCG
         }
 
-        // 3: gather one direction: adds (cos * visible, cos) for every covered texel facing it. Additive.
         Pass
         {
             Blend One One
@@ -113,22 +99,19 @@ Shader "Hidden/Avistry/Maps"
                 float3 n = tex2Dlod(_NrmTex, float4(i.uv, 0, 0)).xyz;
                 float c = dot(n, _LightDir.xyz);
                 if (c <= 0.0) return 0;
-                float3 q = p.xyz + n * _AoParams.x;          // normal offset: step off the surface a little
+                float3 q = p.xyz + n * _AoParams.x;
                 float h = dot(q - _LightCentre.xyz, _LightDir.xyz);
                 float2 l = LightUV(q);
-                // grazing directions need more bias (the surface itself slopes across a light-map texel)
                 float bias = _AoParams.y * (1.0 + 2.0 * min(sqrt(saturate(1.0 - c * c)) / max(c, 0.05), 6.0));
                 float spread = max(_AoParams.z, 1e-6);
                 float occ = 0;
                 [unroll] for (int k = 0; k < 4; k++)
                 {
                     float4 uvk = float4(l + float2((k & 1) ? 0.5 : -0.5, (k & 2) ? 0.5 : -0.5) * _DepthTex_TexelSize.xy, 0, 0);
-                    // The layers go from the top surface down; the nearest occluder above the texel is the lowest
-                    // layer that is still above it. (Below 4 layers, layer 4 stands in for it.)
                     float layers[4] = { tex2Dlod(_DepthTex, uvk).r, tex2Dlod(_DepthTex1, uvk).r, tex2Dlod(_DepthTex2, uvk).r, tex2Dlod(_DepthTex3, uvk).r };
                     float nearest = 1e9;
                     [unroll] for (int j = 0; j < 4; j++) if (layers[j] > h + bias) nearest = layers[j];
-                    float dist = nearest - h;                 // how far above the texel the occluder is
+                    float dist = nearest - h;
                     if (nearest < 1e8) occ += 1.0 - smoothstep(spread * 0.6, spread, dist);
                 }
                 return float4(c * (1.0 - occ * 0.25), c, 0, 0);
@@ -136,8 +119,6 @@ Shader "Hidden/Avistry/Maps"
             ENDCG
         }
 
-        // 4: resolve + smooth: AO = sum(cos * visible) / sum(cos), blurred with neighbours that are close in 3D
-        //    (so it never bleeds across a UV seam into an unrelated part). Out: rgb = AO, a = coverage.
         Pass
         {
             CGPROGRAM
@@ -174,7 +155,6 @@ Shader "Hidden/Avistry/Maps"
             ENDCG
         }
 
-        // 5: any normal map texture (DXT5nm / BC5 / plain) -> plain tangent-space normal, 0..1 encoded, z rebuilt.
         Pass
         {
             CGPROGRAM

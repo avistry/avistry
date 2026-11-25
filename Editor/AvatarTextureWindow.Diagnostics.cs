@@ -4,20 +4,31 @@ namespace Avistry.Textures
 {
     partial class AvatarTextureWindow
     {
-        string BuildDiagnostics() => DiagnosticsReport.Build(_renderer, _material, _slots,
-            _material != null ? ShaderProfiles.Detect(_material.shader).ToString() : "none");
+        void RefreshWindowTitle()
+        {
+            string label = _automationSandbox ? Loc.T("Avistry Textures (test)") : Loc.T("Avistry Textures");
+            titleContent = new GUIContent(label, DiagnosticsReport.Logo, Loc.F("Avistry {0}", Version));
+        }
+
+        string BuildDiagnostics() => DiagnosticsReport.Build(_renderer, _material, _slots);
 
         internal void ShowErrorDialog(string title, System.Exception e)
         {
-            Debug.LogException(e);
-            int r = StudioDialog.AskComplex(Loc.T("Avistry"), title, Loc.T("Copy diagnostics…"), Msg.BtnCancel, Msg.BtnOpenConsole);
-            if (r == 0) CopyDiagnosticsFlow();
-            else if (r == 2) OpenConsole();
+            if (e is System.OperationCanceledException) return;
+            if (SupportSession.LogSaveFailure(e)) OfferDiagnostics(title);
+            else Toast(title, UnityEditor.MessageType.Error);
+        }
+
+        internal void OfferDiagnostics(string reason)
+        {
+            int choice = StudioDialog.AskComplex(Loc.T("Avistry"), reason, Loc.T("Review report"), Msg.BtnCancel, Msg.BtnOpenConsole);
+            if (choice == 0) CopyDiagnosticsFlow();
+            else if (choice == 2) OpenConsole();
         }
 
         internal string CopyDiagnosticsFlow()
         {
-            var text = BuildDiagnostics();
+            string text = BuildDiagnostics();
             if (!DiagnosticsReport.SkipPreview) DiagnosticsWindow.Show(text);
             return text;
         }

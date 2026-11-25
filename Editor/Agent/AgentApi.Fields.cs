@@ -11,16 +11,15 @@ namespace Avistry.Textures
     {
         internal enum FieldType { Float, Int, Bool, Colour, Enum }
 
-        /// <summary>One layer setting the helper may change. Anything not listed here cannot be set through set_layer.</summary>
         internal class FieldSpec
         {
-            public readonly string kind;          // the layer kind word
+            public readonly string kind;
             public readonly Type layerType;
-            public readonly string wire;          // the name the helper uses
-            public readonly string field;         // the serialised field on the layer class
+            public readonly string wire;
+            public readonly string field;
             public readonly FieldType type;
             public readonly float min, max;
-            public readonly string[] choices;     // Enum: accepted words, in the enum's order
+            public readonly string[] choices;
 
             internal FieldSpec(string kind, Type layerType, string wire, string field, FieldType type, float min = 0, float max = 0, string[] choices = null)
             {
@@ -33,7 +32,6 @@ namespace Avistry.Textures
 
         internal static readonly string[] ChromaWords = { "adjust", "add_colour", "set_colour" };
 
-        /// <summary>Settable layer fields, per layer kind. The tests check every row against the class by reflection.</summary>
         internal static readonly IReadOnlyList<FieldSpec> Fields = new[]
         {
             new FieldSpec("hsl", typeof(HslLayer), "hue", nameof(HslLayer.hue), FieldType.Float, -180, 180),
@@ -59,7 +57,6 @@ namespace Avistry.Textures
             new FieldSpec("root_tip_gradient", typeof(RootTipGradientLayer), "end", nameof(RootTipGradientLayer.end), FieldType.Float, 0, 1),
         };
 
-        /// <summary>Layer kinds the helper can add, with the class each one makes. Order is the order shown to the helper.</summary>
         static readonly (string kind, Type type)[] AddableKinds =
         {
             ("paint", typeof(PaintLayer)), ("hsl", typeof(HslLayer)), ("levels", typeof(LevelsLayer)),
@@ -69,7 +66,6 @@ namespace Avistry.Textures
             ("tone_curve", typeof(ToneCurveLayer)), ("root_tip_gradient", typeof(RootTipGradientLayer)),
         };
 
-        /// <summary>Kinds the helper can read but not add.</summary>
         static readonly (string kind, Type type)[] ReadOnlyKinds =
         {
             ("gradient", typeof(DrawnGradientLayer)), ("image", typeof(ImageLayer)),
@@ -113,7 +109,6 @@ namespace Avistry.Textures
             return null;
         }
 
-        /// <summary>The whitelisted fields of a layer as plain data.</summary>
         static Dictionary<string, object> FieldValues(Layer l)
         {
             var d = new Dictionary<string, object>();
@@ -131,7 +126,6 @@ namespace Avistry.Textures
             return d;
         }
 
-        /// <summary>Checks one value against its spec. Returns the value to store, or null with a plain reason.</summary>
         static object ConvertField(FieldSpec f, object raw, out string problem)
         {
             problem = null;
@@ -197,7 +191,6 @@ namespace Avistry.Textures
 
         static Dictionary<string, BlendMode> s_blends;
 
-        /// <summary>Accepts the enum name ("Multiply"), the menu name ("Multiply") or its full menu path ("Darken/Multiply"), any case.</summary>
         static bool TryBlend(string word, out BlendMode mode)
         {
             mode = BlendMode.Normal;

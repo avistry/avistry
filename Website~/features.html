@@ -3,22 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Avistry features: every tool in action</title>
-<meta name="description" content="Short loops of every Avistry tool: select, paint, layers, recolour, material controls, baked maps and safety." data-i18n-attr="content:ft.meta.description">
+<title>Avistry features | Avatar texture editing in Unity</title>
+<meta name="description" content="Select, recolour and paint avatar textures in Unity. Preview reusable layers, save drafts and share editable style packs." data-i18n-attr="content:ft.meta.description">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#F3F1F6" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#141218" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Avistry features: every tool in action">
+<meta property="og:title" content="Avistry features | Avatar texture editing in Unity">
 <meta property="og:url" content="https://avistry.github.io/avistry/features.html">
-<meta property="og:description" content="Short loops of every Avistry tool: select, paint, layers, recolour, material controls, baked maps and safety.">
-<meta property="og:image" content="https://avistry.github.io/avistry/media/og-features.jpg">
+<meta property="og:description" content="Select, recolour and paint avatar textures in Unity. Preview reusable layers, save drafts and share editable style packs.">
+<meta property="og:image" content="https://avistry.github.io/avistry/media/og-features.jpg?v=030-studio-capture-6">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:type" content="image/jpeg">
-<meta property="og:image:alt" content="Avistry tools at work: Paint, Layers, Colour and Material.">
+<meta property="og:image:alt" content="An edited headset showing layered texture, baked relief and metal in Unity.">
 <meta property="og:site_name" content="Avistry">
-<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-features.jpg">
+<meta name="twitter:image" content="https://avistry.github.io/avistry/media/og-features.jpg?v=030-studio-capture-6">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="canonical" href="https://avistry.github.io/avistry/features.html">
 <link rel="icon" type="image/svg+xml" href="media/favicon.svg">
@@ -34,8 +34,6 @@
   try {
     var theme = localStorage.getItem('ats-theme');
     root.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
-    /* Performance mode by itself: on weak devices, with data saver, or after this tab crashed or ran short of memory
-       (app.js keeps ats-alive set while the page is on screen); never just for being a phone on strong hardware */
     var perf = localStorage.getItem('ats-perf'), nav = navigator, mem = nav.deviceMemory, cores = nav.hardwareConcurrency, con = nav.connection || {};
     var ss = sessionStorage, sick = ss.getItem('ats-sick') === '1' || ss.getItem('ats-alive') === '1';
     if (sick) ss.setItem('ats-sick', '1');
@@ -63,8 +61,9 @@
   } catch (e) {}
 })();
 </script>
-<style>html{background:#141218}html[data-theme="light"]{background:#F3F1F6}html.i18n-wait body{visibility:hidden}</style>
-<link rel="stylesheet" href="style.css">
+<style>html{background:var(--bg,#141218)}html[data-theme="light"]{background:var(--bg,#F3F1F6)}html.i18n-wait body{visibility:hidden}</style>
+<link rel="stylesheet" href="style.css?v=030-paper-3">
+<link rel="stylesheet" href="features.css?v=030-studio-capture-6" data-page-style>
 </head>
 <body class="v4 sub-page">
 
@@ -89,6 +88,10 @@
     <symbol id="i-sel-wand" viewBox="0 0 20 20"><path d="M3.5 16.5 12.5 7.5"/><path d="M14.5 2.5v2.6M18 6h-2.6M17 3l-1.6 1.6M11.5 6.5l2 2"/></symbol>
     <symbol id="i-sel-part" viewBox="0 0 20 20"><path d="M10 2.5 16.5 6v8L10 17.5 3.5 14V6z"/><path d="M3.5 6 10 9.5 16.5 6M10 9.5v8"/></symbol>
     <symbol id="i-sel-tile" viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="1.5"/><path d="M10 3v14M3 10h14"/></symbol>
+    <symbol id="i-sel-face" viewBox="0 0 20 20"><path d="M10 3 17 16H3z"/></symbol>
+    <symbol id="i-sel-loop" viewBox="0 0 20 20"><path d="M4 10a6 6 0 1 0 12 0 6 6 0 1 0-12 0" stroke-dasharray="2.3 2"/></symbol>
+    <symbol id="i-sel-edge" viewBox="0 0 20 20"><path d="m3 15 14-10"/><circle cx="3" cy="15" r="1.2"/><circle cx="17" cy="5" r="1.2"/></symbol>
+    <symbol id="i-sel-vertex" viewBox="0 0 20 20"><path d="m4 14 6-6 6 6"/><circle cx="10" cy="8" r="2.4"/></symbol>
     <symbol id="i-m-tint" viewBox="0 0 20 20"><path d="M10 2.5S4.5 8.6 4.5 12.2a5.5 5.5 0 0 0 11 0C15.5 8.6 10 2.5 10 2.5z"/></symbol>
     <symbol id="i-m-glow" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.2"/><path d="M10 2v2.2M10 15.8V18M2 10h2.2M15.8 10H18M4.3 4.3l1.6 1.6M14.1 14.1l1.6 1.6M4.3 15.7l1.6-1.6M14.1 5.9l1.6-1.6"/></symbol>
     <symbol id="i-m-rim" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><path d="M13.5 4.6a6.5 6.5 0 0 1 0 10.8" stroke-width="3"/></symbol>
@@ -120,12 +123,12 @@
       <a href="about.html" data-i18n="nav.about">About</a>
       <a href="download.html" data-i18n="nav.download">Download</a>
     </nav>
-    <div class="looks hdr-looks" role="radiogroup" aria-label="Look" data-i18n-attr="aria-label:look.pick">
+    <div class="studio-palette-home"><div class="looks hdr-looks" role="radiogroup" aria-label="Look" data-i18n-attr="aria-label:look.pick">
       <button type="button" role="radio" aria-checked="false" tabindex="-1" data-look="original" style="--a:#E58AB8;--b:#2A3555" aria-label="Original" title="Original" data-i18n-attr="aria-label:look.original,title:look.original"><svg class="look-ic" aria-hidden="true" focusable="false"><use href="#lk-original"/></svg></button>
       <button type="button" role="radio" aria-checked="true" tabindex="0" data-look="crimson" style="--a:#CF0A11;--b:#93611A" aria-label="Crimson" title="Crimson" data-i18n-attr="aria-label:look.crimson,title:look.crimson"><svg class="look-ic" aria-hidden="true" focusable="false"><use href="#lk-crimson"/></svg></button>
       <button type="button" role="radio" aria-checked="false" tabindex="-1" data-look="frost" style="--a:#8FD3FF;--b:#C9D6E8" aria-label="Frost" title="Frost" data-i18n-attr="aria-label:look.frost,title:look.frost"><svg class="look-ic" aria-hidden="true" focusable="false"><use href="#lk-frost"/></svg></button>
       <button type="button" role="radio" aria-checked="false" tabindex="-1" data-look="venom" style="--a:#3CDC78;--b:#2A2A30" aria-label="Venom" title="Venom" data-i18n-attr="aria-label:look.venom,title:look.venom"><svg class="look-ic" aria-hidden="true" focusable="false"><use href="#lk-venom"/></svg></button>
-    </div>
+    </div></div>
     <div class="hdr-lang" id="hdr-lang">
       <button type="button" class="hdr-lang-btn" aria-haspopup="true" aria-expanded="false" aria-controls="hdr-lang-menu" aria-label="Language" data-i18n-attr="aria-label:a11y.lang"><svg class="lang-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg><span class="hdr-lang-code" aria-hidden="true">EN</span></button>
       <div class="hdr-lang-menu" id="hdr-lang-menu" role="menu" hidden>
@@ -137,6 +140,11 @@
     </div>
     <a class="hdr-icon" href="https://github.com/avistry/avistry" rel="noopener" aria-label="Avistry on GitHub" data-i18n-attr="aria-label:hdr.github"><svg class="brand-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg></a>
     <a class="hdr-icon hdr-icon--dc" href="https://discord.gg/sSeWgDJJjY" rel="noopener" aria-label="Join the Avistry Discord" data-i18n-attr="aria-label:hdr.discord"><svg class="brand-ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.38-.44.87-.61 1.25a18.27 18.27 0 0 0-5.49 0 12.64 12.64 0 0 0-.62-1.25.08.08 0 0 0-.08-.04 19.74 19.74 0 0 0-4.88 1.52.07.07 0 0 0-.03.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 5.99 3.03.08.08 0 0 0 .09-.03c.46-.63.87-1.3 1.22-1.99a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.89.08.08 0 0 1-.01-.13l.37-.29a.07.07 0 0 1 .08-.01c3.93 1.79 8.18 1.79 12.06 0a.07.07 0 0 1 .08.01l.37.29a.08.08 0 0 1-.01.13c-.6.35-1.22.65-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.36 1.22 1.99a.08.08 0 0 0 .09.03 19.84 19.84 0 0 0 6-3.03.08.08 0 0 0 .03-.06c.5-5.18-.84-9.67-3.55-13.66a.06.06 0 0 0-.03-.03zM8.02 15.33c-1.18 0-2.16-1.09-2.16-2.42 0-1.33.96-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.96 2.42-2.16 2.42zm7.97 0c-1.18 0-2.15-1.09-2.15-2.42 0-1.33.95-2.42 2.15-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.33-.95 2.42-2.16 2.42z"/></svg></a>
+    <div class="studio-scroll-speed" role="radiogroup" aria-label="Scroll speed" title="Scroll speed" data-i18n-attr="aria-label:fv.speed,title:fv.speed" hidden>
+      <label><input class="sr-only" type="radio" name="studio-scroll-speed" value="1" checked><span>1×</span></label>
+      <label><input class="sr-only" type="radio" name="studio-scroll-speed" value="2"><span>2×</span></label>
+      <label><input class="sr-only" type="radio" name="studio-scroll-speed" value="4"><span>4×</span></label>
+    </div>
     <button type="button" class="menu-btn" id="menu-btn" aria-expanded="false" aria-controls="sheet"><span data-i18n="nav.menu">Menu</span></button>
   </div>
 </header>
@@ -165,490 +173,647 @@
   </div>
 </div>
 
-<main id="main">
-<div class="opt-strip">
-  <div class="wrap">
-    <p><a href="index.html"><svg class="ic" aria-hidden="true" focusable="false" style="transform:scaleX(-1)"><use href="#i-arrow"/></svg><span data-i18n="optional.home">Home</span></a></p>
-  </div>
-</div>
-
-<section class="page-head" data-hero aria-labelledby="page-title">
-  <div class="wrap">
-    <h1 class="h-display" id="page-title" data-i18n="ft.title" data-emo="hue_spin">Every tool in action.</h1>
-    <p class="lead" data-i18n="ft.lead">Short loops from the real window.</p>
-  </div>
-</section>
-
-<nav class="jump" id="jump" aria-label="On this page" data-i18n-attr="aria-label:jump.label">
-  <div class="wrap">
-    <ul role="list">
-      <li><a href="#select" data-i18n="tools.n.select">Select</a></li>
-      <li><a href="#paint" data-i18n="tools.n.paint">Paint</a></li>
-      <li><a href="#layers" data-i18n="jump.layers">Layers</a></li>
-      <li><a href="#colour" data-i18n="jump.colour">Colour</a></li>
-      <li><a href="#material" data-i18n="tools.n.material">Material</a></li>
-      <li><a href="#maps" data-i18n="jump.maps">Maps</a></li>
-      <li><a href="#safety" data-i18n="jump.safety">Safety</a></li>
-      <li><a href="#learn" data-i18n="jump.learn">Learn</a></li>
-    </ul>
-    <div class="fview" role="group" aria-label="How to show layers and blend modes" data-i18n-attr="aria-label:fv.label" hidden>
-      <button type="button" data-fv="scroll" aria-pressed="true"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-fv-scroll"/></svg><span data-i18n="fv.scroll">Scroll</span></button>
-      <button type="button" data-fv="overview" aria-pressed="false"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-fv-grid"/></svg><span data-i18n="fv.overview">Overview</span></button>
-    </div>
-  </div>
-</nav>
-
-<!-- 1. SELECT -->
-<section class="sec" id="select" aria-labelledby="select-title">
-  <span class="stk stk-corner" data-stk="my_uvs" aria-hidden="true"></span>
-  <div class="wrap">
-    <h2 id="select-title"><span data-i18n="sel.title">Select exactly what you mean.</span><i class="emo" data-emo="e_magic_wand" aria-hidden="true"></i></h2>
-    <p class="lead" data-i18n="sel.lead2">Six ways to pick pieces. Each loop picks the same region.</p>
-    <div class="sel-grid">
-    <div class="sel-side">
-      <ol class="sel-steps" id="sel-steps" role="list" aria-label="Selection tools" data-i18n-attr="aria-label:sel.tools">
-        <li class="sel-step is-on" data-loop="sel-click" data-cap="sel.b.click"><button type="button" aria-pressed="true"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-sel-click"/></svg><span class="st" data-i18n="sel.c.click">Click</span><span class="sb" data-i18n="sel.b.click">One piece at a time. Shift adds, Ctrl removes.</span><i class="bar" aria-hidden="true"></i></button></li>
-        <li class="sel-step" data-loop="sel-box" data-cap="sel.b.box"><button type="button" aria-pressed="false"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-sel-box"/></svg><span class="st" data-i18n="sel.c.box">Box</span><span class="sb" data-i18n="sel.b.box">Drag around pieces, on the texture or straight on the model.</span><i class="bar" aria-hidden="true"></i></button></li>
-        <li class="sel-step" data-loop="sel-lasso" data-cap="sel.b.lasso"><button type="button" aria-pressed="false"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-sel-lasso"/></svg><span class="st" data-i18n="sel.c.lasso">Lasso</span><span class="sb" data-i18n="sel.b.lasso">Draw around the pieces you want, in any shape.</span><i class="bar" aria-hidden="true"></i></button></li>
-        <li class="sel-step" data-loop="sel-wand" data-cap="sel.b.wand"><button type="button" aria-pressed="false"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-sel-wand"/></svg><span class="st" data-i18n="sel.c.wand">Magic wand</span><span class="sb" data-i18n="sel.b.wand">Click a colour and every piece that has it is picked. Or make it a layer mask instead.</span><i class="bar" aria-hidden="true"></i></button></li>
-        <li class="sel-step" data-loop="sel-part" data-cap="sel.b.part"><button type="button" aria-pressed="false"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-sel-part"/></svg><span class="st" data-i18n="sel.c.part">By part</span><span class="sb" data-i18n="sel.b.part">One click takes every piece of a part.</span><i class="bar" aria-hidden="true"></i></button></li>
-        <li class="sel-step" data-loop="sel-tile" data-cap="sel.b.tile"><button type="button" aria-pressed="false"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-sel-tile"/></svg><span class="st" data-i18n="sel.c.tile">By UV tile</span><span class="sb" data-i18n="sel.b.tile">Take every piece in a tile, for avatars that spread over several tiles.</span><i class="bar" aria-hidden="true"></i></button></li>
-      </ol>
-      <div class="sel-ctl">
-        <button type="button" class="sel-prev" aria-label="Previous tool" data-i18n-attr="aria-label:sel.prev"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-prev"/></svg></button>
-        <button type="button" class="sel-play" aria-label="Pause video"></button>
-        <button type="button" class="sel-next" aria-label="Next tool" data-i18n-attr="aria-label:sel.next"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-next"/></svg></button>
-        <span class="sel-n tnum" id="sel-n" aria-hidden="true">1 / 6</span>
-      </div>
-    </div>
-    <figure class="plate plate--md loop-plate" id="sel-plate">
-      <div class="plate-body vwrap">
-        <video muted playsinline preload="none" width="960" height="600" style="--ar: 8 / 5" poster="media/v4/link-still.webp" data-loop="sel-click" aria-label="A click on the sleeve of the model picks its pieces, and the same pieces light up orange on the texture" data-i18n-attr="aria-label:sel.still.alt"></video>
-        <button type="button" class="pp" aria-label="Play video" data-i18n-attr="aria-label:ui.play"></button>
-        <span class="pending" data-i18n="media.pending">The loop is on its way. This is a still.</span>
-      </div>
-      <figcaption class="plate-cap"><span id="sel-cap" data-i18n="sel.b.click">One piece at a time. Shift adds, Ctrl removes.</span></figcaption>
-    </figure>
-    </div>
-  </div>
-</section>
-
-
-<!-- 2. PAINT -->
-<section class="sec" id="paint" aria-labelledby="paint-title">
-  <div class="wrap">
-    <h2 id="paint-title"><span data-i18n="ctl.title">Paint like in your art app.</span><i class="emo" data-emo="e_brush" aria-hidden="true"></i></h2>
-    <p class="lead" data-i18n="ctl.lead">11 brushes, 28 blend modes, masks and gradients. Every stroke sits on a layer you can hide, move or change later.</p>
-    <div class="grid12">
-      <figure class="plate plate--md loop-plate">
-        <div class="plate-body vwrap">
-          <video muted playsinline loop preload="none" width="1280" height="720" style="--ar: 16 / 9; --ar-m: 4 / 5" poster="media/v4/ui-brush-chips.webp" data-loop="paint" aria-label="A brush with symmetry on the front, then a gradient on the hair" data-i18n-attr="aria-label:pt.alt"></video>
-          <button type="button" class="pp" aria-label="Play video" data-i18n-attr="aria-label:ui.play"></button>
-          <span class="pending" data-i18n="media.pending">The loop is on its way. This is a still.</span>
-        </div>
-      </figure>
-      <div class="paint-side">
-      <figure class="plate plate--sm">
-        <div class="plate-body still"><img src="media/v4/ui-brush-chips.webp" width="308" height="242" loading="lazy" decoding="async" alt="The brush chips of the compact panel, each with a stroke thumbnail" data-i18n-attr="alt:ctl.chips.alt"></div>
-      </figure>
-      <figure class="plate plate--sm loop-plate">
-        <div class="plate-body vwrap vwrap--contain">
-          <video muted playsinline loop preload="none" width="1280" height="720" style="--ar: 4 / 3; --ar-m: 4 / 3" poster="media/v4/ui-scene-bar.webp" data-loop="scenebar" aria-label="The floating Avistry bar in the Scene view switches between select, brush and fill while the camera circles the arm." data-i18n-attr="aria-label:bar.alt"></video>
-          <button type="button" class="pp" aria-label="Play video" data-i18n-attr="aria-label:ui.play"></button>
-          <span class="pending" data-i18n="media.pending">The loop is on its way. This is a still.</span>
-        </div>
-      </figure>
-      </div>
-    </div>
-    <ul class="tick-list" role="list">
-      <li data-i18n="pt.brushes">11 brushes</li>
-      <li data-i18n="pt.3d">3D brush on the model</li>
-      <li data-i18n="pt.sym">Symmetry</li>
-      <li data-i18n="pt.grad">Drawn gradients</li>
-      <li data-i18n="pt.decal">Decals</li>
-    </ul>
-  </div>
-</section>
-
-
-<!-- 3. LAYERS (dark band, held full screen while you scroll) -->
-<section class="sec stack-band surface-dark" id="layers" aria-labelledby="stack-title">
-  <div class="stack" id="stack" data-state="idle">
-    <div class="stack-head wrap">
-      <h2 id="stack-title"><span data-i18n="stack.title">Every edit is its own layer.</span><i class="emo" data-emo="e_layers" aria-hidden="true"></i></h2>
-      <p class="lead" id="stack-lead" data-i18n="stack.lead0">Scroll to pull the wing texture apart. These are its layers.</p>
-    </div>
-    <div class="stack-track" id="stack-track" hidden>
-      <div class="stack-stage">
-        <div class="stack-scene" id="stack-scene" aria-hidden="true"></div>
-        <ol class="stack-labels" id="stack-labels" role="list"></ol>
-        <p class="stack-count tnum" id="stack-count" aria-hidden="true"></p>
-      </div>
-    </div>
-    <figure class="stack-still wrap" id="stack-still">
-      <img class="cutout-inline" src="media/v4/ui-layers.webp" width="616" height="92" loading="lazy" decoding="async" alt="The layers list in Avistry: every edit is its own layer with a blend mode and an opacity" data-i18n-attr="alt:stack.alt">
-    </figure>
-  </div>
-</section>
-
-<!-- 3b. EVERY BLEND MODE AND ADJUSTMENT (rendered by Avistry, held full screen) -->
-<section class="sec modes-band surface-dark" id="modes" aria-labelledby="modes-title">
-  <div class="modes" id="modes-root" data-state="idle">
-    <div class="modes-head wrap">
-      <h2 id="modes-title"><span data-i18n="modes.title">28 blend modes. 11 adjustment layers.</span><i class="emo" data-emo="shader_glitch" aria-hidden="true"></i></h2>
-      <p class="lead" data-i18n="modes.lead">Every picture is the same texture with the same gradient layer.</p>
-    </div>
-    <div class="modes-track" id="modes-track" hidden>
-      <div class="modes-stage">
-        <div class="modes-view" id="modes-view">
-          <p class="modes-name" id="modes-name" aria-live="off"></p>
-        </div>
-        <div class="modes-side">
-          <p class="modes-kind" id="modes-kind"></p>
-          <ol class="modes-list" id="modes-list" role="list"></ol>
-          <p class="modes-count tnum" id="modes-count" aria-hidden="true"></p>
-        </div>
-      </div>
-    </div>
-    <div class="modes-grid wrap" id="modes-grid" hidden></div>
-    <div class="wrap modes-video">
-      <figure class="plate plate--md loop-plate">
-        <div class="plate-body vwrap">
-          <video muted playsinline loop preload="none" width="1280" height="720" style="--ar: 16 / 9; --ar-m: 4 / 5" poster="media/v4/ui-layers.webp" data-loop="blend" aria-label="The top layer cycles through eight of the 28 blend modes" data-i18n-attr="aria-label:blend.alt"></video>
-          <button type="button" class="pp" aria-label="Play video" data-i18n-attr="aria-label:ui.play"></button>
-          <span class="pending" data-i18n="media.pending">The loop is on its way. This is a still.</span>
-        </div>
-        <figcaption class="plate-cap"><span data-i18n="stack.line">28 blend modes and 11 adjustment layers.</span></figcaption>
-      </figure>
-    </div>
-  </div>
-</section>
-
-
-<!-- 4. COLOUR -->
-<section class="sec" id="colour" aria-labelledby="colour-title">
-  <div class="wrap">
-    <h2 id="colour-title"><span data-i18n="col.title">Recolour and match.</span><i class="emo" data-emo="e_palette" aria-hidden="true"></i></h2>
-    <p class="lead" data-i18n="col.lead">Shift a colour, copy it from another part, or fade it from root to tip.</p>
-    <div class="grid12">
-      <figure class="plate plate--md loop-plate">
-        <div class="plate-body vwrap">
-          <video muted playsinline loop preload="none" width="1280" height="720" style="--ar: 16 / 9; --ar-m: 4 / 5" data-loop="match" aria-label="The eyedropper picks the horn crystal and the trim snaps to match" data-i18n-attr="aria-label:col.alt"></video>
-          <button type="button" class="pp" aria-label="Play video" data-i18n-attr="aria-label:ui.play"></button>
-          <span class="pending" data-i18n="media.pending2">The loop is on its way.</span>
-        </div>
-      </figure>
-      <ul class="list-card plate--sm" role="list">
-        <li><strong data-i18n="col.hsl.t">HSL</strong><span data-i18n="col.hsl.b">Hue, saturation and brightness bars.</span></li>
-        <li><strong data-i18n="col.gmap.t">Gradient map</strong><span data-i18n="col.gmap.b">Give grey pixels a range of colours.</span></li>
-        <li><strong data-i18n="col.match.t">Colour match</strong><span data-i18n="col.match.b">Copy the colouring of another texture or part.</span></li>
-        <li><strong data-i18n="col.rt.t">Root to tip</strong><span data-i18n="col.rt.b">Fade a colour along the hair.</span></li>
-      </ul>
-    </div>
-  </div>
-</section>
-
-<!-- 5. MATERIAL -->
-<section class="sec" id="material" aria-labelledby="material-title">
-  <div class="wrap">
-    <h2 id="material-title" data-i18n="mat.title">Tune the material.</h2>
-    <div class="mat-top">
-      <figure class="plate plate--md loop-plate">
-        <div class="plate-body vwrap vwrap--contain">
-          <video muted playsinline loop preload="none" width="1280" height="720" style="--ar: 16 / 9; --ar-m: 4 / 5" poster="media/v4/ui-material.webp" data-loop="material" aria-label="Sliders in Avistry's Quick material panel make the crystal horn glow brighter, turn violet, and switch its glitter off and on in cyan." data-i18n-attr="aria-label:mat.alt"></video>
-          <button type="button" class="pp" aria-label="Play video" data-i18n-attr="aria-label:ui.play"></button>
-          <span class="pending" data-i18n="media.pending">The loop is on its way. This is a still.</span>
-        </div>
-      </figure>
-      <div class="mat-side">
-        <p class="lead" data-i18n="mat.lead2">A material decides how a part reacts to light: its colour, shine, glow and outline. Avistry puts the settings people change most in Poiyomi and lilToon on a few plain sliders, so you don't have to dig through the shader's long list.</p>
-        <ol class="mat-how" role="list">
-          <li data-i18n="mat.how.1">Pick a part on the model.</li>
-          <li data-i18n="mat.how.2">Move a slider and watch it change live.</li>
-          <li data-i18n="mat.how.3">The sliders change a copy of the material, made with one click. The original stays as it was.</li>
-        </ol>
-      </div>
-    </div>
-    <ul class="mat-list" role="list">
-      <li><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-m-tint"/></svg><strong data-i18n="mat.c.tint.t">Tint</strong><span data-i18n="mat.c.tint.b">Shifts the colour of the whole material, on top of the texture. Handy to try a colour before you repaint.</span></li>
-      <li><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-m-glow"/></svg><strong data-i18n="mat.c.glow.t">Glow</strong><span data-i18n="mat.c.glow.b">Makes eyes, trim or lines give off their own light, so they stand out in dark worlds.</span></li>
-      <li><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-m-rim"/></svg><strong data-i18n="mat.c.rim.t">Rim light</strong><span data-i18n="mat.c.rim.b">A bright edge along the outline of a part, so it stands out from the background.</span></li>
-      <li><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-m-matcap"/></svg><strong data-i18n="mat.c.matcap.t">Matcap</strong><span data-i18n="mat.c.matcap.b">A ready-made shine laid over the part, for a glossy, reflective look on skin, latex or gems.</span></li>
-      <li><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-m-shadow"/></svg><strong data-i18n="mat.c.shadow.t">Shadow</strong><span data-i18n="mat.c.shadow.b">Picks the colour of the shaded side. A warm or coloured shadow makes toon shading look richer.</span></li>
-      <li><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-m-outline"/></svg><strong data-i18n="mat.c.outline.t">Outline</strong><span data-i18n="mat.c.outline.b">Choose the colour and width of the line around a part, when your shader has an outline.</span></li>
-      <li><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-m-metal"/></svg><strong data-i18n="mat.c.metal.t">Metal</strong><span data-i18n="mat.c.metal.b">Make a surface read as polished metal. Poiyomi needs its PBR section on; lilToon Lite has no metal.</span></li>
-      <li><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-m-glitter"/></svg><strong data-i18n="mat.c.glitter.t">Glitter</strong><span data-i18n="mat.c.glitter.b">Add sparkling specks and choose their colour. Your shader decides how they move.</span></li>
-    </ul>
-  </div>
-</section>
-
-
-<!-- 6. MAPS -->
-<section class="sec" id="maps" aria-labelledby="maps-title">
-  <span class="stk stk-corner" data-stk="baking" aria-hidden="true"></span>
-  <div class="wrap">
-    <h2 id="maps-title"><span data-i18n="map.title">Bake maps.</span><i class="emo" data-emo="e_fresh_bake" aria-hidden="true"></i></h2>
-    <p class="lead" data-i18n="map.lead2">Two maps that give a flat texture depth, made for you in seconds. There is a toon face shadow map for anime faces too.</p>
-    <div class="map-row">
-      <figure class="plate plate--md" data-pending-if-missing>
-        <div class="plate-body still"><img data-v4="map-ao.webp" width="1200" height="800" decoding="async" loading="lazy" alt="The wing's feathers before and after Avistry's ambient occlusion, with the grey AO map in the corner." data-i18n-attr="alt:map.ao.alt2"><span class="pending" data-i18n="media.pending3">Picture on its way.</span></div>
-      </figure>
-      <div class="map-text">
-        <p class="map-kicker" data-i18n="map.ao.k">Shading in creases</p>
-        <h3 data-i18n="map.ao.t">Ambient occlusion</h3>
-        <p data-i18n="map.ao.what">Soft shading where light hardly reaches: creases, under the hair, between feathers and fingers. Flat toon textures get depth without painting shadows by hand.</p>
-        <ul class="tick-list map-facts" role="list">
-          <li data-i18n="map.ao.f1">Baked from the model in its current pose, on your graphics card.</li>
-          <li data-i18n="map.ao.f2">Clothing and hair can shade the part under them too.</li>
-          <li data-i18n="map.ao.f3">Added as a Multiply layer: fade it with Layer opacity or keep it off places with a mask.</li>
-        </ul>
-      </div>
-    </div>
-    <div class="map-row map-row--flip">
-      <figure class="plate plate--md" data-pending-if-missing>
-        <div class="plate-body still"><img data-v4="map-normal.webp" width="1200" height="800" decoding="async" loading="lazy" alt="Gold wing trim before and after Avistry's normal map, the hammered detail catching a low side light." data-i18n-attr="alt:map.normal.alt"><span class="pending" data-i18n="media.pending3">Picture on its way.</span></div>
-      </figure>
-      <div class="map-text">
-        <p class="map-kicker" data-i18n="map.normal.k">Bumps from the texture</p>
-        <h3 data-i18n="map.normal.t">Normal map</h3>
-        <p data-i18n="map.normal.what">Fake bumps made from the light and dark details of the texture: stitches, fabric, scales, hammered metal. Light catches them as if they were really raised.</p>
-        <ul class="tick-list map-facts" role="list">
-          <li data-i18n="map.normal.f1">Strength and Smoothness set how deep and how fine the bumps are.</li>
-          <li data-i18n="map.normal.f2">Keeps the bumps of the material's own normal map and adds the new ones on top, if you like.</li>
-          <li data-i18n="map.normal.f3">Saved as a new PNG next to the texture. Apply to material puts it in the slot, and Ctrl+Z takes it out.</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
-
-
-<!-- 7. SAFETY IN DETAIL -->
-<section class="sec" id="safety" aria-labelledby="safety-title">
-  <span class="stk stk-corner" data-stk="undo" aria-hidden="true"></span>
-  <div class="wrap">
-    <h2 id="safety-title"><span data-i18n="safe.detail">Safety, in detail.</span><i class="emo" data-emo="e_originals_safe" aria-hidden="true"></i></h2>
-    <p class="lead" data-i18n="safety.lead">Every edit can be undone, and saving never touches your originals.</p>
-
-    <div class="undo" id="undo">
-      <div class="undo-media">
-        <figure class="plate plate--md undo-frame" id="undo-frame">
-          <div class="plate-body undo-view" id="undo-view"></div>
-        </figure>
-        <div class="undo-bar" id="undo-bar" hidden>
-          <button type="button" class="undo-play" id="undo-play" aria-label="Pause"></button>
-          <input type="range" id="undo-range" min="0" max="0" step="1" value="0" aria-labelledby="undo-h">
-          <output id="undo-out" class="tnum" aria-live="polite"></output>
-        </div>
-      </div>
-      <div class="undo-side">
-        <h3 id="undo-h" data-i18n="undo.title">Go back to any step.</h3>
-        <p data-i18n="undo.body">Drag through the edit history of this hair. In Avistry, click a step in the History list to go back to it.</p>
-        <ol class="hist-list" id="hist-list" role="list" hidden></ol>
-        <div class="hist-still" id="hist-still">
-          <img class="cutout-inline" src="media/v4/ui-history.webp" width="644" height="262" loading="lazy" decoding="async" alt="The History list in Avistry: click a step to go back to it" data-i18n-attr="alt:undo.hist.alt">
-          <p data-i18n="undo.fallback">Ctrl+Z undoes every edit.</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="safe-two">
-      <div class="files" id="files">
-        <h3 data-i18n="files.title">Your files stay safe.</h3>
-        <p data-i18n="files.body">Saving adds new files next to the original. The original stays exactly as it was.</p>
-        <figure class="plate plate--sm loop-plate files-plate">
-          <div class="plate-body vwrap" id="files-loop" hidden>
-            <video muted playsinline loop preload="none" width="1280" height="720" style="--ar: 16 / 9; --ar-m: 4 / 5" data-loop="files" aria-label="The original hair material and texture stay unchanged; Avistry's new material, PNG and recipe appear as separate files." data-i18n-attr="aria-label:files.alt"></video>
-            <button type="button" class="pp" aria-label="Play video" data-i18n-attr="aria-label:ui.play"></button>
+<main id="main" class="feature-studio" data-media-version="030-studio-capture-6">
+  <section class="studio-hero surface-dark" id="editor" aria-labelledby="studio-title">
+    <span id="logo" class="studio-alias" aria-hidden="true"></span>
+    <span id="crest" class="studio-alias" aria-hidden="true"></span>
+    <div class="studio-opening-stage">
+      <div class="studio-shell studio-opening-layout">
+        <div class="studio-opening-grid">
+          <figure class="studio-opening-art" aria-label="The same headset in Unity at each stage of the material edit" data-i18n-attr="aria-label:studio.opening.alt">
+            <img src="media/v4/studio/opening/metal.webp?v=030-studio-capture-6" width="1600" height="900" fetchpriority="high" alt="">
+            <img data-opening-image="studio/opening/original.webp" width="1600" height="900" decoding="async" alt="" hidden>
+            <img data-opening-image="studio/opening/layers.webp" width="1600" height="900" decoding="async" alt="" hidden>
+            <img data-opening-image="studio/opening/texture.webp" width="1600" height="900" decoding="async" alt="" hidden>
+            <img data-opening-image="studio/opening/ao.webp" width="1600" height="900" decoding="async" alt="" hidden>
+            <img data-opening-image="studio/opening/normals.webp" width="1600" height="900" decoding="async" alt="" hidden>
+            <img data-opening-image="studio/opening/normal-off.webp" data-opening-normal-off width="1600" height="900" decoding="async" alt="" hidden>
+            <img data-opening-image="studio/opening/metal.webp" width="1600" height="900" decoding="async" alt="" hidden>
+          </figure>
+          <div class="studio-opening-copy">
+            <section class="studio-opening-beat">
+              <h1 id="studio-title"><span data-i18n="studio.title">Edit textures<br>in Unity.</span><i class="emo" data-emo="hue_spin" aria-hidden="true"></i></h1>
+              <p data-i18n="studio.intro">Select a surface, paint on the model, and keep every edit in layers.</p>
+              <span class="studio-page-art" data-studio-paint aria-hidden="true"></span>
+            </section>
+            <section class="studio-opening-beat" hidden>
+              <h2 data-i18n="studio.opening.original.title">Start with a blank material</h2>
+              <p data-i18n="studio.opening.original.body">The unedited headset has a plain grey texture. The mesh and camera stay in place through every step.</p>
+            </section>
+            <section class="studio-opening-beat" hidden>
+              <h2 data-i18n="studio.opening.layers.title">Build the design in layers</h2>
+              <p data-i18n="studio.opening.layers.body">Lay down the colour, then add the artwork on its own layer.</p>
+              <div class="studio-opening-planes" aria-hidden="true">
+                <img data-opening-image="studio/opening/swatch-base.webp" width="512" height="512" alt="">
+                <img data-opening-image="studio/opening/swatch-print.webp" width="512" height="512" alt="">
+                <img data-opening-image="studio/opening/swatch-colour.webp" width="512" height="512" alt="">
+              </div>
+            </section>
+            <section class="studio-opening-beat" hidden>
+              <h2 data-i18n="studio.opening.texture.title">Add surface detail</h2>
+              <p data-i18n="studio.opening.texture.body">Build grain and wear into the texture so each part has its own finish.</p>
+              <img class="studio-opening-sample" data-opening-image="studio/opening/swatch-colour.webp" width="512" height="512" alt="">
+            </section>
+            <section class="studio-opening-beat" hidden>
+              <h2 data-i18n="studio.opening.ao.title">Bake contact shadows</h2>
+              <p data-i18n="studio.opening.ao.body">Ambient occlusion deepens seams and the spots where pieces meet.</p>
+              <img class="studio-opening-sample" data-opening-image="studio/opening/swatch-ao.webp" width="512" height="512" alt="">
+            </section>
+            <section class="studio-opening-beat" hidden>
+              <h2 data-i18n="studio.opening.normals.title">Give the pattern depth</h2>
+              <p data-i18n="studio.opening.normals.body">Bake a normal map so the fine pattern catches the light.</p>
+              <div class="studio-opening-proof">
+                <button type="button" class="studio-opening-compare" data-opening-compare role="switch" aria-checked="true"><img class="studio-opening-map-chip" data-opening-image="studio/opening/swatch-normal.webp" width="512" height="512" alt=""><span data-i18n="studio.maps.normal">Normal map</span><span class="studio-switch-track" aria-hidden="true"></span></button>
+              </div>
+            </section>
+            <section class="studio-opening-beat" hidden>
+              <h2 data-i18n="studio.opening.metal.title">Let the finish catch the light</h2>
+              <p data-i18n="studio.opening.metal.body">Adjust gloss and metal to bring out highlights while keeping the other surfaces matte.</p>
+              <div class="studio-opening-proof">
+                <button type="button" class="studio-opening-compare" data-opening-compare role="switch" aria-checked="true"><svg class="ic" aria-hidden="true"><use href="#i-m-metal"/></svg><span data-i18n="mat.c.metal.t">Metal</span><span class="studio-switch-track" aria-hidden="true"></span></button>
+              </div>
+            </section>
           </div>
-          <div class="plate-body files-mock">
-            <div class="fwin">
-              <p class="fwin-title mono">Textures</p>
-              <ul class="fwin-list" role="list">
-                <li class="frow frow-old"><code class="mono">Hair_color.png</code><span class="fmark"><i aria-hidden="true"></i><span data-i18n="files.orig.label">stays as it was</span></span></li>
-              </ul>
-              <ul class="fwin-new" role="list" id="files-new">
-                <li><code class="mono">Hair_color_ats.png</code><span data-i18n="files.png">the new PNG</span></li>
-                <li><code class="mono">Hair_ats.mat</code><span data-i18n="files.mat">a copy of the material</span></li>
-                <li><code class="mono">Hair_color_ats_recipe.asset</code><span data-i18n="files.recipe">your layers, to keep editing later</span></li>
-              </ul>
+        </div>
+        <div class="studio-opening-footer">
+          <div class="studio-opening-chapters" hidden>
+            <div class="studio-chapter-rail">
+              <input class="studio-chapter-scrub" type="range" min="0" max="6" step="0.01" value="0" aria-label="Material build" data-i18n-attr="aria-label:studio.opening.nav">
+            </div>
+            <ol aria-label="Material build" data-i18n-attr="aria-label:studio.opening.nav">
+              <li><button type="button" aria-current="step" data-i18n="studio.opening.finish">Finished</button></li>
+              <li><button type="button" data-i18n="studio.opening.original">Original</button></li>
+              <li><button type="button" data-i18n="studio.opening.layers">Layers</button></li>
+              <li><button type="button" data-i18n="studio.opening.texture">Texture</button></li>
+              <li><button type="button" data-i18n="studio.opening.ao">Bake</button></li>
+              <li><button type="button" data-i18n="studio.opening.normals">Normals</button></li>
+              <li><button type="button" data-i18n="studio.opening.metal">Material finish</button></li>
+            </ol>
+          </div>
+          <div class="studio-opening-links">
+            <span class="studio-opening-hint"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-fv-scroll"/></svg><span data-i18n="studio.opening.hint">Scroll to see how it’s made</span></span>
+            <a href="#select"><span data-i18n="studio.opening.skip">Explore the tools</span><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <nav class="jump studio-nav" id="jump" aria-label="On this page" data-i18n-attr="aria-label:jump.label">
+    <div class="studio-shell">
+      <ul role="list">
+        <li><a href="#editor" data-i18n="studio.opening.nav">Material build</a></li>
+        <li><a href="#select" data-i18n="tools.n.select">Select</a></li>
+        <li><a href="#paint" data-i18n="tools.n.paint">Paint</a></li>
+        <li><a href="#layers" data-i18n="jump.layers">Layers</a></li>
+        <li><a href="#modes" data-i18n="studio.layers.blends">Blend modes</a></li>
+        <li><a href="#texture" data-i18n="studio.surface.nav">Texture</a></li>
+        <li><a href="#colour" data-i18n="jump.colour">Colour</a></li>
+        <li><a href="#quick-material" data-i18n="tools.n.material">Material</a></li>
+        <li><a href="#maps" data-i18n="jump.maps">Maps</a></li>
+        <li><a href="#safety" data-i18n="studio.save">Save</a></li>
+        <li><a href="#learn" data-i18n="nav.learn">Learn</a></li>
+      </ul>
+      <div class="studio-switch studio-modes" role="group" aria-label="Choose how to browse Features" data-i18n-attr="aria-label:fv.label" hidden>
+        <button type="button" data-studio-view="scroll" aria-pressed="true" aria-label="Scroll" data-i18n-attr="aria-label:fv.scroll"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-fv-scroll"/></svg><span data-i18n="fv.scroll">Scroll</span></button>
+        <button type="button" data-studio-view="overview" aria-pressed="false" aria-label="Overview" data-i18n-attr="aria-label:fv.overview"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-fv-grid"/></svg><span data-i18n="fv.overview">Overview</span></button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="studio-flow studio-shell">
+    <section class="studio-section studio-select" id="select" aria-labelledby="studio-select-title">
+      <header class="studio-section-head studio-sticker-place">
+        <span class="studio-sticker" data-stk="my_uvs" aria-hidden="true"></span>
+        <h2 id="studio-select-title"><span data-i18n="studio.select.title">Select where the edit goes.</span><i class="emo" data-emo="e_magic_wand" aria-hidden="true"></i></h2>
+        <p data-i18n="studio.select.body">Preview a selection before you click. The mesh and texture show the same pieces. Return to a part to pick up its selection again.</p>
+      </header>
+      <div class="studio-motion-track" data-motion-study="select"><div class="studio-motion-stage"><div class="studio-workbench">
+        <div class="studio-gallery-head">
+          <div class="studio-switch studio-tools" role="group" aria-label="Selection tools" data-i18n-attr="aria-label:sel.tools">
+            <button type="button" data-image="studio/select-uv.webp" data-caption="studio.select.uv.note" aria-pressed="true"><svg class="ic" aria-hidden="true"><use href="#i-sel-click"/></svg><span data-i18n="studio.select.uv">Pieces and areas</span></button>
+            <button type="button" data-image="studio/select-part.webp" data-caption="studio.select.part.note" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-sel-part"/></svg><span data-i18n="studio.select.part">By part and tile</span></button>
+            <button type="button" data-image="studio/select-topology.webp" data-caption="studio.select.topology.note" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-sel-loop"/></svg><span data-i18n="studio.select.topology">Faces and edges</span></button>
+            <button type="button" data-image="studio/select-colour.webp" data-caption="studio.select.colour.note" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-sel-wand"/></svg><span data-i18n="studio.select.colour">By colour</span></button>
+            <button type="button" data-image="studio/select-paint.webp" data-caption="studio.select.paint.note" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-m-tint"/></svg><span data-i18n="studio.select.paint">Paint selected</span></button>
+          </div>
+</div>
+        <figure class="studio-preview studio-selection-frame">
+          <div class="studio-motion-picture studio-motion-selection">
+            <img src="media/v4/studio/select-uv.webp?v=030-studio-capture-6" width="1280" height="720" loading="lazy" decoding="async" alt="">
+            <canvas width="800" height="450" data-motion-canvas aria-hidden="true"></canvas>
+          </div>
+          <figcaption class="studio-caption" data-studio-caption aria-live="polite" data-i18n="studio.select.uv.note">Click a piece, drag a box, or draw a lasso to choose an area.</figcaption>
+        </figure>
+      </div></div></div>
+      <figure class="studio-gesture-film" id="mesh-selection">
+        <figcaption class="studio-support-copy">
+          <h3 data-i18n="studio.select.gesture.title">Select and switch meshes</h3>
+          <p data-i18n="studio.select.gesture.body">Drag a box or lasso around the earcup. Select the headband, then return to the earcup to see its selection restored.</p>
+          <a class="studio-native-panel" href="media/v4/studio/selection-tools-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/selection-tools-panel.webp?v=030-studio-capture-6" width="528" height="255" loading="lazy" decoding="async" alt="Selection tools" data-i18n-attr="alt:sel.tools"></a>
+        </figcaption>
+        <div class="plate-body vwrap">
+          <video muted playsinline loop preload="none" width="1280" height="720" poster="media/v4/studio/mesh-selection-poster.webp?v=030-studio-capture-6" data-loop="studio/mesh-selection" aria-label="Select and switch meshes" data-i18n-attr="aria-label:studio.select.gesture.title"></video>
+          <button type="button" class="pp" aria-label="Play video" data-i18n-attr="aria-label:ui.play"></button>
+        </div>
+      </figure>
+    </section>
+
+    <section class="studio-section studio-paint" id="paint" aria-labelledby="studio-paint-title">
+      <span id="scene-workflow" class="studio-alias" aria-hidden="true"></span>
+      <header class="studio-section-head" data-studio-doodle="zigzag">
+        <h2 id="studio-paint-title"><span data-i18n="studio.paint.title">Paint on the model.</span><i class="emo" data-emo="e_brush" aria-hidden="true"></i></h2>
+        <p data-i18n="studio.paint.body">Brush, fill or drag a gradient inside the selected area.</p>
+      </header>
+      <div class="studio-motion-track" data-motion-study="paint" data-recording="studio/paint-scroll.mp4"><div class="studio-motion-stage">
+        <figure class="studio-motion-picture studio-motion-paint">
+          <img src="media/v4/studio/paint-poster.webp?v=030-studio-capture-6" width="1280" height="720" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.paint.title">
+          <canvas width="800" height="450" data-motion-canvas aria-hidden="true"></canvas>
+        </figure>
+      </div></div>
+      <div class="studio-body-paint">
+        <figure>
+          <a class="studio-native-panel" href="media/v4/studio/body-headband.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/body-headband.webp?v=030-studio-capture-6" width="1280" height="720" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.paint.body.headband"></a>
+          <figcaption data-i18n="studio.paint.body.headband">Paint the headband</figcaption>
+        </figure>
+        <figure>
+          <a class="studio-native-panel" href="media/v4/studio/body-cushion.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/body-cushion.webp?v=030-studio-capture-6" width="1280" height="720" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.paint.body.cushion"></a>
+          <figcaption data-i18n="studio.paint.body.cushion">Paint the cushions</figcaption>
+        </figure>
+      </div>
+      <article class="studio-tools-note" id="studio-paint-tools"><h3 data-i18n="studio.paint.more">Brush and fill tools</h3>
+        <p data-i18n="studio.paint.more.body">Mirror a stroke, restrict the paint area, erase on a layer, or fill a region by colour. Work on the 3D surface or on its texture.</p>
+        <a class="studio-native-panel" href="media/v4/studio/paint-handoff-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/paint-handoff-panel.webp?v=030-studio-capture-6" width="525" height="256" loading="lazy" decoding="async" alt="Paint selected" data-i18n-attr="alt:studio.select.paint"></a>
+      </article>
+      <div class="studio-support-grid studio-brush-controls">
+        <article class="studio-support-card">
+          <header class="studio-support-copy">
+            <h3 data-i18n="studio.pen.title">Pen tablet support</h3>
+            <p data-i18n="studio.pen.body">Try light and firm strokes on the pressure pad with an XP-Pen or another pen tablet. Save the range in a preset and use pressure for size or strength. Let the tip follow the stroke, or steer it with tilt or rotation if your pen supports it.</p>
+          </header>
+          <figure class="studio-support-media">
+            <a class="studio-native-panel" href="media/v4/studio/pen-controls-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/pen-controls-panel.webp?v=030-studio-capture-6" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.pen.title" width="472" height="279"></a>
+          </figure>
+        </article>
+        <article class="studio-support-card">
+          <header class="studio-support-copy">
+            <h3 data-i18n="pt.brushes">29 brushes plus 74 searchable brush shapes</h3>
+          </header>
+          <figure class="studio-support-media studio-brush-pictures">
+            <a class="studio-native-panel" href="media/v4/studio/brush-library-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/brush-library-panel.webp?v=030-studio-capture-6" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:pt.brushes" width="547" height="466"></a>
+            <a class="studio-native-panel" href="media/v4/studio/brush-shapes-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/brush-shapes-panel.webp?v=030-studio-capture-6" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:pt.brushes" width="547" height="262"></a>
+          </figure>
+        </article>
+      </div>
+      <div class="studio-bristle-study">
+        <header class="studio-support-copy">
+          <h3 data-i18n="study.bristle">How much paint is on the brush?</h3>
+          <p data-i18n="study.bristle.body">Compare the same stroke at three paint loads. Look at the gaps between strands as the brush turns.</p>
+        </header>
+        <div class="studio-bristle-samples">
+          <figure><img src="media/v4/studio/bristle-dry.webp?v=030-studio-capture-6" width="768" height="256" loading="lazy" decoding="async" alt=""><figcaption data-i18n="study.dry">Dry</figcaption></figure>
+          <figure><img src="media/v4/studio/bristle-natural.webp?v=030-studio-capture-6" width="768" height="256" loading="lazy" decoding="async" alt=""><figcaption data-i18n="study.natural">Natural</figcaption></figure>
+          <figure><img src="media/v4/studio/bristle-loaded.webp?v=030-studio-capture-6" width="768" height="256" loading="lazy" decoding="async" alt=""><figcaption data-i18n="study.loaded">Loaded</figcaption></figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="studio-section sec stack-band surface-dark" id="layers" aria-labelledby="stack-title">
+      <div class="stack" id="stack" data-state="idle">
+        <div class="stack-head wrap" data-studio-doodle="wave">
+          <h2 id="stack-title"><span data-i18n="studio.layers.title">Build the finish in layers.</span><i class="emo" data-emo="e_layers" aria-hidden="true"></i></h2>
+          <p class="lead" data-i18n="studio.layers.body">Choose a material and follow its layers from the original texture to the finished surface.</p>
+          <div class="stack-materials" role="group" aria-labelledby="stack-material-label" hidden>
+            <span id="stack-material-label" data-i18n="tools.n.material">Material</span>
+            <button type="button" data-stack-material="earcup" aria-pressed="true" data-i18n="studio.layer.earcup">Earcup</button>
+            <button type="button" data-stack-material="headband" aria-pressed="false" data-i18n="studio.layer.headband">Headband</button>
+            <button type="button" data-stack-material="cushion" aria-pressed="false" data-i18n="studio.layer.cushion">Cushion</button>
+          </div>
+        </div>
+        <div class="stack-track" id="stack-track" data-hold-result hidden>
+          <div class="stack-stage" tabindex="0" aria-labelledby="stack-title">
+            <div class="stack-scene" id="stack-scene" aria-hidden="true"></div>
+            <ol class="stack-labels" id="stack-labels" role="list"></ol>
+            <p class="stack-count tnum" id="stack-count" aria-hidden="true"></p>
+          </div>
+        </div>
+        <ol class="stack-cards wrap" id="stack-cards" role="list" hidden></ol>
+        <figure class="stack-still wrap">
+          <img src="media/v4/studio/layer-07-finish.webp?v=030-studio-capture-6" width="1600" height="900" loading="lazy" decoding="async" alt="">
+        </figure>
+      </div>
+    </section>
+
+    <section class="studio-section sec modes-band surface-dark" id="modes" aria-labelledby="modes-title">
+      <div class="modes" id="modes-root" data-state="idle">
+        <div class="modes-head wrap">
+          <h2 id="modes-title"><span data-i18n="modes.title">28 blend modes. 11 adjustments.</span><i class="emo" data-emo="shader_glitch" aria-hidden="true"></i></h2>
+          <p class="lead" data-i18n="studio.layers.more.body">Clip paint to the layer below, stack blend modes with individual strengths, or merge layers. Compatible paint layers can keep their editable strokes.</p>
+        </div>
+        <div class="modes-track" id="modes-track" hidden>
+          <div class="modes-stage" tabindex="0" aria-labelledby="modes-title">
+            <div class="modes-view" id="modes-view">
+              <p class="modes-name" id="modes-name" aria-live="off"></p>
+            </div>
+            <div class="modes-side">
+              <p class="modes-kind" id="modes-kind"></p>
+              <ol class="modes-list" id="modes-list" role="list"></ol>
+              <p class="modes-count tnum" id="modes-count" aria-hidden="true"></p>
             </div>
           </div>
-          <figcaption class="plate-cap"><span data-i18n="files.note">Example names. Saving again adds _ats_2.</span> <button type="button" class="btn btn-quiet btn-sm" id="files-replay" hidden data-i18n="files.replay">Play again</button></figcaption>
+        </div>
+        <div class="modes-grid wrap" id="modes-grid" hidden></div>
+        <figure class="modes-still wrap">
+          <img src="media/v4/studio/blend-normal.webp?v=030-studio-capture-6" width="960" height="960" loading="lazy" decoding="async" alt="">
         </figure>
       </div>
+    </section>
 
-      <div class="report" id="report">
-        <h3 data-i18n="card.title">Catch problems before you upload.</h3>
-        <p data-i18n="card.body">The material audit looks for what makes avatars blurry, heavy or pink, and fixes most of it with one click.</p>
-        <div class="rcard plate plate--md" id="rcard">
-          <p class="rcard-head" data-i18n="card.head">Audit of the showcase avatar</p>
-          <p class="rcard-counts tnum" id="rcard-counts" hidden></p>
-          <ul class="rcard-rows" id="rcard-rows" role="list">
-            <li data-row="crunch"><svg class="icon is-neutral" aria-hidden="true" focusable="false"><use href="#i-dot"/></svg><strong data-i18n="opt.1.t">Crunch compression off</strong><span class="rstat"></span><details><summary data-i18n="card.why">Why it matters</summary><p data-i18n="opt.1.b">Crunch shrinks the download but smears colour and detail, and turning it off makes the avatar a little bigger. Avistry warns you and has a Turn off Crunch button.</p></details></li>
-            <li data-row="format"><svg class="icon is-neutral" aria-hidden="true" focusable="false"><use href="#i-dot"/></svg><strong data-i18n="opt.2.t">PNG, not JPG</strong><span class="rstat"></span><details><summary data-i18n="card.why">Why it matters</summary><p data-i18n="opt.2.b">A JPG blurs detail and cannot hold transparency. Avistry flags JPG sources and always saves a PNG.</p></details></li>
-            <li data-row="size"><svg class="icon is-neutral" aria-hidden="true" focusable="false"><use href="#i-dot"/></svg><strong data-i18n="opt.3.t">Power-of-two sizes</strong><span class="rstat"></span><details><summary data-i18n="card.why">Why it matters</summary><p data-i18n="opt.3.b">Sizes like 1024 or 2048 use less memory than odd sizes, which can look soft. Avistry tells you when a size is off.</p></details></li>
-            <li data-row="mips"><svg class="icon is-neutral" aria-hidden="true" focusable="false"><use href="#i-dot"/></svg><strong data-i18n="opt.4.t">Kaiser mipmaps</strong><span class="rstat"></span><details><summary data-i18n="card.why">Why it matters</summary><p data-i18n="opt.4.b">The Box filter blurs a texture when it is seen from far away. VRChat recommends Kaiser, and there is a Use Kaiser button in Advanced mode.</p></details></li>
-            <li data-row="srgb"><svg class="icon is-neutral" aria-hidden="true" focusable="false"><use href="#i-dot"/></svg><strong data-i18n="opt.5.t">Read the right way</strong><span class="rstat"></span><details><summary data-i18n="card.why">Why it matters</summary><p data-i18n="opt.5.b">Colour images need sRGB on, and data images like masks need it off. Normal maps need the Normal map type. Wrong settings wash out colour or break an effect, and Fix N image settings corrects them.</p></details></li>
-          </ul>
-          <p class="rcard-also-h" data-i18n="card.also">Also done every time you save</p>
-          <ul class="rcard-rows rcard-also" role="list">
-            <li><strong data-i18n="opt.6.t">Same import settings on the new PNG</strong><details><summary data-i18n="card.why">Why it matters</summary><p data-i18n="opt.6.b">The saved PNG copies the original's max size, compression and other import settings, so it behaves like the file it replaces.</p></details></li>
-            <li><strong data-i18n="opt.7.t">Seam padding on save</strong><details><summary data-i18n="card.why">Why it matters</summary><p data-i18n="opt.7.b">On colour textures laid out by the part’s UVs, the empty space around pieces is filled with their edge colours, so mipmaps do not pull the background into seams.</p></details></li>
-            <li><strong data-i18n="opt.8.t">Material audit</strong><details><summary data-i18n="card.why">Why it matters</summary><p data-i18n="opt.8.b">Finds empty slots, extra materials that draw a part twice and slow the avatar, pink shaders and missing images, hidden parts included.</p></details></li>
-          </ul>
-          <img class="cutout-inline rcard-still" id="rcard-still" src="media/v4/ui-audit.webp" width="662" height="464" loading="lazy" decoding="async" alt="Avistry's material check on a demo avatar lists a few things worth a look, each with a button to fix or select." data-i18n-attr="alt:card.alt">
+
+    <section class="studio-section studio-surface" id="texture" aria-labelledby="studio-surface-title" data-studio-pick>
+      <header class="studio-section-head" data-studio-doodle="loop">
+        <h2 id="studio-surface-title"><span data-i18n="studio.surface.title">Add texture and detail.</span><i class="emo" data-emo="e_palette" aria-hidden="true"></i></h2>
+        <p data-i18n="studio.surface.body">Build colour, brush texture and relief on the same surface.</p>
+      </header>
+      <div class="studio-motion-track" data-scroll-pick data-hold-result><div class="studio-motion-stage"><div class="studio-workbench">
+        <div class="studio-gallery-head">
+          <div class="studio-switch studio-tools" role="group" aria-label="Surface finishes" data-i18n-attr="aria-label:studio.surface.label">
+            <button type="button" data-image="studio/surface-base.webp" data-sample="studio/surface-base-texture.webp" data-caption="studio.surface.base.note" aria-pressed="false" data-i18n="studio.surface.base">Brown leather</button>
+            <button type="button" data-image="studio/surface-print.webp" data-sample="studio/surface-print-texture.webp" data-caption="studio.surface.print.note" aria-pressed="true" data-i18n="studio.surface.print">Blossoms and waves</button>
+            <button type="button" data-image="studio/surface-grain.webp" data-sample="studio/surface-grain-texture.webp" data-caption="studio.surface.grain.note" aria-pressed="false" data-i18n="studio.surface.grain">Brush texture</button>
+          </div>
+        </div>
+        <div class="studio-proof-grid">
+          <figure class="studio-preview studio-surface-model">
+            <img src="media/v4/studio/surface-print.webp?v=030-studio-capture-6" data-studio-image width="1600" height="900" loading="lazy" decoding="async" alt="">
+          </figure>
+          <figure class="studio-sample studio-texture-sample">
+            <img src="media/v4/studio/surface-print-texture.webp?v=030-studio-capture-6" data-studio-sample width="477" height="364" loading="lazy" decoding="async" alt="">
+            <figcaption data-i18n="studio.surface.sample">Texture detail</figcaption>
+          </figure>
+        </div>
+        <p class="studio-caption" data-studio-caption aria-live="polite" data-i18n="studio.surface.print.note">Paint flowing lines and cherry-blossom accents.</p>
+      </div></div></div>
+      <div class="studio-surface-details">
+        <figure>
+          <img src="media/v4/studio/leather-cushion-detail.webp?v=030-studio-capture-6" width="600" height="600" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.surface.detail.cushion">
+          <figcaption data-i18n="studio.surface.detail.cushion">Leather cushions</figcaption>
+        </figure>
+        <figure>
+          <img src="media/v4/studio/leather-headband-detail.webp?v=030-studio-capture-6" width="600" height="600" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.surface.detail.headband">
+          <figcaption data-i18n="studio.surface.detail.headband">Leather headband</figcaption>
+        </figure>
+        <figure>
+          <img src="media/v4/studio/metal-detail.webp?v=030-studio-capture-6" width="600" height="600" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.surface.detail.metal">
+          <figcaption data-i18n="studio.surface.detail.metal">Brushed metal</figcaption>
+        </figure>
+        <figure>
+          <img src="media/v4/studio/rear-finish.webp?v=030-studio-capture-6" width="600" height="600" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.surface.detail.rear">
+          <figcaption data-i18n="studio.surface.detail.rear">Both sides</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="studio-section studio-colour" id="colour" aria-labelledby="studio-colour-title">
+      <header class="studio-section-head studio-sticker-place">
+        <span class="studio-sticker" data-stk="recoloured" aria-hidden="true"></span>
+        <h2 id="studio-colour-title"><span data-i18n="studio.colour.title">Match a reference colour.</span><i class="emo" data-emo="e_eyedropper" aria-hidden="true"></i></h2>
+        <p data-i18n="studio.colour.body">Choose a reference colour to recolour the selected leather panels.</p>
+      </header>
+      <div class="studio-motion-track" data-scroll-compare="colour" data-hold-result><div class="studio-motion-stage"><div class="studio-colour-grid">
+        <div class="cmp studio-compare" data-cmp="71" data-ar="7 / 6" data-ar-m="7 / 6">
+          <div class="cmp-view">
+            <picture class="cmp-saved"><img src="media/v4/studio/colour-match-crimson.webp?v=030-studio-capture-6" width="1008" height="864" loading="lazy" decoding="async" alt=""></picture>
+            <picture class="cmp-orig"><img src="media/v4/studio/colour-match-before.webp?v=030-studio-capture-6" width="1008" height="864" loading="lazy" decoding="async" alt=""></picture>
+            <span class="cmp-label cmp-label-orig" aria-hidden="true" data-i18n="compare.original">Before</span>
+            <span class="cmp-label cmp-label-saved" aria-hidden="true" data-i18n="compare.saved">After</span>
+            <span class="cmp-seam" aria-hidden="true"><span class="cmp-handle"></span></span>
+            <input class="cmp-range" type="range" min="0" max="100" value="71" aria-label="Compare the colour match" data-i18n-attr="aria-label:studio.colour.compare">
+          </div>
+        </div>
+        <div class="studio-reference" data-reference-look="crimson" style="--reference-colour: #D87381">
+          <span class="studio-reference-swatch" aria-hidden="true"></span>
+          <div class="studio-reference-caption">
+            <span id="reference-label" data-i18n="studio.colour.reference">Reference colour</span>
+            <strong data-reference-name data-i18n="look.crimson">Crimson</strong>
+            <code id="reference-hex" data-reference-hex>#D87381</code>
+          </div>
+          <div class="studio-palette-dock"></div>
+          <template data-match-look="original" data-match-hex="#B59DDF"><img src="media/v4/studio/colour-match-original.webp?v=030-studio-capture-6" width="1008" height="864" alt=""></template>
+          <template data-match-look="crimson" data-match-hex="#D87381"><img src="media/v4/studio/colour-match-crimson.webp?v=030-studio-capture-6" width="1008" height="864" alt=""></template>
+          <template data-match-look="frost" data-match-hex="#8FD3FF"><img src="media/v4/studio/colour-match-frost.webp?v=030-studio-capture-6" width="1008" height="864" alt=""></template>
+          <template data-match-look="venom" data-match-hex="#6AB791"><img src="media/v4/studio/colour-match-venom.webp?v=030-studio-capture-6" width="1008" height="864" alt=""></template>
+        </div>
+      </div></div></div>
+      <article class="studio-tools-note studio-colour-controls" id="studio-colour-tools">
+        <div><h3 data-i18n="studio.colour.more">More colour tools</h3>
+        <p data-i18n="studio.colour.more.body">Adjust hue, saturation and brightness, or use a gradient map to map colours to the texture’s light and dark areas.</p></div>
+        <div class="studio-colour-control-images">
+          <a class="studio-native-panel" href="media/v4/studio/recolour-scope-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/recolour-scope-panel.webp?v=030-studio-capture-6" width="523" height="158" loading="lazy" decoding="async" alt="By part" data-i18n-attr="alt:sel.c.part"></a>
+          <a class="studio-native-panel" href="media/v4/studio/recolour-tools-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/recolour-tools-panel.webp?v=030-studio-capture-6" width="523" height="109" loading="lazy" decoding="async" alt="Hue, saturation, brightness" data-i18n-attr="alt:mode.a.hsl"></a>
+        </div>
+      </article>
+    </section>
+
+    <section class="studio-section studio-material-study" id="quick-material" aria-labelledby="studio-material-title">
+      <header class="studio-section-head">
+        <h2 id="studio-material-title"><span data-i18n="studio.material.title">Tune the material.</span><i class="emo" data-emo="shader_glitch" aria-hidden="true"></i></h2>
+        <p data-i18n="mat.lead2">A material controls how a part responds to light. Quick material puts frequently used settings for Poiyomi, lilToon and supported Unity shaders together in Recolour.</p>
+      </header>
+      <div class="studio-motion-track" data-motion-study="material" data-hold-result><div class="studio-motion-stage"><div class="studio-workbench">
+        <div class="studio-gallery-head">
+          <div class="studio-switch studio-tools" role="group" aria-label="Material" data-i18n-attr="aria-label:mat.title">
+            <button type="button" data-image="studio/material-base.webp" data-caption="studio.material.base.note" aria-pressed="true" data-i18n="studio.material.base">Matte</button>
+            <button type="button" data-image="studio/material-tint.webp" data-caption="mat.c.tint.b" aria-pressed="false" data-i18n="mat.c.tint.t">Tint</button>
+            <button type="button" data-image="studio/material-satin.webp" data-caption="studio.material.satin.note" aria-pressed="false" data-i18n="studio.material.satin">Satin</button>
+            <button type="button" data-image="studio/material-metal.webp" data-caption="mat.c.metal.b" aria-pressed="false" data-i18n="mat.c.metal.t">Metal</button>
+            <button type="button" data-image="studio/material-shadow.webp" data-caption="mat.c.shadow.b" aria-pressed="false" data-i18n="mat.c.shadow.t">Shadow</button>
+            <button type="button" data-image="studio/material-matcap.webp" data-caption="mat.c.matcap.b" aria-pressed="false" data-i18n="mat.c.matcap.t">Matcap</button>
+            <button type="button" data-image="studio/material-glitter.webp" data-caption="mat.c.glitter.b" aria-pressed="false" data-i18n="mat.c.glitter.t">Glitter</button>
+            <button type="button" data-image="studio/material-rim.webp" data-caption="mat.c.rim.b" aria-pressed="false" data-i18n="mat.c.rim.t">Rim light</button>
+            <button type="button" data-image="studio/material-outline.webp" data-caption="mat.c.outline.b" aria-pressed="false" data-i18n="mat.c.outline.t">Outline</button>
+            <button type="button" data-image="studio/material-emission.webp" data-caption="mat.c.glow.b" aria-pressed="false" data-i18n="mat.c.glow.t">Glow</button>
+          </div>
+        </div>
+        <figure class="studio-preview">
+          <div class="studio-motion-picture">
+            <img src="media/v4/studio/material-base.webp?v=030-studio-capture-6" width="1280" height="720" loading="lazy" decoding="async" alt="">
+            <canvas width="800" height="450" data-motion-canvas aria-hidden="true"></canvas>
+          </div>
+          <figcaption class="studio-caption" data-studio-caption aria-live="polite" data-i18n="studio.material.base.note">A soft finish keeps the painted detail visible with broad highlights.</figcaption>
+        </figure>
+      </div></div></div>
+      <div class="studio-material-examples studio-support-grid">
+        <article class="studio-material-example studio-support-card">
+          <header class="studio-support-copy">
+            <h3 data-i18n="studio.material.quick.title">Quick material</h3>
+            <p data-i18n="studio.material.quick.body">Adjust tint, reflections, outlines and the surface finish together.</p>
+          </header>
+          <figure class="studio-support-media">
+            <a class="studio-native-panel" href="media/v4/studio/quick-material-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/quick-material-panel.webp?v=030-studio-capture-6" width="573" height="451" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.material.quick.title"></a>
+          </figure>
+        </article>
+        <article class="studio-material-example studio-support-card" id="studio-material-tools">
+          <header class="studio-support-copy studio-sticker-place">
+            <span class="studio-sticker" data-stk="lgtm" aria-hidden="true"></span>
+            <h3 data-i18n="studio.material.copy.title">Copy material settings</h3>
+            <p data-i18n="studio.material.copy.body">Choose the settings to transfer, review the differences, and create an editable copy.</p>
+          </header>
+          <figure class="studio-support-media">
+            <a class="studio-native-panel" href="media/v4/studio/advanced-copy-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/advanced-copy-panel.webp?v=030-studio-capture-6" width="573" height="442" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.material.copy.title"></a>
+          </figure>
+        </article>
+        <article class="studio-material-example studio-support-card studio-mask-example">
+          <header class="studio-support-copy">
+            <h3 data-i18n="studio.material.mask.title">Add a shader mask</h3>
+            <p data-i18n="studio.material.mask.body">Open Add a mask to see the available slots. Choose a slot, then add its texture.</p>
+          </header>
+          <figure class="studio-support-media">
+            <a class="studio-native-panel" href="media/v4/studio/mask-picker-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/mask-picker-panel.webp?v=030-studio-capture-6" width="430" height="114" loading="lazy" decoding="async" alt="Add a shader mask" data-i18n-attr="alt:studio.material.mask.title"></a>
+          </figure>
+        </article>
+      </div>
+    </section>
+
+    <section class="studio-section studio-maps" id="maps" aria-labelledby="studio-maps-title">
+      <header class="studio-section-head studio-sticker-place">
+        <span class="studio-sticker" data-stk="baking" aria-hidden="true"></span>
+        <h2 id="studio-maps-title"><span data-i18n="studio.maps.title">Bake shadows and surface detail.</span><i class="emo" data-emo="e_fresh_bake" aria-hidden="true"></i></h2>
+        <p data-i18n="studio.maps.body">Bake ambient occlusion from the mesh and make a normal map from texture detail.</p>
+      </header>
+      <div class="studio-map-workflow">
+      <section class="studio-map-example studio-map-step studio-map-step--ao" id="studio-ao" aria-labelledby="studio-ao-title">
+        <span id="crest-ao" class="studio-alias" aria-hidden="true"></span>
+        <header class="studio-section-head studio-chapter-head">
+          <h3 id="studio-ao-title" data-i18n="studio.maps.chapter.ao">Bake shadows</h3>
+          <p data-i18n="studio.maps.ao.note">Bake shadows where the model’s parts meet and add them as a Multiply layer.</p>
+        </header>
+        <div class="studio-motion-track" data-scroll-compare data-hold-result><div class="studio-motion-stage">
+          <div class="studio-map-layout">
+            <div class="cmp studio-compare" data-cmp="50" data-ar="1.18 / 1" data-ar-m="1.18 / 1">
+              <div class="cmp-view">
+                <picture class="cmp-saved"><img src="media/v4/studio/ao-after.webp?v=030-studio-capture-6" width="1280" height="720" loading="lazy" decoding="async" alt=""></picture>
+                <picture class="cmp-orig"><img src="media/v4/studio/ao-before.webp?v=030-studio-capture-6" width="1280" height="720" loading="lazy" decoding="async" alt=""></picture>
+                <span class="cmp-label cmp-label-orig" aria-hidden="true" data-i18n="compare.original">Before</span>
+                <span class="cmp-label cmp-label-saved" aria-hidden="true" data-i18n="compare.saved">After</span>
+                <span class="cmp-seam" aria-hidden="true"><span class="cmp-handle"></span></span>
+                <input class="cmp-range" type="range" min="0" max="100" value="50" aria-label="Compare the surface before and after baking shadows" data-i18n-attr="aria-label:studio.maps.ao.compare">
+              </div>
+            </div>
+            <div class="studio-map-evidence studio-map-controls">
+              <figure class="studio-map-swatch studio-map-output">
+                <img src="media/v4/studio/maps-ao.webp?v=030-studio-capture-6" width="512" height="512" loading="lazy" decoding="async" alt="">
+                <figcaption data-i18n="studio.maps.ao.map">Baked shadow map</figcaption>
+              </figure>
+              <figure class="studio-support-media studio-map-panel">
+                <a class="studio-native-panel" href="media/v4/studio/bake-ao-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/bake-ao-panel.webp?v=030-studio-capture-6" width="547" height="241" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.maps.chapter.ao"></a>
+              </figure>
+            </div>
+          </div>
+        </div></div>
+      </section>
+      <section class="studio-map-example studio-map-step studio-map-step--normal" id="material" aria-labelledby="studio-normals-title">
+        <span id="crest-poiyomi" class="studio-alias" aria-hidden="true"></span>
+        <header class="studio-section-head studio-chapter-head">
+          <h3 id="studio-normals-title" data-i18n="studio.maps.metal">Make a normal map.</h3>
+          <p data-i18n="studio.maps.metal.body">Turn texture detail into surface relief. Compare the material with the normal map on and off.</p>
+        </header>
+        <div class="studio-motion-track" data-scroll-compare data-hold-result><div class="studio-motion-stage">
+          <div class="studio-map-layout">
+            <div class="cmp studio-compare" data-cmp="50" data-ar="1 / 1" data-ar-m="1 / 1">
+              <div class="cmp-view">
+                <picture class="cmp-saved"><img src="media/v4/studio/normal-detail-after.webp?v=030-studio-capture-6" width="960" height="960" loading="lazy" decoding="async" alt=""></picture>
+                <picture class="cmp-orig"><img src="media/v4/studio/normal-detail-before.webp?v=030-studio-capture-6" width="960" height="960" loading="lazy" decoding="async" alt=""></picture>
+                <span class="cmp-label cmp-label-orig" aria-hidden="true" data-i18n="studio.maps.normal.off">Before</span>
+                <span class="cmp-label cmp-label-saved" aria-hidden="true" data-i18n="studio.maps.normal.on">After</span>
+                <span class="cmp-seam" aria-hidden="true"><span class="cmp-handle"></span></span>
+                <input class="cmp-range" type="range" min="0" max="100" value="50" aria-label="Compare the surface" data-i18n-attr="aria-label:studio.maps.compare">
+              </div>
+            </div>
+            <div class="studio-map-evidence studio-map-controls">
+              <div class="studio-map-flow">
+                <figure class="studio-sample"><img src="media/v4/studio/height-source.webp?v=030-studio-capture-6" width="640" height="640" loading="lazy" decoding="async" alt=""><figcaption data-i18n="studio.maps.height">Texture detail</figcaption></figure>
+                <span aria-hidden="true">→</span>
+                <figure class="studio-sample"><img src="media/v4/studio/maps-normal.webp?v=030-studio-capture-6" width="640" height="640" loading="lazy" decoding="async" alt=""><figcaption data-i18n="studio.maps.normal">Normal map</figcaption></figure>
+              </div>
+              <figure class="studio-support-media studio-map-panel">
+                <a class="studio-native-panel" href="media/v4/studio/bake-normal-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/bake-normal-panel.webp?v=030-studio-capture-6" width="547" height="207" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.maps.chapter.normal"></a>
+              </figure>
+            </div>
+          </div>
+        </div></div>
+      </section>
+      <section class="studio-map-example studio-map-step studio-map-step--apply studio-material-apply" id="studio-bake-guide" aria-labelledby="studio-apply-title">
+        <span id="studio-light-in-unity" class="studio-alias" aria-hidden="true"></span>
+        <header class="studio-section-head studio-chapter-head" data-studio-doodle="star">
+          <h3 id="studio-apply-title" data-i18n="studio.maps.chapter.apply">Apply to material</h3>
+          <p data-i18n="studio.maps.apply.body">Assign the generated map to a compatible material and preview the result in Unity.</p>
+        </header>
+        <div class="studio-map-layout studio-map-apply-layout">
+          <figure class="studio-model-photo"><img src="media/v4/studio/maps-after.webp?v=030-studio-capture-6" width="1280" height="720" loading="lazy" decoding="async" alt=""></figure>
+          <div class="studio-map-evidence studio-map-controls">
+            <figure class="studio-support-media studio-map-panel">
+              <a class="studio-native-panel" href="media/v4/studio/bake-apply-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/bake-apply-panel.webp?v=030-studio-capture-6" width="547" height="275" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.maps.chapter.apply"></a>
+            </figure>
+            <p class="studio-compatibility-note" data-i18n="studio.maps.compatible">Use generated maps with supported Unity Standard, Poiyomi and lilToon materials.</p>
+          </div>
+        </div>
+      </section>
+      </div>
+    </section>
+
+    <section class="studio-section studio-save" id="safety" aria-labelledby="studio-save-title">
+      <span id="reopen-and-share" class="studio-alias" aria-hidden="true"></span>
+      <header class="studio-section-head studio-sticker-place">
+        <span class="studio-sticker" data-stk="originals_safe" aria-hidden="true"></span>
+        <h2 id="studio-save-title"><span data-i18n="studio.save.title">Save and share</span><i class="emo" data-emo="e_originals_safe" aria-hidden="true"></i></h2>
+        <p data-i18n="studio.save.body">Save a new texture and material, reopen an editable draft, or share a style pack with just the edits.</p>
+      </header>
+      <div class="studio-save-workflow">
+        <article class="studio-save-output studio-export-example" aria-labelledby="studio-export-title">
+          <header class="studio-support-copy">
+            <h3 id="studio-export-title" data-i18n="files.title">Your files stay safe.</h3>
+            <p data-i18n="files.body">New textures, saved edits and material copies go in Assets/Avistry/Output.</p>
+          </header>
+          <figure class="studio-save-art">
+            <a data-panel-link href="media/v4/studio/save-panel.webp" target="_blank" rel="noopener" title="Open larger" data-i18n-attr="title:ui.zoom">
+              <img class="studio-save-panel" src="media/v4/studio/save-panel.webp?v=030-studio-capture-6" width="1280" height="720" loading="lazy" decoding="async" alt="The Avistry Save panel showing export options" data-i18n-attr="alt:studio.save.alt">
+            </a>
+          </figure>
+          <div class="studio-save-files">
+            <ul role="list">
+              <li><code>Headset_ats.png</code><span data-i18n="files.png">the new PNG</span></li>
+              <li><code>Headset_ats.mat</code><span data-i18n="files.mat">a copy of the material</span></li>
+              <li><code>Headset_ats_recipe.asset</code><span data-i18n="files.recipe">your layers, to keep editing later</span></li>
+            </ul>
+            <p class="studio-export-note" data-i18n="files.note">Example names. Saving again adds _ats_2.</p>
+          </div>
+        </article>
+        <div class="studio-save-continuation">
+          <section class="studio-resume-workflow" aria-labelledby="studio-resume-title">
+            <header class="studio-support-copy studio-group-head" id="studio-save-tools">
+              <h3 id="studio-resume-title" data-i18n="studio.save.more">Drafts, templates and history</h3>
+              <p data-i18n="studio.save.more.body">Save a template to reuse your settings. Reopen a draft to keep working, or step back through Avistry’s edit history.</p>
+            </header>
+            <div class="studio-resume-grid">
+              <article class="studio-support-card studio-draft-card">
+                <header class="studio-support-copy">
+                  <h4 data-i18n="studio.save.drafts">Resume a draft</h4>
+                  <p data-i18n="studio.save.drafts.body">Browse unfinished edits and continue with their layers intact.</p>
+                </header>
+                <figure class="studio-support-media">
+                  <a class="studio-native-panel" href="media/v4/studio/draft-browser.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/draft-browser.webp?v=030-studio-capture-6" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.save.drafts" width="360" height="90"></a>
+                </figure>
+              </article>
+              <article class="studio-support-card studio-template-card">
+                <header class="studio-support-copy">
+                  <h4 data-i18n="studio.save.templates">Reuse a template</h4>
+                  <p data-i18n="studio.save.templates.body">Save the settings and layers to start another edit.</p>
+                </header>
+                <figure class="studio-support-media">
+                  <a class="studio-native-panel" href="media/v4/studio/template-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/template-panel.webp?v=030-studio-capture-6" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.save.templates" width="380" height="124"></a>
+                </figure>
+              </article>
+              <article id="history-example" class="studio-support-card studio-history-card studio-safety-example">
+                <header class="studio-support-copy studio-sticker-place">
+                  <span class="studio-sticker" data-stk="undo" aria-hidden="true"></span>
+                  <h4 data-i18n="undo.title">Go back through Avistry edits.</h4>
+                  <p data-i18n="studio.history.body">Choose a step in History to return to an earlier Avistry edit.</p>
+                </header>
+                <figure class="studio-support-media">
+                  <a class="studio-tool-shot" href="media/v4/studio/history-panel.webp" target="_blank" rel="noopener"><img src="media/v4/studio/history-panel.webp?v=030-studio-capture-6" width="1280" height="720" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.history.body"></a>
+                </figure>
+              </article>
+            </div>
+          </section>
+          <article class="studio-support-card studio-share-card" aria-labelledby="studio-pack-title">
+            <header class="studio-support-copy">
+              <h3 id="studio-pack-title" data-i18n="studio.save.pack">Pack and Share</h3>
+              <p data-i18n="studio.save.pack.body">Share editable layers and added artwork. The recipient supplies the original textures and model.</p>
+            </header>
+            <figure class="studio-support-media">
+              <a class="studio-native-panel" href="media/v4/studio/style-pack-panel.webp" target="_blank" rel="noopener" aria-label="Open larger" data-i18n-attr="aria-label:ui.zoom"><img src="media/v4/studio/style-pack-panel.webp?v=030-studio-capture-6" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:studio.save.pack" width="625" height="420"></a>
+            </figure>
+          </article>
+          <article id="audit-example" class="studio-support-card studio-audit-card studio-safety-example">
+            <header class="studio-support-copy studio-sticker-place">
+              <span class="studio-sticker" data-stk="pink_again" aria-hidden="true"></span>
+              <h3 data-i18n="card.title">Catch problems before you upload.</h3>
+              <p data-i18n="card.body">Scan for missing materials, broken shaders and wrong texture settings. Avistry offers a fix when it can safely make one.</p>
+            </header>
+            <figure class="studio-support-media">
+              <a class="studio-tool-shot" href="media/v4/studio/audit-panel.webp" target="_blank" rel="noopener"><img src="media/v4/studio/audit-panel.webp?v=030-studio-capture-6" width="1280" height="720" loading="lazy" decoding="async" alt="" data-i18n-attr="alt:card.alt"></a>
+            </figure>
+          </article>
         </div>
       </div>
-    </div>
-  </div>
-</section>
+    </section>
 
-
-<!-- 8. LEARN -->
-<section class="sec" id="learn" aria-labelledby="learn-title">
-  <div class="wrap">
-    <h2 id="learn-title"><span data-i18n="learn.h2">Learn as you go, if you like.</span><i class="emo" data-emo="e_avistry_think" aria-hidden="true"></i></h2>
-    <div class="learn-banner" id="learn-banner">
-      <div class="lb-text">
-        <h3 class="lb-title" data-i18n="lb.title">Learn Unity while you paint.</h3>
-        <p data-i18n="lb.body">40 short skills, from finding the Hierarchy to baking maps. Each one explains a word in plain language and shows where it lives in Unity. Nothing is locked.</p>
-        <div class="lb-actions">
-          <a class="btn btn-primary btn-lg" href="learn.html"><span data-i18n="lb.go">Go to the Learn page</span><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
-        </div>
+    <section class="studio-section studio-learn" id="learn" aria-labelledby="studio-learn-title">
+      <header class="studio-section-head studio-sticker-place">
+        <span class="studio-sticker" data-stk="need_help" aria-hidden="true"></span>
+        <h2 id="studio-learn-title"><span data-i18n="learn.h2">Learn the next step in Unity.</span><i class="emo" data-emo="e_avistry_think" aria-hidden="true"></i></h2>
+        <p data-i18n="lb.body">Follow a brush stroke from UV selection to a saved material. Then set up a toggle and test the avatar with the VRChat SDK.</p>
+      </header>
+      <div class="studio-learn-grid studio-support-grid">
+        <article class="studio-learn-card studio-support-card">
+          <header class="studio-support-copy">
+            <h3 data-i18n="lb.title">Find a lesson for your edit</h3>
+            <ul class="studio-lesson-links">
+              <li><a href="skills.html#sk-pen-pressure" data-i18n="study.pressure">Set up pen pressure</a></li>
+              <li><a href="skills.html#sk-animated-property" data-i18n="study.animated">Keep a material property animated</a></li>
+              <li><a href="skills.html#sk-vrcfury-toggle" data-i18n="study.toggle">Make a VRCFury toggle</a></li>
+              <li><a href="skills.html#sk-build-and-test" data-i18n="study.test">Test an avatar locally</a></li>
+            </ul>
+            <a class="studio-cta" href="learn.html" data-i18n="lb.go">Explore the lessons</a>
+          </header>
+          <figure class="studio-support-media">
+            <a class="studio-tool-shot" href="media/v4/ui-skill-tree-030.webp" target="_blank" rel="noopener"><img src="media/v4/ui-skill-tree-030.webp?v=030-studio-capture-6" width="940" height="542" loading="lazy" decoding="async" alt="Nine chapters in the Unity skill tree, each with its own progress." data-i18n-attr="alt:learn.a.alt"></a>
+          </figure>
+        </article>
+        <article class="studio-learn-card studio-support-card studio-ai">
+          <span id="feature-index-target-ai" class="studio-alias" aria-hidden="true"></span>
+          <header class="studio-support-copy">
+            <h3 data-i18n="learn.b.title">An AI helper, if you want one.</h3>
+            <p data-i18n="learn.b.body">Off by default. Connect your own AI app through MCP for Unity. Its edits appear as undoable AI: steps. You choose whether to share pictures, one at a time or until Unity closes.</p>
+          </header>
+          <figure class="studio-support-media">
+            <a class="studio-tool-shot" href="media/v4/ui-ai-helper-030.webp" target="_blank" rel="noopener"><img src="media/v4/ui-ai-helper-030.webp?v=030-studio-capture-6" width="766" height="640" loading="lazy" decoding="async" alt="The AI helper shows the setup steps, the control set to Off, and what the helper can access." data-i18n-attr="alt:learn.b.alt"></a>
+          </figure>
+        </article>
       </div>
-      <figure class="plate plate--md lb-shot">
-        <picture class="plate-body still">
-          <source media="(max-width: 639px)" type="image/webp" srcset="media/v4/skill-tree-hue.webp" width="306" height="415">
-          <img src="media/v4/skill-tree-tier.webp" width="762" height="152" loading="lazy" decoding="async" alt="A page of the skill tree in Unity. Each skill is a short card that says what the word means, when to use it and what to try." data-i18n-attr="alt:learn.a.alt">
-        </picture>
-      </figure>
-    </div>
-    <div class="learn-b">
-      <figure class="plate plate--sm">
-        <a class="plate-body still shot-link" href="media/v4/ai-helper.webp" target="_blank" rel="noopener">
-          <img src="media/v4/ai-helper.webp" width="800" height="587" loading="lazy" decoding="async" alt="The AI helper window: install steps, an Off, Look only and Look and edit switch set to Off, and the Safe by design list" data-i18n-attr="alt:learn.b.alt">
-        </a>
-      </figure>
-      <div class="learn-text">
-        <h3 data-i18n="learn.b.title">An AI helper, if you want one.</h3>
-        <p data-i18n="learn.b.body">Off by default. Connect your own AI app through MCP for Unity. Its edits show up as undoable AI: steps, and pictures are sent only after you click Allow.</p>
-      </div>
-    </div>
-
-    <details class="all-features" id="all-features">
-      <summary><span data-i18n="tools.all">Every feature, in one list</span></summary>
-      <div class="box-groups">
-        <section><h4 data-i18n="bx.pick.t">Pick and check</h4><ul class="marked" role="list">
-          <li data-i18n="bx.pick.1">Choose a part from a list, or click it on the model</li>
-          <li data-i18n="bx.pick.2">Edit every part that shares a texture together, or just one</li>
-          <li data-i18n="bx.pick.3">Check materials: pink shaders, empty slots, hidden parts too</li>
-          <li data-i18n="bx.pick.4">Fix the image settings it can fix (colour space, normal map type, Crunch) in one click</li>
-          <li data-i18n="bx.pick.5">Picks the part again after Unity restarts</li>
-          <li data-i18n="bx.pick.6">Preview at 512 to 4096 px. Saving is always full size</li>
-        </ul></section>
-        <section><h4 data-i18n="bx.sel.t">Select</h4><ul class="marked" role="list">
-          <li data-i18n="bx.sel.1">Click pieces on the model or on the texture sheet</li>
-          <li data-i18n="bx.sel.2">Shift adds a piece, Ctrl removes one</li>
-          <li data-i18n="bx.sel.3">Selected pieces glow orange, in the Scene view too</li>
-          <li data-i18n="bx.sel.4">Keep any edit inside the pieces you picked</li>
-          <li data-i18n="bx.sel.5">Mirror strokes to the other side of the model</li>
-          <li data-i18n="bx.sel.6">Box, lasso and magic wand, on the texture or in the Scene view</li>
-          <li data-i18n="bx.sel.7">Take a whole part, a UV tile, or grow and shrink a selection</li>
-        </ul></section>
-        <section><h4 data-i18n="bx.col.t">Colour</h4><ul class="marked" role="list">
-          <li data-i18n="bx.col.1">Recolour a whole material through Poiyomi or lilToon, no new PNG</li>
-          <li data-i18n="bx.col.2">One piece at a time, each part keeps its own colour</li>
-          <li data-i18n="bx.col.3">Tint white and grey parts and keep the shading</li>
-          <li data-i18n="bx.col.4">Hue, saturation and brightness bars</li>
-          <li data-i18n="bx.col.5">Copy colouring from another texture or part (Colour Match)</li>
-          <li data-i18n="bx.col.6">Give colour to grey pixels (HSL layer)</li>
-          <li data-i18n="bx.col.7">Recent colours, history and saved swatches</li>
-          <li data-i18n="bx.col.8">Quick material controls for Poiyomi and lilToon, on a copy</li>
-        </ul></section>
-        <section><h4 data-i18n="bx.pnt.t">Paint</h4><ul class="marked" role="list">
-          <li data-i18n="bx.pnt.1">11 brushes: soft, hard, pencil, airbrush, marker and more</li>
-          <li data-i18n="bx.pnt.2">Round, square, bristle and spray tips</li>
-          <li data-i18n="bx.pnt.3">Grain, scatter, jitter and colour variety per stroke</li>
-          <li data-i18n="bx.pnt.4">Blur, smudge and wet-paint colour mixing</li>
-          <li data-i18n="bx.pnt.5">Fill, eraser and an eyedropper</li>
-          <li data-i18n="bx.pnt.6">Gradients: linear, circle and ellipse</li>
-          <li data-i18n="bx.pnt.7">Save your own brushes</li>
-          <li data-i18n="bx.pnt.8">Pen pressure for size and opacity</li>
-        </ul></section>
-        <section><h4 data-i18n="bx.lay.t">Layers</h4><ul class="marked" role="list">
-          <li data-i18n="bx.lay.1">28 blend modes and an opacity for each layer</li>
-          <li data-i18n="bx.lay.2">Clip a layer to the one below it</li>
-          <li data-i18n="bx.lay.3">Layer masks that hide without erasing</li>
-          <li data-i18n="bx.lay.4">Image layers for logos and patterns, tiled if you like</li>
-          <li data-i18n="bx.lay.5">Adjustment layers: levels, curves, gradient map, posterize and more</li>
-          <li data-i18n="bx.lay.6">Hide, reorder, duplicate and delete layers any time</li>
-          <li data-i18n="bx.lay.7">A history list: click a step to go back</li>
-        </ul></section>
-        <section><h4 data-i18n="bx.map.t">Maps and decals</h4><ul class="marked" role="list">
-          <li data-i18n="bx.map.1">Bake ambient occlusion for soft shading in creases</li>
-          <li data-i18n="bx.map.2">Make a normal map from the texture</li>
-          <li data-i18n="bx.map.3">Make a face shadow map</li>
-          <li data-i18n="bx.map.4">Flatten Poiyomi and lilToon decals into one image layer</li>
-        </ul></section>
-        <section><h4 data-i18n="bx.save.t">Save and safety</h4><ul class="marked" role="list">
-          <li data-i18n="bx.save.1">A new PNG and a material copy, never an overwrite</li>
-          <li data-i18n="bx.save.2">Ctrl+Z undoes every edit</li>
-          <li data-i18n="bx.save.3">Layers saved next to the PNG to edit again later</li>
-          <li data-i18n="bx.save.4">Editor only: nothing goes into your upload</li>
-          <li data-i18n="bx.save.5">No telemetry; the update check is opt-in</li>
-          <li data-i18n="bx.save.6">One-click fixes for common problems</li>
-        </ul></section>
-        <section><h4 data-i18n="bx.learn.t">Learn as you go</h4><ul class="marked" role="list">
-          <li data-i18n="bx.learn.1">Simple mode for everyday controls, Advanced for everything</li>
-          <li data-i18n="bx.learn.2">Info icons that explain a control and show you how</li>
-          <li data-i18n="bx.learn.3">A glossary with 41 words, in plain language</li>
-          <li data-i18n="bx.learn.4">A skill tree with 40 skills in 6 tiers</li>
-          <li data-i18n="bx.learn.5">A shortcut list: S, B, E, G, I, X and [ ]</li>
-        </ul></section>
-        <section><h4 data-i18n="bx.ai.t">AI helper (optional)</h4><ul class="marked" role="list">
-          <li data-i18n="bx.ai.1">Off until you switch it on</li>
-          <li data-i18n="bx.ai.2">Look only, or look and edit, with a Stop button</li>
-          <li data-i18n="bx.ai.3">Every change is one undo step named AI</li>
-          <li data-i18n="bx.ai.4">Saving and pictures wait for your Allow</li>
-        </ul></section>
-      </div>
-    </details>
+    </section>
   </div>
-</section>
-
-<section class="sec next-up" data-next="gallery,download" aria-labelledby="next-title">
-  <div class="wrap">
-    <h2 class="next-h" id="next-title"><span data-i18n="next.title">Keep going</span><i class="emo" data-emo="ship_it_go" aria-hidden="true"></i></h2>
-    <div class="next-grid"></div>
-  </div>
-</section>
-
 <section class="sec install" id="install" aria-labelledby="install-title" data-fx>
   <div class="wrap">
-    <div class="inst-head">
-      <p class="tag" data-i18n="nav.get">Get it</p>
-      <h2 class="h-display" id="install-title" data-i18n="final.title" data-emo="avistry_party">Your avatar. Your colours.</h2>
-      <svg class="inst-stroke" viewBox="0 0 600 36" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="s3" pathLength="1" d="M6 26C120 14 230 30 340 21S520 12 594 20"/><path class="s2" pathLength="1" d="M6 22C120 10 230 26 340 17S520 8 594 16"/><path class="s1" pathLength="1" d="M6 18C120 6 230 22 340 13S520 4 594 12"/></svg>
-      <span class="inst-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-      <p class="lead" data-i18n="final.line">Free. Editor only. Your originals stay as they are.</p>
+    <div class="install-invite">
+      <div class="inst-head">
+        <h2 class="h-display" id="install-title" data-i18n="final.title" data-emo="avistry_party">Your avatar. Your colours.</h2>
+        <svg class="inst-stroke" viewBox="0 0 600 36" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="s3" pathLength="1" d="M6 26C120 14 230 30 340 21S520 12 594 20"/><path class="s2" pathLength="1" d="M6 22C120 10 230 26 340 17S520 8 594 16"/><path class="s1" pathLength="1" d="M6 18C120 6 230 22 340 13S520 4 594 12"/></svg>
+        <span class="inst-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>
+      <div class="inst-quick">
+        <a class="btn btn-primary btn-lg" id="btn-vcc" href="vcc://vpm/addRepo?url=https://avistry.github.io/avistry/index.json" data-i18n="cta.vcc">Get it in VCC</a>
+        <a class="btn btn-outline btn-lg" href="download.html"><span data-i18n="dl.all">All download options</span> <svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
+      </div>
+      <p class="vcc-help" id="vcc-help" hidden data-i18n-html="dl.vcchelp">VCC did not open? The <a href="download.html">Download page</a> has the listing URL and the other ways to install.</p>
+      <p class="inst-meta"><span class="tnum" id="inst-version" hidden></span><span class="tnum js-dl-line" hidden><span class="js-dl-total"></span> <span data-i18n="dl.downloads">downloads</span> · </span><a class="js-vt" href="https://github.com/avistry/avistry/releases/latest" rel="noopener" data-i18n="trust.r1">Scanned on VirusTotal</a> <span aria-hidden="true">&middot;</span> <span data-i18n="install.meta">Unity 2022.3 · VRChat avatars</span></p>
+      <div class="share-pc" id="share-pc-box" hidden>
+        <button type="button" class="btn btn-outline btn-lg" id="share-pc" data-share-url="https://avistry.github.io/avistry/" data-i18n="share.btn">Send this link to your PC</button>
+        <p class="small" id="share-pc-note" data-i18n="share.note">Avistry runs in Unity on a PC.</p>
+      </div>
+      <div class="install-samples" aria-hidden="true">
+        <i></i><i></i><i></i>
+      </div>
     </div>
-    <div class="inst-quick">
-      <a class="btn btn-primary btn-lg" id="btn-vcc" href="vcc://vpm/addRepo?url=https://avistry.github.io/avistry/index.json" data-i18n="cta.vcc">Get it in VCC</a>
-      <a class="btn btn-outline btn-lg" href="download.html"><span data-i18n="dl.all">All download options</span> <svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a>
+    <div class="more">
+      <h3 data-i18n="more.title">Want more?</h3>
+      <ul class="more-cards" role="list">
+        <li><a class="more-card" href="learn.html"><span class="mc-t" data-i18n="nav.learn">Learn</span><span class="mc-b" data-i18n="lb.title">Find a lesson for your edit</span></a></li>
+        <li><a class="more-card" href="gallery.html"><span class="mc-t" data-i18n="nav.gallery">Gallery</span><span class="mc-b" data-i18n="more.gallery">Every angle, every look</span></a></li>
+        <li><a class="more-card" href="about.html"><span class="mc-t" data-i18n="nav.about">About</span><span class="mc-b" data-i18n="more.about">Safety, FAQ, how to help</span></a></li>
+      </ul>
     </div>
-    <p class="vcc-help" id="vcc-help" hidden data-i18n-html="dl.vcchelp">VCC did not open? The <a href="download.html">Download page</a> has the listing URL and the other ways to install.</p>
-    <p class="inst-meta"><span class="tnum" id="inst-version" hidden></span><span class="tnum js-dl-line" hidden><span class="js-dl-total"></span> <span data-i18n="dl.downloads">downloads</span> · </span><a class="js-vt" href="https://github.com/avistry/avistry/releases/latest" rel="noopener" data-i18n="trust.r1">Scanned on VirusTotal</a> <span aria-hidden="true">&middot;</span> <span data-i18n="install.meta">Unity 2022.3 · VRChat avatars</span></p>
-    <div class="share-pc" id="share-pc-box" hidden>
-      <button type="button" class="btn btn-outline btn-lg" id="share-pc" data-share-url="https://avistry.github.io/avistry/" data-i18n="share.btn">Send this link to your PC</button>
-      <p class="small" id="share-pc-note" data-i18n="share.note">Avistry runs in Unity on a PC.</p>
-    </div>
-    <dl class="qa">
-      <div><dt data-i18n="qa.1.q">Will it change my original?</dt><dd data-i18n="qa.1.a">No. Saving makes a new PNG and a new material copy.</dd></div>
-      <div><dt data-i18n="qa.2.q">Does it work with Poiyomi and lilToon?</dt><dd data-i18n="qa.2.a">Yes. Selecting and painting work on any shader.</dd></div>
-      <div><dt data-i18n="qa.3.q">Is it free?</dt><dd data-i18n="qa.3.a">Yes. It is free and open source (MIT).</dd></div>
-    </dl>
-    <p class="more-link"><a href="about.html#faq"><span data-i18n="qa.more">More questions</span> <svg class="ic" aria-hidden="true" focusable="false"><use href="#i-arrow"/></svg></a></p>
   </div>
 </section>
 </main>
@@ -684,7 +849,6 @@
       <button type="button" class="theme-toggle" aria-label="Light mode"><svg class="ic ic-sun" aria-hidden="true" focusable="false"><use href="#i-sun"/></svg><svg class="ic ic-moon" aria-hidden="true" focusable="false"><use href="#i-moon"/></svg><span class="theme-text">Light mode</span></button>
       <button type="button" class="perf-toggle" aria-pressed="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/></svg><span data-i18n="skin.perf">Performance mode</span></button>
     </div>
-    <p class="foot-small" data-i18n-html="credit.html">Avatar shown: <a href="https://godfall.club/collections/avatars-assets/products/godmagician" rel="noopener">GodMagician by Godfall</a></p>
     <p class="foot-small" data-i18n="footer.disclaimer">Not affiliated with VRChat Inc., Unity Technologies, Adobe, Poiyomi or lilToon.</p>
   </div>
 </footer>
@@ -696,9 +860,10 @@
 
 <p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
 
-<script src="tour.js" defer></script>
-<script src="paint.js" defer></script>
-<script src="app.js" defer></script>
-<script src="ideas.js" defer></script>
+<script src="tour.js?v=030-paper-3" defer></script>
+<script src="app.js?v=030-studio-capture-6" defer></script>
+<script src="features.js?v=030-studio-capture-6" defer></script>
+<script src="ink-effects.js?v=030-paper-3" defer></script>
+<script src="paint.js?v=030-paper-3" defer></script>
 </body>
 </html>

@@ -2,23 +2,21 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Avistry.Textures
 {
-    /// <summary>
-    /// Scene view picking of real texture colours on any part of the avatar (not the lit colour on screen), used by the
-    /// brush's Scene picker and by Colour Match (pick the material to match, a target colour, or a whole pair).
-    /// </summary>
     partial class AvatarTextureWindow
     {
         struct SceneTexel
         {
-            public Color colour;        // gamma
-            public Material material;   // null when it came from the screen
+            public Color colour;
+            public Material material;
             public Renderer renderer;
-            public bool onTarget;       // on the mesh and material being edited
+            public bool onTarget;
             public bool fromScreen;
-            public Color raw;           // the texture colour before the material's own colour settings (gamma)
+            public bool changedUv;
+            public Color raw;
         }
 
         readonly Dictionary<(int, int, int), MeshUV> _pickMeshes = new Dictionary<(int, int, int), MeshUV>();
@@ -28,15 +26,20 @@ namespace Avistry.Textures
 
         MeshUV PickMesh(Renderer r, int index)
         {
+            MeshUV.PoseSample pose = default;
+            return PickMeshUsingPose(r, index, ref pose);
+        }
+
+        MeshUV PickMeshUsingPose(Renderer r, int index, ref MeshUV.PoseSample pose)
+        {
             Mesh m = MeshOf(r);
             var key = (r.GetInstanceID(), m != null ? m.GetInstanceID() : 0, index);
-            if (_pickMeshes.TryGetValue(key, out var mu)) return mu; // a failed build stays null so it is not retried on every event
-            try { mu = MeshUV.Build(r, index, 0); } catch { mu = null; }
+            if (_pickMeshes.TryGetValue(key, out var mu)) return mu;
+            try { mu = MeshUV.BuildScenePicker(r, m, index, ref pose); } catch { mu = null; }
             _pickMeshes[key] = mu;
             return mu;
         }
 
-        // Drops cached meshes of renderers that no longer exist (the key holds the renderer's instance id).
         void PrunePickMeshes()
         {
             List<(int, int, int)> gone = null;
@@ -47,94 +50,198 @@ namespace Avistry.Textures
         }
 
         readonly List<Renderer> _occluders = new List<Renderer>();
+        readonly List<(Renderer renderer, Bounds? bounds)> _strokeBlockerParts = new List<(Renderer, Bounds?)>();
+        readonly HashSet<MeshUV> _strokeRayPoses = new HashSet<MeshUV>();
+        readonly List<Material> _blockerMaterials = new List<Material>();
+        readonly List<Material> _editedPartMaterials = new List<Material>();
+        bool _strokeRayBatch, _strokeBlockerPartsReady;
+        MaterialPropertyBlock _sceneTileProperties, _sceneCutoutProperties;
+        System.Func<MeshUV.Part, PoiyomiTileDiscard.TriangleFilter> _editedPartTileFilter;
+        System.Func<MeshUV.Part, CullMode> _editedPartCull;
 
-        // Whether the user can see this renderer in the Scene view right now.
         static bool IsDrawn(Renderer r) =>
             r.enabled && r.gameObject.activeInHierarchy && !r.forceRenderingOff
             && r.shadowCastingMode != UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly
-            && !SceneVisibilityManager.instance.IsHidden(r.gameObject)
-            && (Tools.visibleLayers & (1 << r.gameObject.layer)) != 0;
+            && (Tools.visibleLayers & (1 << r.gameObject.layer)) != 0
+            && !SceneVisibilityManager.instance.IsHidden(r.gameObject);
 
-        /// <summary>
-        /// The part of the avatar that hides the spot at distance maxDist along the ray, or null. Only slots that are not
-        /// being edited count. Parts hidden in the Scene view and see-through materials (queue 3000+) are skipped. Known
-        /// limits: cutout materials (hair cards, lashes) cover their empty texels too, and a single-sided face seen from
-        /// behind is ignored, so a mirrored (negative scale) part may not cover.
-        /// </summary>
-        Renderer FrontBlocker(Ray ray, float maxDist)
+        Renderer FrontBlocker(Ray ray, float maxDist, bool reuseStrokeBatch = false)
         {
             Renderer found = null;
-            // Same idea as the slack in "Match on the model", scaled to the avatar so the surface itself never blocks.
             float nearest = maxDist - Mathf.Max(_uv.PosedSize * 0.002f, 1e-4f);
-            foreach (var (r, m, mu) in BlockerSlots())
+            foreach (var (r, mu, tileFilter, cull, cutout) in BlockerSlots(ray, nearest, reuseStrokeBatch))
             {
-                if (!mu.Raycast(ray, out var h)) continue;
-                if (h.backFace && !IsDoubleSided(m)) continue; // culled, the user sees through it
+                if (!mu.RaycastBlocker(ray, out var h, tileFilter, cull, cutout)) continue;
                 float d = Vector3.Distance(ray.origin, h.point);
                 if (d < nearest) { nearest = d; found = r; }
             }
             return found;
         }
 
-        static bool IsDoubleSided(Material m) => m.HasProperty("_Cull") && m.GetInt("_Cull") == 0;
-
-        /// <summary>
-        /// The slots that can cover the edited surface: other parts of the avatar that are drawn and not see-through
-        /// (render queue below 3000), with their posed geometry up to date. One rule for clicks (FrontBlocker) and for the
-        /// Scene Box and Lasso (SceneMarquee), so they can never disagree about what is in front.
-        /// </summary>
-        IEnumerable<(Renderer renderer, Material material, MeshUV mesh)> BlockerSlots()
+        bool BeginStrokeRayBatch()
         {
-            var root = TargetResolver.AvatarRoot(_renderer);
-            if (root == null) yield break;
-            root.GetComponentsInChildren(false, _occluders);
-            PrunePickMeshes();
-            foreach (var r in _occluders)
+            if (_strokeRayBatch) return false;
+            _strokeRayBatch = true;
+            return true;
+        }
+
+        void EndStrokeRayBatch()
+        {
+            _strokeRayBatch = _strokeBlockerPartsReady = false;
+            _strokeBlockerParts.Clear();
+            _strokeRayPoses.Clear();
+        }
+
+        bool NeedsScenePoseRefresh(MeshUV mesh, bool reuseStrokeBatch) =>
+            (!reuseStrokeBatch || _strokeRayPoses.Add(mesh)) && mesh.PoseChanged();
+
+        static bool IsPossibleBlocker(Renderer renderer, SlotIsolation isolated) =>
+            (renderer is SkinnedMeshRenderer || renderer is MeshRenderer) && MeshOf(renderer) != null && IsDrawn(renderer) &&
+            (isolated == null || !isolated.parts.Any(part => part.renderer == renderer));
+
+        static Bounds? StaticBlockerBounds(Renderer renderer)
+        {
+            if (!(renderer is MeshRenderer)) return null;
+            var bounds = renderer.bounds;
+            bounds.Expand(0.002f);
+            return bounds;
+        }
+
+        IEnumerable<(Renderer renderer, MeshUV mesh, PoiyomiTileDiscard.TriangleFilter tileFilter, CullMode cull, SceneCutout cutout)> BlockerSlots(
+            Ray? ray = null, float maxDistance = float.PositiveInfinity, bool reuseStrokeBatch = false)
+        {
+            bool reuse = reuseStrokeBatch && ray.HasValue;
+            SlotIsolation isolated = null;
+            if (!reuse || !_strokeBlockerPartsReady)
             {
-                if (!(r is SkinnedMeshRenderer || r is MeshRenderer) || MeshOf(r) == null || !IsDrawn(r)) continue;
-                var mats = r.sharedMaterials;
-                for (int i = 0; i < mats.Length; i++)
+                var root = TargetResolver.AvatarRoot(_renderer);
+                if (root == null) yield break;
+                root.GetComponentsInChildren(false, _occluders);
+                PrunePickMeshes();
+                isolated = _isolateMaterialSlots && SlotPreviewMatches() ? _slotIsolation : null;
+                if (reuse)
                 {
-                    var m = mats[i];
-                    if (m == null || m.renderQueue >= 3000 || IsEditedSlot(r, i)) continue;
-                    var mu = PickMesh(r, i);
+                    foreach (var renderer in _occluders)
+                        if (IsPossibleBlocker(renderer, isolated)) _strokeBlockerParts.Add((renderer, StaticBlockerBounds(renderer)));
+                    _strokeBlockerPartsReady = true;
+                }
+            }
+
+            int count = reuse ? _strokeBlockerParts.Count : _occluders.Count;
+            for (int part = 0; part < count; part++)
+            {
+                var r = reuse ? _strokeBlockerParts[part].renderer : _occluders[part];
+                if (!reuse && !IsPossibleBlocker(r, isolated)) continue;
+                var bounds = ray.HasValue ? (reuse ? _strokeBlockerParts[part].bounds : StaticBlockerBounds(r)) : null;
+                if (bounds.HasValue && (!bounds.Value.IntersectRay(ray.Value, out float distance) || distance > maxDistance)) continue;
+                r.GetSharedMaterials(_blockerMaterials);
+                bool mirrored = r.localToWorldMatrix.determinant < 0f;
+                MeshUV.PoseSample pose = default;
+                for (int i = 0; i < _blockerMaterials.Count; i++)
+                {
+                    var m = _blockerMaterials[i];
+                    if (m == null || m.renderQueue >= 3000 || (IsEditedSlot(r, i) && _uv?.SlotMissingUv(r, i) != true)) continue;
+                    var mu = PickMeshUsingPose(r, i, ref pose);
                     if (mu == null) continue;
-                    if (mu.PoseChanged()) mu.RefreshPose();
-                    yield return (r, m, mu);
+                    var tileFilter = ReadTileFilter(mu, mu.parts[0], m);
+                    if (tileFilter.AllDiscarded) continue;
+                    if (NeedsScenePoseRefresh(mu, reuse)) mu.RefreshPoseUsing(ref pose);
+                    var cutout = SceneCutout.Read(r, i, m, ref _sceneCutoutProperties);
+                    yield return (r, mu, tileFilter, SceneMarquee.WindingCull(MaterialCullMode(m), mirrored), cutout);
                 }
             }
         }
 
-        /// <summary>
-        /// The edited surface under a Scene ray, only when nothing else on the avatar is in front of it. When another part
-        /// covers the spot, returns false with coveredBy set (a plain miss leaves it null). Used on clicks only.
-        /// </summary>
-        bool RaycastVisible(Ray ray, out MeshUV.SurfaceHit hit, out Renderer coveredBy)
+        PoiyomiTileDiscard.TriangleFilter ReadTileFilter(MeshUV mesh, MeshUV.Part part, Material material) =>
+            material != null && PoiyomiTileDiscard.TryRead(part.renderer, part.materialSlot, material, ref _sceneTileProperties,
+                out int channel, out int discarded) ? mesh.TileDiscardFilter(part, channel, discarded) : default;
+
+        PoiyomiTileDiscard.TriangleFilter EditedPartTileFilter(MeshUV.Part part)
+        {
+            part.renderer.GetSharedMaterials(_editedPartMaterials);
+            return (uint)part.materialSlot < (uint)_editedPartMaterials.Count
+                ? ReadTileFilter(_uv, part, _editedPartMaterials[part.materialSlot]) : default;
+        }
+
+        CullMode EditedPartCull(MeshUV.Part part)
+        {
+            part.renderer.GetSharedMaterials(_editedPartMaterials);
+            if ((uint)part.materialSlot >= (uint)_editedPartMaterials.Count) return CullMode.Off;
+            var material = _editedPartMaterials[part.materialSlot];
+            if (material == null) return CullMode.Off;
+            var shader = material.shader;
+            bool knownStandard = shader != null && (shader.name == "Standard" || shader.name == "Standard (Specular setup)");
+            if (!knownStandard && !CullProperties.Any(material.HasProperty)) return CullMode.Off;
+            return SceneMarquee.WindingCull(MaterialCullMode(material), part.renderer.localToWorldMatrix.determinant < 0f);
+        }
+
+        bool RaycastVisible(Ray ray, out MeshUV.SurfaceHit hit, out Renderer coveredBy) =>
+            RaycastVisibleWithUvStatus(ray, out hit, out coveredBy, out _);
+
+        bool RaycastVisibleWithUvStatus(Ray ray, out MeshUV.SurfaceHit hit, out Renderer coveredBy, out bool changedUv,
+            bool respectEditedCulling = false) =>
+            RaycastVisibleCore(ray, out hit, out coveredBy, out changedUv, false, respectEditedCulling);
+
+        bool RaycastVisibleForStroke(Ray ray, out MeshUV.SurfaceHit hit, out Renderer coveredBy, bool reuseStrokeBatch) =>
+            RaycastVisibleCore(ray, out hit, out coveredBy, out _, reuseStrokeBatch && _strokeRayBatch, respectEditedCulling: true);
+
+        bool RaycastVisibleCore(Ray ray, out MeshUV.SurfaceHit hit, out Renderer coveredBy, out bool changedUv,
+            bool reuseStrokeBatch, bool respectEditedCulling = false)
         {
             coveredBy = null;
-            if (_uv.PoseChanged()) _uv.RefreshPose();
-            if (!_uv.Raycast(ray, out hit)) return false;
-            coveredBy = FrontBlocker(ray, Vector3.Distance(ray.origin, hit.point));
+            hit = default;
+            changedUv = false;
+            var mesh = _uv;
+            if (mesh == null) return false;
+            if (_strokeRayBatch && !reuseStrokeBatch) _strokeRayPoses.Clear();
+            if (NeedsScenePoseRefresh(mesh, reuseStrokeBatch)) mesh.RefreshPose();
+            var partCull = respectEditedCulling ? (_editedPartCull ??= EditedPartCull) : null;
+            if (!mesh.RaycastScene(ray, out hit, part => IsDrawn(part.renderer), _editedPartTileFilter ??= EditedPartTileFilter, partCull)) return false;
+            if (_alsoUsers.Count > 0 && !IncludedHitUsesCurrentUv(mesh.PartOfTriangle(hit.triangle)))
+            {
+                changedUv = true;
+                return false;
+            }
+            coveredBy = FrontBlocker(ray, Vector3.Distance(ray.origin, hit.point), reuseStrokeBatch);
             return coveredBy == null;
+        }
+
+        bool IncludedHitUsesCurrentUv(MeshUV.Part part)
+        {
+            var slot = CurrentSlot;
+            if (part == null || slot == null) return false;
+            foreach (var user in _alsoUsers)
+            {
+                if (user.slot.renderer != part.renderer || user.slot.materialIndex != part.materialSlot) continue;
+                if (TargetResolver.GetSharedMesh(part.renderer) != part.mesh || !TextureUserStillAssigned(user, slot.texture))
+                    return false;
+                bool boundChannel = TryGetIncludedUvChannel(part.renderer, part.materialSlot, slot.texture, out _);
+                var actualChannel = TargetResolver.CommonUvChannel(user.material, user.properties);
+                return actualChannel.HasValue ? actualChannel.Value == part.uvChannel : !boundChannel;
+            }
+            return true;
+        }
+
+        bool SceneTriangleUsesCurrentUv(int triangle) =>
+            _alsoUsers.Count == 0 || IncludedHitUsesCurrentUv(_uv?.PartOfTriangle(triangle));
+
+        bool SceneSlotUsesCurrentUv(Renderer renderer, int materialIndex)
+        {
+            if (!_alsoUsers.Any(user => user.slot.renderer == renderer && user.slot.materialIndex == materialIndex)) return true;
+            return IncludedHitUsesCurrentUv(_uv?.parts.Find(part => part.renderer == renderer && part.materialSlot == materialIndex));
         }
 
         static string CoveredMessage(Renderer r) => Loc.F("Another part covers that spot ({0}). Click a spot you can see.", r.name);
 
-        /// <summary>
-        /// The texture colour under the mouse. On the texture being edited: the original colour (originalOnTarget) or the
-        /// edited one. On any other part: that material's main texture times its colour. Elsewhere: the screen pixel.
-        /// </summary>
         bool PickSceneTexel(Event e, bool targetOnly, bool originalOnTarget, out SceneTexel t)
         {
             t = new SceneTexel();
             var ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
             var th = new MeshUV.SurfaceHit();
             bool onTarget = false;
-            if (_uv != null && _comp != null)
-            {
-                if (_uv.PoseChanged()) _uv.RefreshPose();
-                onTarget = _uv.Raycast(ray, out th);
-            }
+            if (_uv != null && _comp != null && !SceneTargetOutsideCurrentStage)
+                onTarget = RaycastVisibleWithUvStatus(ray, out th, out _, out t.changedUv);
+            if (t.changedUv) return false;
             float targetDist = onTarget ? Vector3.Distance(ray.origin, th.point) : float.MaxValue;
 
             Renderer best = null;
@@ -167,16 +274,21 @@ namespace Avistry.Textures
                     ? _comp.Sample(Compositor.PickSource.Original, th.uv, 1, null, _uv, out _)
                     : _comp.SampleResult(th.uv);
                 t.material = _material;
-                t.renderer = RendererOfHit(th); // the target or an included mesh
+                t.renderer = RendererOfHit(th);
                 t.onTarget = true;
                 return true;
             }
             if (targetOnly) return false;
             if (best != null)
             {
+                if (!SceneSlotUsesCurrentUv(best, bestIdx))
+                {
+                    t.changedUv = true;
+                    return false;
+                }
                 var m = best.sharedMaterials[bestIdx];
                 t.raw = MaterialTexel(m, bh.uv);
-                t.colour = MaterialLook.Texel(m, bh.uv); // as the material shows it (tint, HSV, gradation, layers…)
+                t.colour = MaterialLook.Texel(m, bh.uv);
                 t.material = m;
                 t.renderer = best;
                 return true;
@@ -189,7 +301,6 @@ namespace Avistry.Textures
             return true;
         }
 
-        /// <summary>", texture #RRGGBB" when the material shows the texture in a different colour (else empty).</summary>
         static string RawNote(SceneTexel t)
         {
             if (t.material == null || t.onTarget) return "";
@@ -198,7 +309,6 @@ namespace Avistry.Textures
             return same ? "" : Loc.F(", as its material shows it; the texture itself is #{0}", ColorUtility.ToHtmlStringRGB(a));
         }
 
-        /// <summary>A material's main texture (with its tiling) times its colour at a mesh UV, as gamma values.</summary>
         static Color MaterialTexel(Material m, Vector2 uv)
         {
             var c = Color.white;
@@ -212,7 +322,7 @@ namespace Avistry.Textures
                 var rt = RenderTexture.GetTemporary(1, 1, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
                 try
                 {
-                    Graphics.Blit(tex, rt, Vector2.zero, u); // scale 0: every pixel samples the texture at u
+                    Graphics.Blit(tex, rt, Vector2.zero, u);
                     RenderTexture.active = rt;
                     var read = new Texture2D(1, 1, TextureFormat.RGBA32, false, false);
                     read.ReadPixels(new Rect(0, 0, 1, 1), 0, 0, false);
@@ -293,14 +403,16 @@ namespace Avistry.Textures
             bool targetOnly = _matchPick == MatchPick.PairFrom;
             if (!PickSceneTexel(e, targetOnly, true, out var t))
             {
-                Toast(_renderer != null ? Loc.F("Click on {0} itself (it's the texture whose colour changes).", _renderer.name) : Loc.T("Click on the mesh you're editing itself (it's the texture whose colour changes)."), MessageType.Info, 4f);
+                string hint = t.changedUv ? IncludedUvChangedHint : _renderer != null
+                    ? Loc.F("Click on {0} itself (it's the texture whose colour changes).", _renderer.name)
+                    : Loc.T("Click on the mesh you're editing itself (it's the texture whose colour changes).");
+                Toast(hint, MessageType.Info, 4f);
                 return;
             }
             ApplyMatchPick(layer, t);
             sv.Repaint();
         }
 
-        /// <summary>Texture view click while a Colour Match pick is waiting: picks this texture's own (original) colour.</summary>
         bool HandleCanvasMatchPick(Vector2 uv)
         {
             if (_matchPick == MatchPick.None || _comp == null) return false;
@@ -321,7 +433,6 @@ namespace Avistry.Textures
             return true;
         }
 
-        /// <summary>What a Colour Match pick does, from the Scene view or the texture view.</summary>
         void ApplyMatchPick(ColourMatchLayer layer, SceneTexel t)
         {
             string hex = "#" + ColorUtility.ToHtmlStringRGB(t.colour);
